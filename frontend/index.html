@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=3.0.0">
 </head>
 <body>
   <!-- Offline banner -->
@@ -140,6 +140,10 @@
         <span class="tab-icon">✅</span>
         <span class="tab-label">Задачи</span>
       </button>
+      <button class="tab-btn" data-tab="fitness" role="tab" aria-selected="false">
+        <span class="tab-icon">🏃</span>
+        <span class="tab-label">Спорт</span>
+      </button>
       <button class="tab-btn" data-tab="media" role="tab" aria-selected="false">
         <span class="tab-icon">🎬</span>
         <span class="tab-label">Медиа</span>
@@ -159,10 +163,6 @@
       <button class="tab-btn" data-tab="agent" role="tab" aria-selected="false">
         <span class="tab-icon">🔍</span>
         <span class="tab-label">Поиск</span>
-      </button>
-      <button class="tab-btn" data-tab="fitness" role="tab" aria-selected="false">
-        <span class="tab-icon">🏃</span>
-        <span class="tab-label">Спорт</span>
       </button>
       <button class="tab-btn hidden" id="tab-btn-hospitality" data-tab="hospitality" role="tab" aria-selected="false">
         <span class="tab-icon">🏨</span>
@@ -526,6 +526,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=3.0.0"></script>
 </body>
 </html>

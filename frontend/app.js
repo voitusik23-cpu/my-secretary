@@ -13,12 +13,28 @@ const state = {
   recordStartTime: null,
 };
 
-// --- Service Worker Registration ---
+// --- Service Worker Registration with Auto-Update ---
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch((err) => {
-      console.warn("ServiceWorker registration failed:", err);
-    });
+    navigator.serviceWorker
+      .register("/sw.js?v=3.0.0")
+      .then((reg) => {
+        reg.update();
+        reg.addEventListener("updatefound", () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener("statechange", () => {
+              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                console.log("[PWA] New version installed! Reloading for latest features...");
+                window.location.reload();
+              }
+            });
+          }
+        });
+      })
+      .catch((err) => {
+        console.warn("ServiceWorker registration failed:", err);
+      });
   });
 }
 
