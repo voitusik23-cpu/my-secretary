@@ -2,12 +2,18 @@
 .env
 .env.local
 *.env
+service_account.json
+*.pem
+*.key
+*.crt
 
-# SQLite Database
+# SQLite Database & Persistent Data
 *.db
 *.db-journal
 *.sqlite3
 secretary.db
+data/
+secretary_data/
 
 # Python & Virtual Environments
 venv/

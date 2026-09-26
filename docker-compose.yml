@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  secretary:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: secretary-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Store persistent encrypted SQLite database in the /data volume
+      - DATABASE_URL=sqlite:////data/secretary.db
+      - HOST=0.0.0.0
+      - PORT=8000
+    volumes:
+      # Named volume for persistent database storage across container rebuilds
+      - secretary_data:/data
+      # Mount host backups folder for local snapshot archives
+      - ./backups:/app/backups
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Zero-config Cloudflare Remote Tunnel for HTTPS on iPhone / Safari
+  # To run with tunnel: docker compose --profile remote up -d
+  cloudflared:
+    profiles: ["remote"]
+    image: cloudflare/cloudflared:latest
+    container_name: secretary-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - secretary
+
+volumes:
+  secretary_data:
+    name: secretary_data_volume

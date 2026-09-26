@@ -1,10 +1,12 @@
 import os
+import time
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from sqlalchemy import text
 from app.config import settings
 from app.database import init_db
 from app.services.crypto import get_fernet
@@ -38,10 +40,13 @@ async def lifespan(app: FastAPI):
         backup_task.cancel()
 
 
+START_TIME = time.time()
+
+
 app = FastAPI(
     title="Мой Секретарь (My Secretary)",
     description="Автономный персональный AI-секретарь на FastAPI и Google Gemini",
-    version="3.0.0",
+    version="3.1.0",
     lifespan=lifespan,
 )
 
@@ -77,29 +82,61 @@ api_v1.include_router(system_router)
 if settings.ENABLE_HOSPITALITY:
     api_v1.include_router(hospitality_router)
 
-app.mount("/api/v1", api_v1)
-app.mount("/api", api_v1)
-
-
-@app.get("/health")
-def health_check():
+# Healthcheck endpoint (database status, active modules, uptime)
+def get_system_health():
     """
-    Проверка работоспособности системы и статуса конфигурации.
+    Комплексна перевірка працездатності: статус бази даних, список активних модулів, uptime.
     """
-    has_gemini = bool(settings.GEMINI_API_KEY)
-    has_secret = bool(settings.SECRET_KEY)
-    has_encryption = get_fernet() is not None
+    db_connected = False
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_connected = True
+    except Exception:
+        db_connected = False
+
+    active_modules = [
+        "finance",
+        "shopping",
+        "tasks",
+        "media_notes",
+        "inventory",
+        "auto",
+        "utilities",
+        "fitness",
+        "web_agent",
+        "gemini_router",
+        "system_backup",
+    ]
+    if settings.ENABLE_HOSPITALITY:
+        active_modules.append("hospitality")
+
+    uptime = round(time.time() - START_TIME, 1)
+    status_code = "online" if db_connected else "degraded"
 
     return {
-        "status": "online",
+        "status": status_code,
         "app": "Мой Секретарь",
         "version": app.version,
+        "uptime_seconds": uptime,
+        "database_connected": db_connected,
+        "active_modules": active_modules,
         "features": {
-            "gemini_configured": has_gemini,
-            "secret_key_protection": has_secret,
-            "database_encryption": has_encryption,
-        }
+            "gemini_configured": bool(settings.GEMINI_API_KEY),
+            "secret_key_protection": bool(settings.SECRET_KEY),
+            "database_encryption": get_fernet() is not None,
+            "hospitality_module": settings.ENABLE_HOSPITALITY,
+            "nightly_gdrive_backup": True,
+        },
     }
+
+
+# Register healthcheck on API v1 and root app
+api_v1.add_api_route("/health", get_system_health, methods=["GET"], tags=["System & Health"])
+app.add_api_route("/health", get_system_health, methods=["GET"], tags=["System & Health"])
+
+app.mount("/api/v1", api_v1)
+app.mount("/api", api_v1)
 
 
 # Static files and frontend PWA mount

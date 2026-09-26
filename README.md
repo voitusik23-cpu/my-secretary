@@ -204,3 +204,41 @@ my-secretary/
 ./rollback.sh
 ```
 Скрипт предложит откатить код назад на один шаг и (по желанию) восстановить базу данных из резервной копии.
+
+---
+
+## 🐳 Запуск через Production Docker
+
+Для развёртывания в изолированном контейнере с постоянным томом данных `/data`:
+
+```bash
+# 1. Запуск контейнера в фоне
+docker compose up -d
+
+# 2. Проверка состояния и здоровья системы
+curl http://localhost:8000/api/v1/health
+
+# 3. Остановка
+docker compose down
+```
+
+База данных SQLite сохраняется в именованный том `secretary_data_volume`, а локальные снимки синхронизируются с папкой `./backups`.
+
+---
+
+## 🌐 Удалённый доступ по HTTPS (iPhone / Safari Voice)
+
+Safari на iOS требует **HTTPS** для доступа к микрофону и распознаванию речи:
+
+1. **Быстрый туннель Cloudflare (30 секунд):**
+   ```bash
+   brew install cloudflared
+   cloudflared tunnel --url http://localhost:8000
+   ```
+2. Откройте полученную ссылку `https://...trycloudflare.com` в Safari на iPhone.
+3. Нажмите **Поделиться** → **На экран «Домой»** для установки полноценного PWA-приложения.
+4. Введите `SECRET_KEY` в настройках приложения (⚙️).
+
+Подробные инструкции по настройке собственного домена и локального SSL смотрите в [`docs/REMOTE_ACCESS.md`](file:///docs/REMOTE_ACCESS.md).
+Архитектурные правила и стандарты разработки описаны в [`docs/ARCHITECTURE.md`](file:///docs/ARCHITECTURE.md).
+
