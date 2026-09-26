@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.0.0")
+      .register("/sw.js?v=3.1.2")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -559,6 +559,9 @@ async function loadMedia() {
       .join("");
   } catch {
     list.innerHTML = `<div class="empty-state"><p>Ошибка загрузки заметок</p></div>`;
+  }
+}
+
 // 6. Inventory (Where is what)
 async function loadInventory() {
   const list = document.getElementById("inventory-list");
@@ -974,17 +977,28 @@ function initSettingsModal() {
   const secretInput = document.getElementById("secret-key-input");
   const resultText = document.getElementById("settings-test-result");
 
-  openBtn.addEventListener("click", () => {
-    serverInput.value = state.serverUrl;
-    secretInput.value = state.secretKey;
-    resultText.textContent = "";
-    loadBackupStatus();
-    modal.classList.remove("hidden");
-  });
+  if (openBtn) {
+    openBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      modal.classList.remove("hidden");
+      serverInput.value = state.serverUrl;
+      secretInput.value = state.secretKey;
+      resultText.textContent = "";
+      try {
+        loadBackupStatus();
+      } catch (err) {
+        console.warn("loadBackupStatus error:", err);
+      }
+    });
+  }
 
   document.getElementById("trigger-cloud-backup-btn")?.addEventListener("click", triggerCloudBackup);
 
-  closeBtn.addEventListener("click", () => modal.classList.add("hidden"));
+  closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
+
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
+  });
 
   saveBtn.addEventListener("click", () => {
     state.serverUrl = serverInput.value.trim() || window.location.origin;

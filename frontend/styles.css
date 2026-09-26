@@ -157,17 +157,28 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   color: var(--text-muted);
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  z-index: 10;
   transition: all 0.2s ease;
 }
 
-.icon-btn:hover {
+.icon-btn svg {
+  pointer-events: none;
+}
+
+.icon-btn:hover,
+.icon-btn:active {
   background: var(--bg-card-hover);
   color: var(--text-main);
 }
