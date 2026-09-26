@@ -40,3 +40,8 @@ wheels/
 .vscode/
 *.swp
 *.swo
+
+# Backups
+backups/
+*.bak
+*.backup
