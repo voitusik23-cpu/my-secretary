@@ -1,0 +1,239 @@
+from datetime import datetime
+from typing import Optional, Dict, Any, List
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+from sqlalchemy import desc
+from app.database import get_db
+from app.auth import verify_secret_key
+from app.services.ai_parser import parse_with_gemini
+from app.models.finance import FinanceRecord, FinanceResponse
+from app.models.shopping import ShoppingItem, ShoppingResponse
+from app.models.tasks import Task, TaskResponse
+from app.models.media_notes import MediaNote, MediaNoteResponse
+from app.services.currency import get_usd_uah_rate
+
+router = APIRouter(prefix="", tags=["Process & Feed"], dependencies=[Depends(verify_secret_key)])
+
+
+class ProcessTextRequest(BaseModel):
+    text: str = Field(..., description="Голосовая расшифровка или текст команды")
+
+
+def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str, List[Any]]:
+    """
+    Сохраняет извлеченные AI действия в соответствующие таблицы базы данных.
+    """
+    created_items: Dict[str, List[Any]] = {
+        "finance": [],
+        "shopping": [],
+        "tasks": [],
+        "media_notes": [],
+    }
+
+    for action in actions:
+        domain = action.get("domain")
+        data = action.get("data", {})
+        if not data:
+            continue
+
+        try:
+            if domain == "finance":
+                amount = float(data.get("amount", 0))
+                if amount > 0:
+                    rec = FinanceRecord(
+                        amount=amount,
+                        currency=(data.get("currency") or "UAH").upper(),
+                        category=data.get("category", "Різне"),
+                        type=data.get("type", "expense"),
+                        description=data.get("description"),
+                        date=datetime.utcnow(),
+                    )
+                    db.add(rec)
+                    db.flush()
+                    created_items["finance"].append(FinanceResponse.model_validate(rec).model_dump())
+
+            elif domain == "shopping":
+                item_name = data.get("item", "").strip()
+                if item_name:
+                    item = ShoppingItem(
+                        item=item_name,
+                        category=data.get("category", "Продукты"),
+                        quantity=data.get("quantity", "1 шт"),
+                        is_purchased=False,
+                        notes=data.get("notes"),
+                    )
+                    db.add(item)
+                    db.flush()
+                    created_items["shopping"].append(ShoppingResponse.model_validate(item).model_dump())
+
+            elif domain == "tasks":
+                title = data.get("title", "").strip()
+                if title:
+                    due_date = None
+                    raw_date = data.get("due_date")
+                    if raw_date:
+                        try:
+                            due_date = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
+                        except Exception:
+                            due_date = None
+
+                    task = Task(
+                        title=title,
+                        description=data.get("description"),
+                        due_date=due_date,
+                        priority=data.get("priority", "medium"),
+                        category=data.get("category", "Личное"),
+                        is_completed=False,
+                    )
+                    db.add(task)
+                    db.flush()
+                    created_items["tasks"].append(TaskResponse.model_validate(task).model_dump())
+
+            elif domain == "media_notes":
+                title = data.get("title", "").strip()
+                if title:
+                    note = MediaNote(
+                        title=title,
+                        type=data.get("type", "note"),
+                        url=data.get("url"),
+                        author_creator=data.get("author_creator"),
+                        comment=data.get("comment"),
+                        status=data.get("status", "to_review"),
+                        rating=data.get("rating"),
+                    )
+                    db.add(note)
+                    db.flush()
+                    created_items["media_notes"].append(MediaNoteResponse.model_validate(note).model_dump())
+
+        except Exception as e:
+            # Не падаем на одном битом элементе
+            continue
+
+    db.commit()
+    return created_items
+
+
+@router.post("/process", status_code=status.HTTP_200_OK)
+async def process_text_input(payload: ProcessTextRequest, db: Session = Depends(get_db)):
+    """
+    Принимает текст, анализирует через Gemini AI и распределяет по категориям.
+    """
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Текст запроса не может быть пустым")
+
+    parsed = await parse_with_gemini(text=text)
+    actions = parsed.get("actions", [])
+    created = _save_parsed_actions(actions, db)
+
+    return {
+        "status": "success",
+        "summary": parsed.get("summary", "Запись обработана"),
+        "transcription": parsed.get("transcription", text),
+        "actions_count": len(actions),
+        "created": created,
+    }
+
+
+@router.post("/process/audio", status_code=status.HTTP_200_OK)
+async def process_audio_input(
+    audio: UploadFile = File(..., description="Аудиофайл голосовой заметки"),
+    text: Optional[str] = Form(None, description="Дополнительный текстовый контекст"),
+    db: Session = Depends(get_db),
+):
+    """
+    Принимает аудиозапись (m4a, webm, mp3, wav и т.д.), распознает и сохраняет действия.
+    """
+    audio_bytes = await audio.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Файл аудио пустой")
+
+    mime_type = audio.content_type or "audio/webm"
+    parsed = await parse_with_gemini(text=text, audio_bytes=audio_bytes, mime_type=mime_type)
+    actions = parsed.get("actions", [])
+    created = _save_parsed_actions(actions, db)
+
+    return {
+        "status": "success",
+        "summary": parsed.get("summary", "Голосовая заметка сохранена"),
+        "transcription": parsed.get("transcription", "Голосовое сообщение"),
+        "actions_count": len(actions),
+        "created": created,
+    }
+
+
+@router.get("/feed", status_code=status.HTTP_200_OK)
+def get_unified_feed(db: Session = Depends(get_db), limit: int = 40):
+    """
+    Возвращает единую ленту последних действий со всех 4 категорий в хронологическом порядке.
+    """
+    feed = []
+
+    # 1. Finance
+    usd_rate = get_usd_uah_rate()
+    fin_records = db.query(FinanceRecord).order_by(desc(FinanceRecord.date)).limit(limit // 2).all()
+    for f in fin_records:
+        curr = (f.currency or "UAH").upper()
+        sign = '-' if f.type == 'expense' else '+'
+        if curr == "UAH":
+            usd_equiv = round(f.amount / usd_rate, 2) if usd_rate > 0 else 0
+            title_text = f"{sign}{f.amount} ₴ (~${usd_equiv}) • {f.category}"
+        elif curr == "USD":
+            uah_equiv = round(f.amount * usd_rate, 2)
+            title_text = f"{sign}${f.amount} (~{uah_equiv} ₴) • {f.category}"
+        else:
+            title_text = f"{sign}{f.amount} {curr} • {f.category}"
+
+        feed.append({
+            "domain": "finance",
+            "id": f.id,
+            "title": title_text,
+            "subtitle": f.description or f"Операція: {f.type}",
+            "created_at": f.date.isoformat(),
+            "badge": f.category,
+            "is_positive": f.type == "income",
+        })
+
+    # 2. Shopping
+    shop_items = db.query(ShoppingItem).order_by(desc(ShoppingItem.created_at)).limit(limit // 2).all()
+    for s in shop_items:
+        feed.append({
+            "domain": "shopping",
+            "id": s.id,
+            "title": f"{s.item} ({s.quantity})",
+            "subtitle": s.notes or f"Категория: {s.category}",
+            "created_at": s.created_at.isoformat(),
+            "badge": s.category,
+            "is_completed": s.is_purchased,
+        })
+
+    # 3. Tasks
+    task_items = db.query(Task).order_by(desc(Task.created_at)).limit(limit // 2).all()
+    for t in task_items:
+        feed.append({
+            "domain": "tasks",
+            "id": t.id,
+            "title": t.title,
+            "subtitle": t.description or (f"Срок: {t.due_date.strftime('%d.%m %H:%M')}" if t.due_date else "Без срока"),
+            "created_at": t.created_at.isoformat(),
+            "badge": f"Приоритет: {t.priority}",
+            "is_completed": t.is_completed,
+        })
+
+    # 4. Media
+    media_items = db.query(MediaNote).order_by(desc(MediaNote.created_at)).limit(limit // 2).all()
+    for m in media_items:
+        feed.append({
+            "domain": "media_notes",
+            "id": m.id,
+            "title": f"[{m.type}] {m.title}",
+            "subtitle": m.author_creator or m.comment or "Без описания",
+            "created_at": m.created_at.isoformat(),
+            "badge": m.status,
+            "url": m.url,
+        })
+
+    # Сортировка по дате добавления (новые сверху)
+    feed.sort(key=lambda x: x["created_at"], reverse=True)
+    return feed[:limit]

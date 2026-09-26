@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Мой Секретарь</title>
+  
+  <!-- PWA & Mobile Meta -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#090d16">
+  <meta name="color-scheme" content="dark light">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Секретарь">
+  <link rel="apple-touch-icon" href="/static/icons/icon.svg">
+  <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
+
+  <!-- FOUC prevention inline script -->
+  <script>
+    {
+      const savedTheme = localStorage.getItem("theme");
+      if (savedTheme) {
+        document.documentElement.setAttribute("data-theme", savedTheme);
+      } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+        document.documentElement.setAttribute("data-theme", "light");
+      } else {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    }
+  </script>
+
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <!-- Offline banner -->
+  <div id="offline-banner" class="offline-banner hidden">
+    <span>⚠️ Автономный режим. Подключение отсутствует.</span>
+  </div>
+
+  <div class="app-container">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Мой Секретарь</h1>
+          <span id="connection-status" class="status-indicator">● В сети</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="theme-toggle-btn" class="icon-btn" title="Переключить тему" aria-label="Сменить тему">
+          <svg class="sun-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+        <button id="settings-open-btn" class="icon-btn" title="Настройки" aria-label="Настройки">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Voice & Quick Ingest Section -->
+    <section class="voice-hero">
+      <div class="mic-container">
+        <div class="mic-pulse-ring" id="pulse-ring"></div>
+        <button id="mic-btn" class="mic-button" aria-label="Записать голос">
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="voice-status">
+        <p id="voice-status-text" class="status-text">Нажмите и говорите или введите текст</p>
+        <span id="recording-timer" class="recording-timer hidden">00:00</span>
+      </div>
+
+      <!-- Quick Text Input -->
+      <form id="text-input-form" class="quick-input-form">
+        <input 
+          type="text" 
+          id="text-input" 
+          placeholder="«Купив каву за 75 грн», «Нагадай завтра о 12:00...»" 
+          autocomplete="off"
+        />
+        <button type="submit" id="send-btn" class="send-btn" aria-label="Отправить">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+
+      <!-- Feedback / Result Toast -->
+      <div id="result-toast" class="result-toast hidden">
+        <div class="toast-content">
+          <span class="toast-icon">✨</span>
+          <p id="toast-message">Действие обработано</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="nav-tabs" role="tablist">
+      <button class="tab-btn active" data-tab="feed" role="tab" aria-selected="true">
+        <span class="tab-icon">⚡</span>
+        <span class="tab-label">Лента</span>
+      </button>
+      <button class="tab-btn" data-tab="finance" role="tab" aria-selected="false">
+        <span class="tab-icon">💰</span>
+        <span class="tab-label">Финансы</span>
+      </button>
+      <button class="tab-btn" data-tab="shopping" role="tab" aria-selected="false">
+        <span class="tab-icon">🛒</span>
+        <span class="tab-label">Покупки</span>
+      </button>
+      <button class="tab-btn" data-tab="tasks" role="tab" aria-selected="false">
+        <span class="tab-icon">✅</span>
+        <span class="tab-label">Задачи</span>
+      </button>
+      <button class="tab-btn" data-tab="media" role="tab" aria-selected="false">
+        <span class="tab-icon">🎬</span>
+        <span class="tab-label">Медиа</span>
+      </button>
+      <button class="tab-btn" data-tab="inventory" role="tab" aria-selected="false">
+        <span class="tab-icon">📦</span>
+        <span class="tab-label">Инвентарь</span>
+      </button>
+      <button class="tab-btn" data-tab="auto" role="tab" aria-selected="false">
+        <span class="tab-icon">🚗</span>
+        <span class="tab-label">Гараж</span>
+      </button>
+      <button class="tab-btn" data-tab="utilities" role="tab" aria-selected="false">
+        <span class="tab-icon">💡</span>
+        <span class="tab-label">Счетчики</span>
+      </button>
+      <button class="tab-btn" data-tab="agent" role="tab" aria-selected="false">
+        <span class="tab-icon">🔍</span>
+        <span class="tab-label">Поиск</span>
+      </button>
+    </nav>
+
+    <!-- Tab Panels Container -->
+    <main class="tab-panels">
+      <!-- 1. FEED TAB -->
+      <section id="tab-feed" class="tab-panel active">
+        <div class="panel-header">
+          <h2>Последние записи</h2>
+          <button id="refresh-feed-btn" class="text-btn">Обновить</button>
+        </div>
+        <div id="feed-list" class="items-list">
+          <div class="empty-state">
+            <span class="empty-icon">🎙️</span>
+            <p>Записей пока нет. Нажмите микрофон и скажите, что записать!</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. FINANCE TAB -->
+      <section id="tab-finance" class="tab-panel">
+        <div class="panel-header">
+          <h2>Облік фінансів</h2>
+          <div class="panel-actions">
+            <span id="nbu-rate-badge" class="item-badge badge-finance positive">🇺🇦 1$ = 44.8 ₴</span>
+            <button id="add-finance-btn" class="action-btn-sm">+ Запис</button>
+          </div>
+        </div>
+
+        <!-- Finance Stats Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">Сьогодні витрати</span>
+            <span id="stat-expense-today" class="stat-val expense">0 ₴</span>
+            <span id="stat-expense-today-usd" class="stat-subval">~$0.00</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">У цьому місяці</span>
+            <span id="stat-expense-month" class="stat-val expense">0 ₴</span>
+            <span id="stat-expense-month-usd" class="stat-subval">~$0.00</span>
+          </div>
+        </div>
+
+        <div id="finance-list" class="items-list">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- 3. SHOPPING TAB -->
+      <section id="tab-shopping" class="tab-panel">
+        <div class="panel-header">
+          <h2>Список покупок</h2>
+          <div class="panel-actions">
+            <button id="share-shopping-telegram-btn" class="action-btn-sm" style="background:#229ED9;display:flex;align-items:center;gap:4px;" title="Поділитися в Telegram">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+              <span>В Telegram</span>
+            </button>
+            <button id="clear-shopping-btn" class="text-btn text-danger">Очистити</button>
+            <button id="add-shopping-btn" class="action-btn-sm">+ Товар</button>
+          </div>
+        </div>
+        <div id="shopping-list" class="items-list">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- 4. TASKS TAB -->
+      <section id="tab-tasks" class="tab-panel">
+        <div class="panel-header">
+          <h2>Задачи и дела</h2>
+          <button id="add-task-btn" class="action-btn-sm">+ Задача</button>
+        </div>
+        <div id="tasks-list" class="items-list">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- 5. MEDIA NOTES TAB -->
+      <section id="tab-media" class="tab-panel">
+        <div class="panel-header">
+          <h2>Медиа и заметки</h2>
+          <button id="add-media-btn" class="action-btn-sm">+ Заметка</button>
+        </div>
+        <div id="media-list" class="items-list">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- 6. INVENTORY TAB (Where is what) -->
+      <section id="tab-inventory" class="tab-panel">
+        <div class="panel-header">
+          <h2>Де що лежить (Інвентар)</h2>
+          <button id="add-inventory-btn" class="action-btn-sm">+ Предмет</button>
+        </div>
+
+        <!-- Search bar for inventory -->
+        <div class="quick-input-form" style="margin-top:0;">
+          <input type="text" id="inventory-search-input" placeholder="🔍 Де мій паспорт? шуруповерт..." />
+          <button id="inventory-search-btn" class="send-btn" title="Знайти">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </button>
+        </div>
+        <div id="inventory-query-result" class="result-toast hidden" style="background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.3);color:var(--text-main);"></div>
+
+        <div id="inventory-list" class="items-list">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- 7. AUTO TAB (Auto & Garage) -->
+      <section id="tab-auto" class="tab-panel">
+        <div class="panel-header">
+          <h2>Авто & Гараж</h2>
+          <button id="add-auto-btn" class="action-btn-sm">+ Запис</button>
+        </div>
+
+        <!-- Auto status alerts -->
+        <div id="auto-status-card" class="stat-card" style="border-left: 4px solid var(--primary);">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="stat-label">Поточний пробіг: <strong id="auto-current-km" style="color:var(--text-main);font-size:1rem;">— км</strong></span>
+            <span id="auto-next-km-badge" class="item-badge badge-finance">ТО не задано</span>
+          </div>
+          <p id="auto-service-msg" style="font-size:0.85rem;margin-top:4px;font-weight:600;"></p>
+          <p id="auto-insurance-msg" style="font-size:0.85rem;color:var(--text-muted);"></p>
+        </div>
+
+        <div id="auto-list" class="items-list">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- 8. UTILITIES TAB -->
+      <section id="tab-utilities" class="tab-panel">
+        <div class="panel-header">
+          <h2>Лічильники комунальних</h2>
+          <button id="add-utility-btn" class="action-btn-sm">+ Показники</button>
+        </div>
+
+        <!-- 3 Meter Cards -->
+        <div class="stats-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="stat-card">
+            <span class="stat-label">💡 Світло</span>
+            <span id="meter-val-electricity" class="stat-val" style="font-size:1.05rem;">—</span>
+            <span id="meter-delta-electricity" class="stat-subval">+0 кВт·г</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">💧 Вода</span>
+            <span id="meter-val-water" class="stat-val" style="font-size:1.05rem;">—</span>
+            <span id="meter-delta-water" class="stat-subval">+0 м³</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">🔥 Газ</span>
+            <span id="meter-val-gas" class="stat-val" style="font-size:1.05rem;">—</span>
+            <span id="meter-delta-gas" class="stat-subval">+0 м³</span>
+          </div>
+        </div>
+
+        <div id="utilities-list" class="items-list">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- 9. WEB SEARCH AGENT TAB -->
+      <section id="tab-agent" class="tab-panel">
+        <div class="panel-header">
+          <h2>🔍 AI-Агент (Google Search)</h2>
+        </div>
+
+        <div class="stat-card" style="margin-bottom:8px;background:rgba(6,182,212,0.08);border-color:rgba(6,182,212,0.25);">
+          <p style="font-size:0.85rem;color:var(--text-main);">
+            Запитайте будь-що у реальному часі: погоду, актуальні курси валют, технічні характеристики чи інструкції.
+          </p>
+        </div>
+
+        <!-- Agent Search Form -->
+        <form id="agent-search-form" class="quick-input-form" style="margin-top:0;">
+          <input type="text" id="agent-query-input" placeholder="«Яка погода у Львові?», «Характеристики M3 Max»..." autocomplete="off" />
+          <button type="submit" class="send-btn" title="Запитати агента">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </form>
+
+        <div id="agent-loading" class="empty-state hidden" style="padding:20px;">
+          <div style="font-size:1.5rem;animation:pulse-mic 1s infinite;">🌐</div>
+          <p>Агент шукає відповідь в інтернеті...</p>
+        </div>
+
+        <div id="agent-response-card" class="stat-card hidden" style="margin-top:10px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <span style="font-size:1.1rem;">💡</span>
+            <strong id="agent-res-query" style="font-size:0.95rem;"></strong>
+          </div>
+          <div id="agent-res-answer" style="font-size:0.9rem;line-height:1.6;white-space:pre-wrap;color:var(--text-main);"></div>
+          <div id="agent-res-sources" style="margin-top:12px;border-top:1px solid var(--border-color);padding-top:8px;" class="hidden">
+            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">Джерела Google:</span>
+            <div id="agent-sources-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Настройки подключения</h3>
+          <button id="settings-close-btn" class="icon-btn-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <label for="server-url-input">Адрес сервера:</label>
+          <input type="url" id="server-url-input" placeholder="http://localhost:8000" />
+
+          <label for="secret-key-input">Секретный ключ (SECRET_KEY):</label>
+          <input type="password" id="secret-key-input" placeholder="Введите ваш SECRET_KEY из .env" />
+          <small class="help-text">Ключ защищает ваши эндпоинты и передается в заголовке X-Secret-Key.</small>
+
+          <div class="modal-actions">
+            <button id="test-connection-btn" class="btn-secondary">Проверить связь</button>
+            <button id="save-settings-btn" class="btn-primary">Сохранить</button>
+          </div>
+          <p id="settings-test-result" class="test-result-text"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manual Add Item Modal -->
+    <div id="manual-add-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="manual-modal-title">Добавить запись</h3>
+          <button id="manual-close-btn" class="icon-btn-close">&times;</button>
+        </div>
+        <form id="manual-add-form" class="modal-body">
+          <!-- Dynamic inputs inserted by JS based on current tab -->
+          <div id="manual-form-fields"></div>
+          <div class="modal-actions">
+            <button type="button" id="manual-cancel-btn" class="btn-secondary">Отмена</button>
+            <button type="submit" class="btn-primary">Сохранить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
