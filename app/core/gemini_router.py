@@ -43,12 +43,15 @@ EXTENDED_CLASSIFICATION_INSTRUCTION = """Ти — інтелектуальний
    - meter_type: "electricity" | "water" | "gas"
    - reading_value: float число
 8. "web_search" — запитання до інтернету, актуальні факти, погода, інструкції, довідка ("яка погода", "курс валют", "як полагодити...", "хто винайшов...").
+9. "fitness" — фізична активність, тренування, кроки, калорії, лижі ("скільки кроків пройшов", "запиши 10000 кроків", "покажи лижні спуски", "скільки пробіг").
+   - action: "query_steps" | "query_skiing" | "log"
+   - steps, distance_km, calories, workout_type, workout_details
 
 Поточна дата: {current_time}.
 
 Формат відповіді СУВОРО JSON:
 {{
-  "intent": "finance" | "shopping" | "tasks" | "media_notes" | "inventory" | "auto" | "utility" | "web_search",
+  "intent": "finance" | "shopping" | "tasks" | "media_notes" | "inventory" | "auto" | "utility" | "web_search" | "fitness",
   "summary": "Коротке резюме дії або відповіді",
   "data": {{ ... }}
 }}
@@ -117,6 +120,9 @@ async def process_intent(payload: ProcessRequest, db: Session = Depends(get_db))
                 data = {"action": "log", "notes": text}
             elif any(k in lower for k in ["лічильник", "світло", "вода", "газ", "счетчик"]):
                 parsed_intent = "utility"
+            elif any(k in lower for k in ["крок", "шаг", "лиж", "лыж", "активн", "тренуван", "пробіг пішки"]):
+                parsed_intent = "fitness"
+                data = {"action": "query_skiing" if ("лиж" in lower or "лыж" in lower) else "query_steps"}
             else:
                 parsed_intent = "web_search"
 
@@ -231,7 +237,76 @@ async def process_intent(payload: ProcessRequest, db: Session = Depends(get_db))
             "created": {"id": reading.id, "meter_type": m_type, "reading": val, "delta": delta}
         }
 
-    # 5. FINANCE / SHOPPING / TASKS / MEDIA (делегуємо стандартному збереженню)
+    # 5. FITNESS & HEALTH
+    elif parsed_intent == "fitness":
+        from app.modules.fitness.models import FitnessLog
+        from datetime import date
+        from sqlalchemy import desc
+
+        lower_t = text.lower()
+        action = data.get("action", "")
+        if "лиж" in lower_t or "лыж" in lower_t or "спуск" in lower_t or action == "query_skiing":
+            ski_logs = db.query(FitnessLog).filter(FitnessLog.workout_type == "skiing").order_by(desc(FitnessLog.date)).limit(5).all()
+            if not ski_logs:
+                msg = "🎿 Записів про гірськолижні спуски поки немає. Додайте тренування або синхронізуйте з Apple Health!"
+            else:
+                desc_list = []
+                for s in ski_logs:
+                    details = s.workout_details or {}
+                    descents = details.get("descents", "—")
+                    max_speed = details.get("max_speed_kmh", "—")
+                    desc_list.append(f"• {s.date}: {s.distance_km} км, спусків: {descents}, макс. швидкість: {max_speed} км/год")
+                msg = "🎿 Ваші останні гірськолижні тренування:\n" + "\n".join(desc_list)
+            return {
+                "intent": "fitness",
+                "reply": msg,
+                "summary": "Лижні спуски",
+                "created": None
+            }
+        elif any(k in lower_t for k in ["скільки", "сколько", "статистика", "покажи"]) or action == "query_steps" or not data.get("steps"):
+            today_log = db.query(FitnessLog).filter(FitnessLog.date == date.today()).first()
+            if not today_log:
+                msg = "Сьогодні активність ще не синхронізована (0 кроків). Запустіть швидку команду Apple Health!"
+            else:
+                msg = f"🏃 За сьогодні: {today_log.steps} кроків ({today_log.distance_km} км, {today_log.flights_climbed} поверхів, {today_log.calories} ккал)."
+            return {
+                "intent": "fitness",
+                "reply": msg,
+                "summary": "Активність за сьогодні",
+                "created": today_log
+            }
+        else:
+            steps = int(data.get("steps") or 0)
+            dist = float(data.get("distance_km") or round(steps * 0.00075, 2))
+            w_type = data.get("workout_type", "general")
+            today = date.today()
+            existing = db.query(FitnessLog).filter(FitnessLog.date == today, FitnessLog.workout_type == w_type).first()
+            if existing:
+                existing.steps = steps if steps > 0 else existing.steps
+                existing.distance_km = dist if dist > 0 else existing.distance_km
+                db.commit()
+                db.refresh(existing)
+                saved = existing
+            else:
+                saved = FitnessLog(
+                    date=today,
+                    steps=steps,
+                    distance_km=dist,
+                    workout_type=w_type,
+                    created_at=datetime.utcnow()
+                )
+                db.add(saved)
+                db.commit()
+                db.refresh(saved)
+            msg = f"Записано активність: {saved.steps} кроків ({saved.distance_km} км)"
+            return {
+                "intent": "fitness",
+                "reply": msg,
+                "summary": msg,
+                "created": {"id": saved.id, "steps": saved.steps}
+            }
+
+    # 6. FINANCE / SHOPPING / TASKS / MEDIA (делегуємо стандартному збереженню)
     else:
         # Fallback to standard process router behavior
         from app.routers.process import _save_parsed_actions

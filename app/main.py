@@ -1,4 +1,5 @@
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +18,9 @@ from app.routers import (
 from app.modules.inventory import inventory_router, InventoryItem
 from app.modules.auto import auto_router, AutoLog
 from app.modules.utilities import utilities_router, UtilityReading
-from app.core import web_agent_router, gemini_router
+from app.modules.fitness import fitness_router, FitnessLog
+from app.modules.hospitality import hospitality_router, Booking
+from app.core import web_agent_router, gemini_router, system_router, start_nightly_backup_task
 from app.database import Base, engine
 
 
@@ -26,13 +29,19 @@ async def lifespan(app: FastAPI):
     # Initialize database tables on startup
     init_db()
     Base.metadata.create_all(bind=engine)
-    yield
+
+    # Start background Google Drive nightly backup task
+    backup_task = asyncio.create_task(start_nightly_backup_task())
+    try:
+        yield
+    finally:
+        backup_task.cancel()
 
 
 app = FastAPI(
     title="Мой Секретарь (My Secretary)",
     description="Автономный персональный AI-секретарь на FastAPI и Google Gemini",
-    version="2.0.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 
@@ -59,6 +68,14 @@ api_v1.include_router(auto_router)
 api_v1.include_router(utilities_router)
 api_v1.include_router(web_agent_router)
 api_v1.include_router(gemini_router)
+
+# Step 3 Modules
+api_v1.include_router(fitness_router)
+api_v1.include_router(system_router)
+
+# Dormant Hospitality Module (Feature-flagged)
+if settings.ENABLE_HOSPITALITY:
+    api_v1.include_router(hospitality_router)
 
 app.mount("/api/v1", api_v1)
 app.mount("/api", api_v1)

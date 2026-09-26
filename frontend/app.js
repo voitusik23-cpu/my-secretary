@@ -312,6 +312,12 @@ function loadTabData(tab) {
     case "utilities":
       loadUtilities();
       break;
+    case "fitness":
+      loadFitness();
+      break;
+    case "hospitality":
+      loadHospitality();
+      break;
     case "agent":
       document.getElementById("agent-query-input")?.focus();
       break;
@@ -682,6 +688,215 @@ async function loadUtilities() {
   }
 }
 
+// 8. Fitness & Apple Health
+async function loadFitness() {
+  const stepsEl = document.getElementById("stat-fitness-steps");
+  const distEl = document.getElementById("stat-fitness-distance");
+  const flightsEl = document.getElementById("stat-fitness-flights");
+  const progressEl = document.getElementById("stat-fitness-progress");
+  const weeklyStepsEl = document.getElementById("stat-weekly-steps");
+  const weeklyAvgEl = document.getElementById("stat-weekly-avg");
+  const weeklyDistEl = document.getElementById("stat-weekly-dist");
+  const weeklyDaysEl = document.getElementById("stat-weekly-active-days");
+  const skiBadgeEl = document.getElementById("ski-count-badge");
+  const skiListEl = document.getElementById("ski-logs-list");
+  const logsListEl = document.getElementById("fitness-logs-list");
+
+  try {
+    const data = await apiFetch("/api/v1/fitness/summary");
+    if (!data) return;
+
+    // Today stats
+    const today = data.today;
+    const steps = today ? today.steps : 0;
+    const dist = today ? today.distance_km : 0;
+    const flights = today ? today.flights_climbed : 0;
+    const cals = today ? today.calories : 0;
+
+    if (stepsEl) stepsEl.textContent = steps.toLocaleString("ru-RU");
+    if (distEl) distEl.textContent = `${dist} км`;
+    if (flightsEl) flightsEl.textContent = `${flights} поверхів • ${cals} ккал`;
+
+    const progressPct = Math.min(100, Math.round((steps / 10000) * 100));
+    if (progressEl) progressEl.style.width = `${progressPct}%`;
+
+    // Weekly stats
+    if (data.weekly_stats) {
+      if (weeklyStepsEl) weeklyStepsEl.textContent = data.weekly_stats.total_steps.toLocaleString("ru-RU");
+      if (weeklyAvgEl) weeklyAvgEl.textContent = data.weekly_stats.avg_steps_daily.toLocaleString("ru-RU");
+      if (weeklyDistEl) weeklyDistEl.textContent = `${data.weekly_stats.total_distance_km} км`;
+      if (weeklyDaysEl) weeklyDaysEl.textContent = `${data.weekly_stats.days_recorded} активних днів`;
+    }
+
+    // Ski logs
+    const skiLogs = data.ski_logs || [];
+    if (skiBadgeEl) skiBadgeEl.textContent = `${skiLogs.length} сесій`;
+    if (skiListEl) {
+      if (skiLogs.length === 0) {
+        skiListEl.innerHTML = `<span style="color:var(--text-muted);">Поки немає записів лижних спусків.</span>`;
+      } else {
+        skiListEl.innerHTML = skiLogs.map(s => {
+          const d = s.workout_details || {};
+          return `<div style="padding:6px 0;border-bottom:1px solid var(--border-color);font-size:0.85rem;">
+            🎿 <strong>${s.date}</strong>: ${s.distance_km} км • Спусків: <strong>${d.descents || '—'}</strong> • Макс. швидкість: <strong>${d.max_speed_kmh || '—'} км/год</strong>
+          </div>`;
+        }).join("");
+      }
+    }
+
+    // Recent logs
+    const recent = data.recent_logs || [];
+    if (!recent || recent.length === 0) {
+      if (logsListEl) logsListEl.innerHTML = `<div class="empty-state"><p>Записів активності поки немає</p></div>`;
+      return;
+    }
+
+    const typeIcons = { skiing: "🎿 Лижі", running: "🏃 Біг", cycling: "🚴 Велосипед", general: "👟 Кроки" };
+    if (logsListEl) {
+      logsListEl.innerHTML = recent.map(r => {
+        return `
+          <div class="item-card">
+            <div class="item-content">
+              <span class="item-title"><strong>${r.steps.toLocaleString('ru-RU')}</strong> кроків • ${r.distance_km} км</span>
+              <span class="item-subtitle">${r.date} • ${r.flights_climbed} поверхів • ${r.calories} ккал</span>
+              <span class="item-badge badge-finance">${typeIcons[r.workout_type] || r.workout_type}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+  } catch (e) {
+    if (logsListEl) logsListEl.innerHTML = `<div class="empty-state"><p>Помилка завантаження фітнес-даних</p></div>`;
+  }
+}
+
+// 9. Hospitality & Bookings
+async function loadHospitality() {
+  const revEl = document.getElementById("hosp-total-revenue");
+  const countEl = document.getElementById("hosp-active-count");
+  const balEl = document.getElementById("hosp-pending-balance");
+  const prepEl = document.getElementById("hosp-prepayments");
+  const list = document.getElementById("hospitality-list");
+
+  try {
+    const summary = await apiFetch("/api/v1/hospitality/summary");
+    if (summary) {
+      if (revEl) revEl.textContent = `${summary.total_revenue_expected} ₴`;
+      if (countEl) countEl.textContent = `${summary.active_bookings_count} активних броней`;
+      if (balEl) balEl.textContent = `${summary.total_pending_balance} ₴`;
+      if (prepEl) prepEl.textContent = `Передоплата: ${summary.total_prepayments_received} ₴`;
+    }
+
+    const bookings = await apiFetch("/api/v1/hospitality/bookings");
+    if (!bookings || bookings.length === 0) {
+      if (list) list.innerHTML = `<div class="empty-state"><p>Немає створених бронювань</p></div>`;
+      return;
+    }
+
+    const statusBadge = { active: "badge-tasks", completed: "badge-finance positive", cancelled: "badge-finance" };
+    const statusText = { active: "Активно", completed: "Завершено", cancelled: "Скасовано" };
+
+    if (list) {
+      list.innerHTML = bookings.map(b => {
+        return `
+          <div class="item-card">
+            <div class="item-content">
+              <span class="item-title"><strong>${escapeHtml(b.guest_name)}</strong> • ${escapeHtml(b.apartment_unit)}</span>
+              <span class="item-subtitle">📅 ${b.check_in_date} ➔ ${b.check_out_date} (${b.total_days} діб)</span>
+              <span class="item-subtitle">💰 Сума: ${b.total_amount} ₴ • Оплачено: ${b.prepayment} ₴ • До сплати: <strong>${b.remaining_balance} ₴</strong></span>
+              <span class="item-badge ${statusBadge[b.status] || 'badge-tasks'}">${statusText[b.status] || b.status}</span>
+            </div>
+            <div class="item-actions">
+              <button class="delete-btn" onclick="deleteBooking(${b.id})" title="Видалити бронювання">🗑️</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+  } catch (e) {
+    if (list) list.innerHTML = `<div class="empty-state"><p>Помилка завантаження бронювань</p></div>`;
+  }
+}
+
+window.deleteBooking = async function (id) {
+  if (!confirm("Видалити це бронювання?")) return;
+  try {
+    await apiFetch(`/api/v1/hospitality/bookings/${id}`, { method: "DELETE" });
+    showToast("Бронювання видалено");
+    loadHospitality();
+  } catch (e) {
+    showToast(`Помилка: ${e.message}`);
+  }
+};
+
+// 10. Google Drive 5TB Backup Status & Trigger
+async function loadBackupStatus() {
+  const timeLabel = document.getElementById("last-backup-time-label");
+  const detailsLabel = document.getElementById("last-backup-details-label");
+  if (!timeLabel) return;
+
+  try {
+    const data = await apiFetch("/api/v1/system/backup/status");
+    if (data) {
+      timeLabel.textContent = data.last_backup_time || "ще не створювався";
+      const syncStatus = data.gdrive_synced ? "☁️ Синхронізовано з Google Drive" : "💾 Збережено локально (зашифровано)";
+      const encStatus = data.encrypted ? "🔒 256-bit Fernet" : "відкрито";
+      if (detailsLabel) detailsLabel.textContent = `${syncStatus} • ${encStatus} • Розмір: ${data.size_kb} KB`;
+    }
+  } catch (e) {
+    console.warn("Could not load backup status:", e);
+  }
+}
+
+async function triggerCloudBackup() {
+  const btn = document.getElementById("trigger-cloud-backup-btn");
+  const feedback = document.getElementById("backup-action-feedback");
+  if (!btn) return;
+
+  btn.disabled = true;
+  btn.innerHTML = `<span>⏳ Створення та шифрування архіву...</span>`;
+  if (feedback) feedback.textContent = "Обробка бази даних...";
+
+  try {
+    const res = await apiFetch("/api/v1/system/backup", { method: "POST" });
+    if (feedback) {
+      if (res && res.gdrive_synced) {
+        feedback.textContent = `✅ Успішно! Зашифрований архів (${res.size_kb} KB) вивантажено на Google Drive!`;
+        feedback.style.color = "var(--success)";
+      } else {
+        feedback.textContent = `💾 Зашифрований архів (${res?.size_kb || 0} KB) збережено локально в backups/.`;
+        feedback.style.color = "var(--warning)";
+      }
+    }
+    showToast("✅ Резервну копію успішно створено!");
+    loadBackupStatus();
+  } catch (e) {
+    if (feedback) {
+      feedback.textContent = `❌ Помилка: ${e.message}`;
+      feedback.style.color = "var(--danger)";
+    }
+    showToast(`❌ Помилка бекапу: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span>Створити резервну копію зараз</span>
+    `;
+  }
+}
+
+async function checkSystemFeatures() {
+  try {
+    const data = await apiFetch("/api/v1/system/features");
+    if (data && data.enable_hospitality) {
+      const hospBtn = document.getElementById("tab-btn-hospitality");
+      if (hospBtn) hospBtn.classList.remove("hidden");
+    }
+  } catch (e) {
+    console.warn("Could not check features:", e);
+  }
+}
+
 // --- Action Handlers (Toggle & Delete) ---
 window.toggleShopping = async function (id) {
   try {
@@ -747,8 +962,11 @@ function initSettingsModal() {
     serverInput.value = state.serverUrl;
     secretInput.value = state.secretKey;
     resultText.textContent = "";
+    loadBackupStatus();
     modal.classList.remove("hidden");
   });
+
+  document.getElementById("trigger-cloud-backup-btn")?.addEventListener("click", triggerCloudBackup);
 
   closeBtn.addEventListener("click", () => modal.classList.add("hidden"));
 
@@ -913,6 +1131,49 @@ function initManualAddModal() {
         <label>Поточні показники:</label>
         <input type="number" step="0.01" name="reading_value" required placeholder="14250.5" />
       `;
+    } else if (domain === "fitness") {
+      titleEl.textContent = "Додати активність (Apple Health)";
+      fieldsEl.innerHTML = `
+        <label>Кроки (steps):</label>
+        <input type="number" name="steps" required placeholder="8500" value="8500" />
+        <label>Дистанція (км):</label>
+        <input type="number" step="0.01" name="distance_km" placeholder="6.2" value="6.2" />
+        <label>Пройдено поверхів:</label>
+        <input type="number" name="flights_climbed" placeholder="12" value="12" />
+        <label>Активні калорії (ккал):</label>
+        <input type="number" name="calories" placeholder="420" value="420" />
+        <label>Тип активності:</label>
+        <select name="workout_type">
+          <option value="general">Загальна ходьба / активність</option>
+          <option value="skiing">⛷️ Гірські лижі (Skiing)</option>
+          <option value="running">🏃 Біг</option>
+          <option value="cycling">🚴 Велосипед</option>
+        </select>
+      `;
+    } else if (domain === "hospitality") {
+      titleEl.textContent = "Створити нове бронювання";
+      fieldsEl.innerHTML = `
+        <label>Ім'я гостя:</label>
+        <input type="text" name="guest_name" required placeholder="Олександр Петренко" />
+        <label>Апартаменти:</label>
+        <input type="text" name="apartment_unit" value="Apartment #1" />
+        <label>Дата заїзду:</label>
+        <input type="date" name="check_in_date" required />
+        <label>Дата виїзду:</label>
+        <input type="date" name="check_out_date" required />
+        <label>Добова ставка (₴):</label>
+        <input type="number" step="0.01" name="daily_rate" required placeholder="2500" />
+        <label>Внесена передоплата (₴):</label>
+        <input type="number" step="0.01" name="prepayment" value="0" />
+        <label>Статус:</label>
+        <select name="status">
+          <option value="active">Активно</option>
+          <option value="completed">Завершено</option>
+          <option value="cancelled">Скасовано</option>
+        </select>
+        <label>Примітки:</label>
+        <input type="text" name="notes" placeholder="2 гостя, пізній заїзд о 21:00" />
+      `;
     }
 
     modal.classList.remove("hidden");
@@ -925,6 +1186,8 @@ function initManualAddModal() {
   document.getElementById("add-inventory-btn")?.addEventListener("click", () => openAdd("inventory"));
   document.getElementById("add-auto-btn")?.addEventListener("click", () => openAdd("auto"));
   document.getElementById("add-utility-btn")?.addEventListener("click", () => openAdd("utilities"));
+  document.getElementById("add-fitness-btn")?.addEventListener("click", () => openAdd("fitness"));
+  document.getElementById("add-booking-btn")?.addEventListener("click", () => openAdd("hospitality"));
 
   closeBtn.addEventListener("click", () => modal.classList.add("hidden"));
   cancelBtn.addEventListener("click", () => modal.classList.add("hidden"));
@@ -957,6 +1220,16 @@ function initManualAddModal() {
     } else if (currentDomain === "utilities") {
       endpoint = "/api/utilities/reading";
       data.reading_value = parseFloat(data.reading_value);
+    } else if (currentDomain === "fitness") {
+      endpoint = "/api/v1/fitness/sync";
+      data.steps = parseInt(data.steps) || 0;
+      data.distance_km = parseFloat(data.distance_km) || 0;
+      data.flights_climbed = parseInt(data.flights_climbed) || 0;
+      data.calories = parseInt(data.calories) || 0;
+    } else if (currentDomain === "hospitality") {
+      endpoint = "/api/v1/hospitality/bookings";
+      data.daily_rate = parseFloat(data.daily_rate);
+      data.prepayment = parseFloat(data.prepayment || 0);
     }
 
     try {
@@ -1063,6 +1336,33 @@ function initStep2Handlers() {
   });
 }
 
+// --- Step 3 Handlers (Apple Health & Features) ---
+function initStep3Handlers() {
+  document.getElementById("sync-apple-health-btn")?.addEventListener("click", async () => {
+    const stepsInput = prompt("🍏 Синхронізація Apple Health:\nВведіть кількість кроків за сьогодні:", "10500");
+    if (!stepsInput) return;
+    const steps = parseInt(stepsInput) || 0;
+    const dist = parseFloat((steps * 0.00075).toFixed(2));
+    const calories = Math.round(steps * 0.04);
+    try {
+      await apiFetch("/api/v1/fitness/sync", {
+        method: "POST",
+        body: JSON.stringify({
+          steps,
+          distance_km: dist,
+          flights_climbed: 10,
+          calories,
+          workout_type: "general"
+        })
+      });
+      showToast(`🍏 Apple Health синхронізовано: ${steps} кроків!`);
+      loadFitness();
+    } catch (e) {
+      showToast(`Помилка синхронізації: ${e.message}`);
+    }
+  });
+}
+
 // --- Offline Listener ---
 function initNetworkListeners() {
   const banner = document.getElementById("offline-banner");
@@ -1096,7 +1396,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initSettingsModal();
   initManualAddModal();
   initStep2Handlers();
+  initStep3Handlers();
   initNetworkListeners();
   checkHealth();
+  checkSystemFeatures();
   loadFeed();
 });

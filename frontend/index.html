@@ -160,6 +160,14 @@
         <span class="tab-icon">🔍</span>
         <span class="tab-label">Поиск</span>
       </button>
+      <button class="tab-btn" data-tab="fitness" role="tab" aria-selected="false">
+        <span class="tab-icon">🏃</span>
+        <span class="tab-label">Спорт</span>
+      </button>
+      <button class="tab-btn hidden" id="tab-btn-hospitality" data-tab="hospitality" role="tab" aria-selected="false">
+        <span class="tab-icon">🏨</span>
+        <span class="tab-label">Броні</span>
+      </button>
     </nav>
 
     <!-- Tab Panels Container -->
@@ -358,6 +366,100 @@
           </div>
         </div>
       </section>
+
+      <!-- 9. FITNESS TAB (Apple Health) -->
+      <section id="tab-fitness" class="tab-panel">
+        <div class="panel-header">
+          <h2>Спорт та Активність</h2>
+          <div class="panel-actions">
+            <button id="sync-apple-health-btn" class="action-btn-sm" title="Синхронізувати з Apple Health">🍏 Синхронізація</button>
+            <button id="add-fitness-btn" class="action-btn-sm">+ Запис</button>
+          </div>
+        </div>
+
+        <!-- Fitness Metric Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">👟 Кроки сьогодні</span>
+            <span id="stat-fitness-steps" class="stat-val positive">0</span>
+            <span id="stat-fitness-goal" class="stat-subval">Ціль: 10 000 кроків</span>
+            <div style="background:var(--border-color);border-radius:6px;height:6px;width:100%;margin-top:6px;overflow:hidden;">
+              <div id="stat-fitness-progress" style="background:#30d158;height:100%;width:0%;transition:width 0.4s ease;"></div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">📍 Дистанція</span>
+            <span id="stat-fitness-distance" class="stat-val">0.0 км</span>
+            <span id="stat-fitness-flights" class="stat-subval">0 поверхів</span>
+          </div>
+        </div>
+
+        <!-- Weekly Summary -->
+        <div class="stat-card" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong style="font-size:0.95rem;">📊 Підсумок за 7 днів:</strong>
+            <span id="stat-weekly-active-days" class="item-badge badge-finance">0 активних днів</span>
+          </div>
+          <div style="display:flex;justify-content:space-around;margin-top:8px;text-align:center;">
+            <div>
+              <small style="color:var(--text-muted);display:block;">Всього кроків</small>
+              <strong id="stat-weekly-steps" style="font-size:1.1rem;color:var(--text-main);">0</strong>
+            </div>
+            <div>
+              <small style="color:var(--text-muted);display:block;">В середньому/день</small>
+              <strong id="stat-weekly-avg" style="font-size:1.1rem;color:var(--text-main);">0</strong>
+            </div>
+            <div>
+              <small style="color:var(--text-muted);display:block;">Дистанція</small>
+              <strong id="stat-weekly-dist" style="font-size:1.1rem;color:var(--text-main);">0 км</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Skiing logs section -->
+        <div class="stat-card" style="margin-bottom:12px;border-left:4px solid #0a84ff;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong style="font-size:0.95rem;">⛷️ Гірськолижні спуски (Skiing)</strong>
+            <span id="ski-count-badge" class="item-badge badge-task">0 сесій</span>
+          </div>
+          <div id="ski-logs-list" style="margin-top:8px;font-size:0.85rem;color:var(--text-muted);">
+            Поки немає записів лижних спусків.
+          </div>
+        </div>
+
+        <!-- Recent Fitness Logs -->
+        <h3 style="font-size:0.95rem;color:var(--text-muted);margin:12px 0 8px;">Історія активності</h3>
+        <div id="fitness-logs-list" class="items-list">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- 10. DORMANT HOSPITALITY TAB -->
+      <section id="tab-hospitality" class="tab-panel">
+        <div class="panel-header">
+          <h2>Бронювання апартаментів</h2>
+          <div class="panel-actions">
+            <button id="add-booking-btn" class="action-btn-sm">+ Бронювання</button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">Очікуваний дохід</span>
+            <span id="hosp-total-revenue" class="stat-val positive">0 ₴</span>
+            <span id="hosp-active-count" class="stat-subval">0 активних броней</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Залишок до сплати</span>
+            <span id="hosp-pending-balance" class="stat-val expense">0 ₴</span>
+            <span id="hosp-prepayments" class="stat-subval">Передоплата: 0 ₴</span>
+          </div>
+        </div>
+
+        <div id="hospitality-list" class="items-list">
+          <!-- Populated by JS -->
+        </div>
+      </section>
     </main>
 
     <!-- Settings Modal -->
@@ -380,6 +482,27 @@
             <button id="save-settings-btn" class="btn-primary">Сохранить</button>
           </div>
           <p id="settings-test-result" class="test-result-text"></p>
+
+          <hr style="border:none;border-top:1px solid var(--border-color);margin:16px 0;" />
+
+          <!-- Google Drive 5TB Backup Section -->
+          <div class="backup-settings-section">
+            <h4 style="margin:0 0 6px 0;font-size:0.95rem;display:flex;align-items:center;gap:6px;">
+              <span>☁️ Резервна копія на Google Drive (5TB)</span>
+            </h4>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 10px 0;">
+              Створює 256-бітний зашифрований архів бази даних SQLite та вивантажує у вашу папку <code>Secretary_AI_Backups</code>.
+            </p>
+            <div id="backup-status-badge" style="font-size:0.8rem;padding:6px 10px;border-radius:6px;background:var(--bg-card);border:1px solid var(--border-color);margin-bottom:10px;">
+              <strong>Останній бекап:</strong> <span id="last-backup-time-label">немає даних</span>
+              <div id="last-backup-details-label" style="color:var(--text-muted);margin-top:2px;"></div>
+            </div>
+            <button id="trigger-cloud-backup-btn" class="btn-primary" style="width:100%;background:#0a84ff;display:flex;align-items:center;justify-content:center;gap:6px;">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span>Створити резервну копію зараз</span>
+            </button>
+            <p id="backup-action-feedback" class="test-result-text" style="margin-top:6px;"></p>
+          </div>
         </div>
       </div>
     </div>

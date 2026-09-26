@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     # AI Model preference
     AI_MODEL: str = "gemini-3.8-flash"
 
+    # Step 3: Dormant Hospitality Module flag
+    ENABLE_HOSPITALITY: bool = False
+
+    # Step 3: Google Drive Backup
+    GDRIVE_BACKUP_FOLDER: str = "Secretary_AI_Backups"
+    GDRIVE_SERVICE_ACCOUNT_JSON: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
