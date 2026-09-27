@@ -1,4 +1,4 @@
-const CACHE_NAME = "my-secretary-v3.4.1";
+const CACHE_NAME = "my-secretary-v3.4.2";
 const STATIC_ASSETS = [
   "/",
   "/static/index.html",
@@ -34,7 +34,7 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Fetch: Network-First for navigation & dynamic content, Stale-While-Revalidate for static assets
+// Fetch: Network-First for API, HTML, CSS and JS; Stale-While-Revalidate for images
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
@@ -57,8 +57,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2. HTML navigation requests: Network-First (ensures user always gets latest app updates)
-  if (event.request.mode === "navigate" || url.pathname === "/" || url.pathname.endsWith(".html")) {
+  // 2. HTML navigation, CSS and JS scripts: Network-First (ensures user always gets latest app updates immediately)
+  if (
+    event.request.mode === "navigate" ||
+    url.pathname === "/" ||
+    url.pathname.endsWith(".html") ||
+    url.pathname.endsWith(".css") ||
+    url.pathname.endsWith(".js")
+  ) {
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {
@@ -73,7 +79,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 3. Static assets (JS/CSS/images): Stale-While-Revalidate
+  // 3. Media & static icons: Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)

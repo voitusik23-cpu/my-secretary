@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.3.0")
+      .register("/sw.js?v=3.4.2")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -1216,6 +1216,25 @@ function initSettingsModal() {
   }
 
   document.getElementById("trigger-cloud-backup-btn")?.addEventListener("click", triggerCloudBackup);
+
+  document.getElementById("clear-cache-reload-btn")?.addEventListener("click", async () => {
+    showToast("Очищення кешу та оновлення...");
+    try {
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((r) => r.unregister()));
+      }
+    } catch (e) {
+      console.warn("Cache clear error:", e);
+    }
+    setTimeout(() => {
+      window.location.reload(true);
+    }, 400);
+  });
 
   closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
 
