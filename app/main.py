@@ -22,7 +22,10 @@ from app.modules.auto import auto_router, AutoLog
 from app.modules.utilities import utilities_router, UtilityReading
 from app.modules.fitness import fitness_router, FitnessLog
 from app.modules.hospitality import hospitality_router, Booking
+from app.modules.delegation import delegation_router, FamilyContact
+from app.modules.translator import translator_router
 from app.core import web_agent_router, gemini_router, system_router, start_nightly_backup_task
+from app.core.undo_service import router as undo_router
 from app.database import Base, engine
 
 
@@ -78,6 +81,11 @@ api_v1.include_router(gemini_router)
 api_v1.include_router(fitness_router)
 api_v1.include_router(system_router)
 
+# Step 5 Modules (Delegation, Translator, Undo)
+api_v1.include_router(delegation_router)
+api_v1.include_router(translator_router)
+api_v1.include_router(undo_router)
+
 # Dormant Hospitality Module (Feature-flagged)
 if settings.ENABLE_HOSPITALITY:
     api_v1.include_router(hospitality_router)
@@ -107,6 +115,9 @@ def get_system_health():
         "web_agent",
         "gemini_router",
         "system_backup",
+        "delegation",
+        "translator",
+        "undo",
     ]
     if settings.ENABLE_HOSPITALITY:
         active_modules.append("hospitality")
@@ -127,6 +138,7 @@ def get_system_health():
             "database_encryption": get_fernet() is not None,
             "hospitality_module": settings.ENABLE_HOSPITALITY,
             "nightly_gdrive_backup": True,
+            "telegram_bot_configured": bool(settings.TELEGRAM_BOT_TOKEN),
         },
     }
 

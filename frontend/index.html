@@ -120,6 +120,16 @@
           <p id="toast-message">Действие обработано</p>
         </div>
       </div>
+
+      <!-- Step 5: Floating Action Undo Banner -->
+      <div id="undo-banner" class="undo-floating-banner hidden">
+        <div class="undo-inner">
+          <span class="undo-icon">⚡</span>
+          <span id="undo-text" class="undo-text">Дію збережено</span>
+          <button id="undo-banner-btn" class="undo-btn">↩️ Відмінити</button>
+          <button id="undo-close-btn" class="undo-close">&times;</button>
+        </div>
+      </div>
     </section>
 
     <!-- Main Navigation Tabs -->
@@ -139,6 +149,10 @@
       <button class="tab-btn" data-tab="tasks" role="tab" aria-selected="false">
         <span class="tab-icon">✅</span>
         <span class="tab-label">Задачи</span>
+      </button>
+      <button class="tab-btn" data-tab="translator" role="tab" aria-selected="false">
+        <span class="tab-icon">🌐</span>
+        <span class="tab-label">Переводчик</span>
       </button>
       <button class="tab-btn" data-tab="fitness" role="tab" aria-selected="false">
         <span class="tab-icon">🏃</span>
@@ -460,7 +474,110 @@
           <!-- Populated by JS -->
         </div>
       </section>
+
+      <!-- 10. LIVE TRANSLATOR (Синхронний перекладач віч-на-віч) -->
+      <section id="tab-translator" class="tab-panel">
+        <div class="panel-header">
+          <h2>Перекладач (Віч-на-віч)</h2>
+          <div class="translator-lang-bar">
+            <select id="translator-source-lang" class="lang-select">
+              <option value="auto">🌐 Автовизначення</option>
+              <option value="uk" selected>🇺🇦 Українська</option>
+              <option value="ru">Русский</option>
+              <option value="en">🇬🇧 English</option>
+              <option value="pl">🇵🇱 Polski</option>
+              <option value="de">🇩🇪 Deutsch</option>
+              <option value="es">🇪🇸 Español</option>
+            </select>
+            <button id="translator-swap-btn" class="icon-swap-btn" title="Поміняти мови місцями">⇄</button>
+            <select id="translator-target-lang" class="lang-select">
+              <option value="en" selected>🇬🇧 English</option>
+              <option value="uk">🇺🇦 Українська</option>
+              <option value="ru">Русский</option>
+              <option value="pl">🇵🇱 Polski</option>
+              <option value="de">🇩🇪 Deutsch</option>
+              <option value="es">🇪🇸 Español</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="split-translator-container">
+          <!-- TOP HALF: Flipped 180° for the person sitting opposite across the table -->
+          <div class="translator-half top-half-flipped" id="translator-foreigner-card">
+            <div class="half-header">
+              <span class="half-role-badge">Співрозмовник (навпроти)</span>
+              <button id="foreigner-tts-btn" class="half-action-btn" title="Озвучити голосом">🔊 Озвучити</button>
+            </div>
+            <div class="translated-output" id="foreigner-output-text">
+              Waiting for speech... / Очікування...
+            </div>
+            <div class="half-footer">
+              <button id="foreigner-mic-btn" class="face-mic-btn">
+                <span class="mic-icon">🎙️</span>
+                <span class="mic-label" id="foreigner-mic-label">Говорити англійською</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- DIVIDER -->
+          <div class="translator-divider">
+            <span class="divider-line"></span>
+            <span class="divider-pill">Екран віч-на-віч</span>
+            <span class="divider-line"></span>
+          </div>
+
+          <!-- BOTTOM HALF: Towards user (right side up) -->
+          <div class="translator-half bottom-half-user" id="translator-user-card">
+            <div class="half-header">
+              <span class="half-role-badge">Ви</span>
+              <button id="user-tts-btn" class="half-action-btn" title="Озвучити голосом">🔊 Озвучити</button>
+            </div>
+            <div class="translated-output" id="user-output-text">
+              Натисніть мікрофон нижче і говоріть своєю мовою...
+            </div>
+            <div class="half-footer">
+              <button id="user-mic-btn" class="face-mic-btn primary">
+                <span class="mic-icon">🎙️</span>
+                <span class="mic-label" id="user-mic-label">Говорити українською</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
+
+    <!-- Family Delegation Modal -->
+    <div id="delegation-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Відправити список у Telegram</h3>
+          <button id="delegation-close-btn" class="icon-btn-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 12px 0;">
+            Оберіть контакт сім'ї для миттєвої відправки актуального списку покупок:
+          </p>
+          <div id="delegation-contacts-list" class="contacts-picker-list">
+            <!-- Populated dynamically by JS -->
+          </div>
+          <div class="add-contact-box" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color);">
+            <h4 style="margin:0 0 8px 0;font-size:0.9rem;">+ Додати контакт члена сім'ї</h4>
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
+              <input type="text" id="new-contact-name" placeholder="Ім'я (наприклад: Олена)" style="flex:2;" />
+              <select id="new-contact-rel" style="flex:1;">
+                <option value="wife">Дружина</option>
+                <option value="daughter">Донька</option>
+                <option value="son">Син</option>
+                <option value="husband">Чоловік</option>
+                <option value="other">Інше</option>
+              </select>
+            </div>
+            <input type="text" id="new-contact-tg" placeholder="Telegram Chat ID або @username" style="margin-bottom:8px;" />
+            <button id="save-new-contact-btn" class="btn-secondary" style="width:100%;">Зберегти контакт</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal-overlay hidden">
@@ -526,6 +643,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.1.3"></script>
+  <script src="/static/app.js?v=3.2.0"></script>
 </body>
 </html>

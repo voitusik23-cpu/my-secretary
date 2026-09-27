@@ -820,3 +820,263 @@ body {
   font-weight: 600;
   margin-top: 6px;
 }
+
+/* ==========================================================================
+   Step 5: Action Undo Floating Banner
+   ========================================================================== */
+.undo-floating-banner {
+  position: fixed;
+  bottom: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  width: calc(100% - 24px);
+  max-width: 480px;
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.undo-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(28, 28, 30, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  border-radius: 14px;
+  padding: 10px 14px;
+  color: #fff;
+}
+
+.undo-text {
+  flex: 1;
+  font-size: 0.86rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.undo-btn {
+  background: #ff9f0a;
+  color: #000;
+  border: none;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.undo-btn:active {
+  transform: scale(0.96);
+}
+
+.undo-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* ==========================================================================
+   Step 5: Face-to-Face Live Translator
+   ========================================================================== */
+.translator-lang-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.lang-select {
+  flex: 1;
+  background: var(--bg-card);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.icon-swap-btn {
+  background: var(--bg-card-hover);
+  color: var(--primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.split-translator-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 480px;
+}
+
+.translator-half {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1;
+  min-height: 220px;
+  position: relative;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.top-half-flipped {
+  transform: rotate(180deg);
+  border-color: rgba(10, 132, 255, 0.4);
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.05), var(--bg-card));
+}
+
+.bottom-half-user {
+  border-color: rgba(48, 209, 88, 0.4);
+  background: linear-gradient(135deg, rgba(48, 209, 88, 0.05), var(--bg-card));
+}
+
+.half-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.half-role-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+
+.half-action-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.translated-output {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-main);
+  padding: 12px 0;
+  flex: 1;
+  word-break: break-word;
+}
+
+.face-mic-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #0a84ff;
+  color: #fff;
+  transition: transform 0.1s ease, filter 0.15s ease;
+}
+
+.face-mic-btn.primary {
+  background: #30d158;
+}
+
+.face-mic-btn.recording {
+  background: #ff453a !important;
+  animation: pulse-ring 1.5s infinite;
+}
+
+.face-mic-btn:active {
+  transform: scale(0.98);
+}
+
+.translator-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-color);
+}
+
+.divider-pill {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+/* ==========================================================================
+   Step 5: Contacts Delegation Picker
+   ========================================================================== */
+.contacts-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.contact-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.contact-picker-item:hover {
+  background: var(--bg-card-hover);
+}
+
+.contact-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contact-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.contact-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}

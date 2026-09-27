@@ -198,6 +198,7 @@ function initVoice() {
         await uploadAudio(audioBlob, actualMime);
       };
 
+      playAudioBeep();
       state.mediaRecorder.start();
       state.isRecording = true;
 
@@ -255,6 +256,10 @@ function initVoice() {
         statusText.textContent = "Нажмите и говорите или введите текст";
         const icon = data.status === "warning" ? "⚠️" : "✅";
         showToast(`${icon} ${data.summary}`);
+        if (data.status !== "warning") {
+          playSuccessChime();
+          showUndoBanner(data.summary);
+        }
         reloadCurrentTab();
       }
     } catch (err) {
@@ -287,6 +292,8 @@ function initTextInput() {
       if (data) {
         statusText.textContent = "Нажмите и говорите или введите текст";
         showToast(`✅ ${data.summary}`);
+        playSuccessChime();
+        showUndoBanner(data.summary);
         reloadCurrentTab();
       }
     } catch (err) {
@@ -362,6 +369,9 @@ function loadTabData(tab) {
       break;
     case "agent":
       document.getElementById("agent-query-input")?.focus();
+      break;
+    case "translator":
+      initTranslatorScreen();
       break;
   }
 }
@@ -1419,6 +1429,339 @@ function initStep3Handlers() {
   });
 }
 
+// ==========================================================================
+// --- Step 5: Web Audio API Feedback (Beep & Chime) ---
+// ==========================================================================
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    const Cls = window.AudioContext || window.webkitAudioContext;
+    if (Cls) audioCtx = new Cls();
+  }
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+function playAudioBeep() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.07);
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.07);
+  } catch (e) {}
+}
+
+function playSuccessChime() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    [523.25, 659.25].forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(f, now + i * 0.05);
+      gain.gain.setValueAtTime(0.06, now + i * 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.18);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.05);
+      osc.stop(now + i * 0.05 + 0.18);
+    });
+  } catch (e) {}
+}
+
+// ==========================================================================
+// --- Step 5: Action Undo Floating Banner ---
+// ==========================================================================
+let undoTimer = null;
+function showUndoBanner(summary) {
+  const banner = document.getElementById("undo-banner");
+  const textEl = document.getElementById("undo-text");
+  if (!banner || !textEl) return;
+  textEl.textContent = summary || "Дію збережено";
+  banner.classList.remove("hidden");
+  if (undoTimer) clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => {
+    banner.classList.add("hidden");
+  }, 10000);
+}
+
+function initUndoBanner() {
+  const banner = document.getElementById("undo-banner");
+  document.getElementById("undo-close-btn")?.addEventListener("click", () => {
+    banner?.classList.add("hidden");
+  });
+  document.getElementById("undo-banner-btn")?.addEventListener("click", async () => {
+    try {
+      const res = await apiFetch("/api/v1/system/undo", { method: "POST" });
+      if (res) {
+        showToast(`↩️ ${res.message}`);
+        banner?.classList.add("hidden");
+        reloadCurrentTab();
+      }
+    } catch (e) {
+      showToast(`❌ Помилка скасування: ${e.message}`);
+    }
+  });
+}
+
+// ==========================================================================
+// --- Step 5: Telegram Family Delegation Modal ---
+// ==========================================================================
+function initDelegationModal() {
+  const modal = document.getElementById("delegation-modal");
+  const closeBtn = document.getElementById("delegation-close-btn");
+  const listEl = document.getElementById("delegation-contacts-list");
+  const saveBtn = document.getElementById("save-new-contact-btn");
+
+  closeBtn?.addEventListener("click", () => modal?.classList.add("hidden"));
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
+  });
+
+  async function loadAndRenderContacts() {
+    if (!listEl) return;
+    listEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Завантаження контактів...</div>';
+    try {
+      const contacts = await apiFetch("/api/v1/delegation/contacts");
+      if (!contacts || contacts.length === 0) {
+        listEl.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);padding:8px 0;">Контактів сім\'ї ще не додано. Додайте дружину або доньку у формі нижче.</div>';
+        return;
+      }
+      listEl.innerHTML = contacts.map(c => {
+        const icon = c.relationship === "wife" ? "👩" : (c.relationship === "daughter" ? "👧" : (c.relationship === "son" ? "👦" : (c.relationship === "husband" ? "👨" : "👤")));
+        const tgLabel = c.telegram_chat_id ? `Telegram: ${c.telegram_chat_id}` : "Немає Telegram ID";
+        return `
+          <div class="contact-picker-item" data-id="${c.id}" data-name="${escapeHtml(c.name)}">
+            <div class="contact-meta">
+              <span class="contact-name">${icon} ${escapeHtml(c.name)}</span>
+              <span class="contact-sub">${tgLabel}</span>
+            </div>
+            <button class="action-btn-sm" style="background:#229ED9;">Відправити ➔</button>
+          </div>
+        `;
+      }).join("");
+
+      listEl.querySelectorAll(".contact-picker-item").forEach(item => {
+        item.addEventListener("click", async () => {
+          const contactId = parseInt(item.getAttribute("data-id"));
+          const name = item.getAttribute("data-name");
+          try {
+            showToast(`Відправляю список для ${name}...`);
+            const res = await apiFetch("/api/v1/delegation/send", {
+              method: "POST",
+              body: JSON.stringify({ contact_id: contactId, domain: "shopping" })
+            });
+            if (res) {
+              showToast(`✅ Список покупок надіслано для ${name} в Telegram!`);
+              modal?.classList.add("hidden");
+            }
+          } catch (err) {
+            showToast(`❌ Помилка відправки: ${err.message}`);
+          }
+        });
+      });
+    } catch (e) {
+      listEl.innerHTML = `<div style="color:var(--danger);font-size:0.85rem;">Помилка: ${e.message}</div>`;
+    }
+  }
+
+  document.getElementById("share-shopping-telegram-btn")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    modal?.classList.remove("hidden");
+    loadAndRenderContacts();
+  });
+
+  saveBtn?.addEventListener("click", async () => {
+    const name = document.getElementById("new-contact-name")?.value.trim();
+    const rel = document.getElementById("new-contact-rel")?.value || "other";
+    const tg = document.getElementById("new-contact-tg")?.value.trim();
+    if (!name) {
+      showToast("Вкажіть ім'я контакту!");
+      return;
+    }
+    try {
+      await apiFetch("/api/v1/delegation/contacts", {
+        method: "POST",
+        body: JSON.stringify({ name, relationship: rel, telegram_chat_id: tg, can_add_items: true })
+      });
+      showToast(`✅ Контакт «${name}» збережено!`);
+      const nameInp = document.getElementById("new-contact-name");
+      const tgInp = document.getElementById("new-contact-tg");
+      if (nameInp) nameInp.value = "";
+      if (tgInp) tgInp.value = "";
+      loadAndRenderContacts();
+    } catch (err) {
+      showToast(`❌ Помилка: ${err.message}`);
+    }
+  });
+}
+
+// ==========================================================================
+// --- Step 5: Live Translator (Face-to-Face Split Screen) ---
+// ==========================================================================
+function speakText(text, lang) {
+  if (!window.speechSynthesis || !text) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  const langMap = { uk: "uk-UA", ru: "ru-RU", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
+  utterance.lang = langMap[lang] || lang || "en-US";
+  window.speechSynthesis.speak(utterance);
+}
+
+function initTranslatorScreen() {
+  const sSelect = document.getElementById("translator-source-lang");
+  const tSelect = document.getElementById("translator-target-lang");
+  const swapBtn = document.getElementById("translator-swap-btn");
+  const foreignerOut = document.getElementById("foreigner-output-text");
+  const userOut = document.getElementById("user-output-text");
+  const userMicBtn = document.getElementById("user-mic-btn");
+  const foreignerMicBtn = document.getElementById("foreigner-mic-btn");
+  const userTtsBtn = document.getElementById("user-tts-btn");
+  const foreignerTtsBtn = document.getElementById("foreigner-tts-btn");
+
+  if (!userMicBtn || userMicBtn.dataset.bound) return;
+  userMicBtn.dataset.bound = "true";
+
+  swapBtn?.addEventListener("click", () => {
+    const temp = sSelect.value === "auto" ? "uk" : sSelect.value;
+    sSelect.value = tSelect.value;
+    tSelect.value = temp;
+    updateMicLabels();
+  });
+
+  function updateMicLabels() {
+    const sName = sSelect?.options[sSelect.selectedIndex]?.text?.replace(/^[^\s]+\s/, "") || "своєю мовою";
+    const tName = tSelect?.options[tSelect.selectedIndex]?.text?.replace(/^[^\s]+\s/, "") || "іноземною";
+    const uLabel = document.getElementById("user-mic-label");
+    const fLabel = document.getElementById("foreigner-mic-label");
+    if (uLabel) uLabel.textContent = `Говорити (${sName})`;
+    if (fLabel) fLabel.textContent = `Говорити (${tName})`;
+  }
+
+  sSelect?.addEventListener("change", updateMicLabels);
+  tSelect?.addEventListener("change", updateMicLabels);
+  updateMicLabels();
+
+  let isListening = false;
+  let recognition = null;
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  async function translateAndDisplay(spokenText, fromLang, toLang, isUserSpeaker) {
+    if (!spokenText) return;
+    try {
+      if (isUserSpeaker) {
+        if (userOut) userOut.textContent = `Ви: ${spokenText}`;
+        if (foreignerOut) foreignerOut.textContent = "Перекладаю...";
+      } else {
+        if (foreignerOut) foreignerOut.textContent = `Співрозмовник: ${spokenText}`;
+        if (userOut) userOut.textContent = "Перекладаю...";
+      }
+
+      const res = await apiFetch("/api/v1/translator/translate-text", {
+        method: "POST",
+        body: JSON.stringify({ text: spokenText, source_lang: fromLang, target_lang: toLang })
+      });
+
+      if (res && res.translated_text) {
+        if (isUserSpeaker) {
+          if (foreignerOut) foreignerOut.textContent = res.translated_text;
+          speakText(res.translated_text, toLang);
+        } else {
+          if (userOut) userOut.textContent = res.translated_text;
+          speakText(res.translated_text, toLang);
+        }
+      }
+    } catch (e) {
+      showToast(`Помилка перекладу: ${e.message}`);
+    }
+  }
+
+  function startSpeechRecognition(fromLang, toLang, isUserSpeaker, btnEl) {
+    if (SpeechRec) {
+      if (isListening) {
+        if (recognition) recognition.stop();
+        isListening = false;
+        btnEl.classList.remove("recording");
+        return;
+      }
+
+      recognition = new SpeechRec();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      const langMap = { uk: "uk-UA", ru: "ru-RU", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
+      recognition.lang = langMap[fromLang] || "uk-UA";
+
+      recognition.onstart = () => {
+        isListening = true;
+        btnEl.classList.add("recording");
+        playAudioBeep();
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        translateAndDisplay(transcript, fromLang, toLang, isUserSpeaker);
+      };
+
+      recognition.onerror = (e) => {
+        console.warn("SpeechRec error:", e);
+        showToast("Не вдалося розпізнати мову. Спробуйте ще раз.");
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        btnEl.classList.remove("recording");
+      };
+
+      try {
+        recognition.start();
+      } catch (err) {
+        isListening = false;
+        btnEl.classList.remove("recording");
+      }
+    } else {
+      const text = prompt("Введіть текст для перекладу:");
+      if (text) translateAndDisplay(text, fromLang, toLang, isUserSpeaker);
+    }
+  }
+
+  userMicBtn?.addEventListener("click", () => {
+    startSpeechRecognition(sSelect.value, tSelect.value, true, userMicBtn);
+  });
+
+  foreignerMicBtn?.addEventListener("click", () => {
+    const sLang = sSelect.value === "auto" ? "uk" : sSelect.value;
+    startSpeechRecognition(tSelect.value, sLang, false, foreignerMicBtn);
+  });
+
+  userTtsBtn?.addEventListener("click", () => {
+    const text = userOut?.textContent?.replace(/^Ви:\s*/, "")?.trim();
+    if (text) speakText(text, sSelect.value === "auto" ? "uk" : sSelect.value);
+  });
+
+  foreignerTtsBtn?.addEventListener("click", () => {
+    const text = foreignerOut?.textContent?.replace(/^Співрозмовник:\s*/, "")?.trim();
+    if (text) speakText(text, tSelect.value);
+  });
+}
+
+function initStep5Handlers() {
+  initUndoBanner();
+  initDelegationModal();
+  initTranslatorScreen();
+}
+
 // --- Offline Listener ---
 function initNetworkListeners() {
   const banner = document.getElementById("offline-banner");
@@ -1453,6 +1796,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initManualAddModal();
   initStep2Handlers();
   initStep3Handlers();
+  initStep5Handlers();
   initNetworkListeners();
   checkHealth();
   checkSystemFeatures();

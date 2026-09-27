@@ -41,30 +41,15 @@ def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str
             if domain == "finance":
                 amount = float(data.get("amount", 0))
                 if amount > 0:
-                    rec = FinanceRecord(
-                        amount=amount,
-                        currency=(data.get("currency") or "UAH").upper(),
-                        category=data.get("category", "Різне"),
-                        type=data.get("type", "expense"),
-                        description=data.get("description"),
-                        date=datetime.utcnow(),
-                    )
-                    db.add(rec)
-                    db.flush()
+                    rec = FinanceRecord(amount=amount, currency=(data.get("currency") or "UAH").upper(), category=data.get("category", "Різне"), type=data.get("type", "expense"), description=data.get("description"), date=datetime.utcnow())
+                    db.add(rec); db.flush()
                     created_items["finance"].append(FinanceResponse.model_validate(rec).model_dump())
 
             elif domain == "shopping":
                 item_name = data.get("item", "").strip()
                 if item_name:
-                    item = ShoppingItem(
-                        item=item_name,
-                        category=data.get("category", "Продукты"),
-                        quantity=data.get("quantity", "1 шт"),
-                        is_purchased=False,
-                        notes=data.get("notes"),
-                    )
-                    db.add(item)
-                    db.flush()
+                    item = ShoppingItem(item=item_name, category=data.get("category", "Продукты"), quantity=data.get("quantity", "1 шт"), is_purchased=False, notes=data.get("notes"))
+                    db.add(item); db.flush()
                     created_items["shopping"].append(ShoppingResponse.model_validate(item).model_dump())
 
             elif domain == "tasks":
@@ -77,40 +62,31 @@ def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str
                             due_date = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
                         except Exception:
                             due_date = None
-
-                    task = Task(
-                        title=title,
-                        description=data.get("description"),
-                        due_date=due_date,
-                        priority=data.get("priority", "medium"),
-                        category=data.get("category", "Личное"),
-                        is_completed=False,
-                    )
-                    db.add(task)
-                    db.flush()
+                    task = Task(title=title, description=data.get("description"), due_date=due_date, priority=data.get("priority", "medium"), category=data.get("category", "Личное"), is_completed=False)
+                    db.add(task); db.flush()
                     created_items["tasks"].append(TaskResponse.model_validate(task).model_dump())
 
             elif domain == "media_notes":
                 title = data.get("title", "").strip()
                 if title:
-                    note = MediaNote(
-                        title=title,
-                        type=data.get("type", "note"),
-                        url=data.get("url"),
-                        author_creator=data.get("author_creator"),
-                        comment=data.get("comment"),
-                        status=data.get("status", "to_review"),
-                        rating=data.get("rating"),
-                    )
-                    db.add(note)
-                    db.flush()
+                    note = MediaNote(title=title, type=data.get("type", "note"), url=data.get("url"), author_creator=data.get("author_creator"), comment=data.get("comment"), status=data.get("status", "to_review"), rating=data.get("rating"))
+                    db.add(note); db.flush()
                     created_items["media_notes"].append(MediaNoteResponse.model_validate(note).model_dump())
 
-        except Exception as e:
-            # Не падаем на одном битом элементе
+        except Exception:
             continue
 
     db.commit()
+    try:
+        from app.core.undo_service import record_action
+        for dom in ["shopping", "finance", "tasks", "media_notes"]:
+            its = created_items.get(dom, [])
+            if its:
+                ids = [it["id"] for it in its if "id" in it]
+                if ids:
+                    record_action(dom, ids, f"{dom}: {len(ids)} записів")
+    except Exception:
+        pass
     return created_items
 
 
@@ -122,6 +98,12 @@ async def process_text_input(payload: ProcessTextRequest, db: Session = Depends(
     text = payload.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Текст запроса не может быть пустым")
+
+    lower = text.lower()
+    if any(k in lower for k in ["отмени последнее", "отменить последнее", "удали то что", "скасуй останнє", "відміни останнє"]):
+        from app.core.undo_service import undo_last_action
+        u_res = undo_last_action(db)
+        return {"status": u_res.get("status", "success"), "summary": u_res.get("message", "Дію скасовано"), "transcription": text, "actions_count": 0, "created": {}}
 
     parsed = await parse_with_gemini(text=text)
     actions = parsed.get("actions", [])
@@ -151,10 +133,16 @@ async def process_audio_input(
 
     mime_type = audio.content_type or "audio/webm"
     parsed = await parse_with_gemini(text=text, audio_bytes=audio_bytes, mime_type=mime_type)
-    actions = parsed.get("actions", [])
-    created = _save_parsed_actions(actions, db)
 
     transcription = parsed.get("transcription", "")
+    lower_tr = transcription.lower()
+    if any(k in lower_tr for k in ["отмени последнее", "отменить последнее", "удали то что", "скасуй останнє", "відміни останнє"]):
+        from app.core.undo_service import undo_last_action
+        u_res = undo_last_action(db)
+        return {"status": u_res.get("status", "success"), "summary": u_res.get("message", "Дію скасовано"), "transcription": transcription, "actions_count": 0, "created": {}}
+
+    actions = parsed.get("actions", [])
+    created = _save_parsed_actions(actions, db)
     summary = parsed.get("summary", "Голосовая заметка сохранена")
     resp_status = "success" if (actions or transcription) else "warning"
 

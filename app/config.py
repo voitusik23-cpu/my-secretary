@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     GDRIVE_BACKUP_FOLDER: str = "Secretary_AI_Backups"
     GDRIVE_SERVICE_ACCOUNT_JSON: str = ""
 
+    # Step 5: Telegram Bot & Family Delegation
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_WEBHOOK_SECRET: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
