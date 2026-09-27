@@ -1,8 +1,10 @@
 import json
 import re
+import urllib.parse
 import logging
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, HTTPException, status
+from fastapi.responses import Response
 from app.auth import verify_secret_key
 from app.config import settings
 from app.modules.translator.schemas import TranslateTextRequest, TranslateTextResponse
@@ -101,6 +103,36 @@ async def translate_text_endpoint(payload: TranslateTextRequest):
         detected_source_lang=res["detected_source_lang"],
         target_lang=payload.target_lang
     )
+
+
+@router.get("/tts", dependencies=[Depends(verify_secret_key)])
+async def text_to_speech(text: str, lang: str = "en"):
+    """
+    Генерує аудіо вимови (MP3) для перекладеного тексту через Google TTS.
+    """
+    clean_text = text.strip()[:300]
+    if not clean_text:
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+    encoded_text = urllib.parse.quote(clean_text)
+    clean_lang = (lang or "en").lower().split("-")[0]
+    url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={encoded_text}&tl={clean_lang}&client=tw-ob"
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)"}
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200 and resp.content:
+                return Response(
+                    content=resp.content,
+                    media_type="audio/mpeg",
+                    headers={"Cache-Control": "public, max-age=86400"}
+                )
+    except Exception as e:
+        logger.warning(f"TTS fetch failed: {e}")
+
+    raise HTTPException(status_code=502, detail="TTS generation failed")
 
 
 @router.websocket("/ws/live-translate")

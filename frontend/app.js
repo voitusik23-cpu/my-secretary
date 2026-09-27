@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.2.1")
+      .register("/sw.js?v=3.2.2")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -1612,13 +1612,94 @@ function initDelegationModal() {
 // ==========================================================================
 // --- Step 5: Live Translator (Face-to-Face Split Screen) ---
 // ==========================================================================
-function speakText(text, lang) {
-  if (!window.speechSynthesis || !text) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  const langMap = { uk: "uk-UA", ru: "ru-RU", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
-  utterance.lang = langMap[lang] || lang || "en-US";
-  window.speechSynthesis.speak(utterance);
+let translatorAudio = null;
+let activeUtterance = null;
+
+// iOS Safari requires audio playback / speech to be unlocked during a direct user touch/click
+function unlockAudioPlayback() {
+  try {
+    if (!translatorAudio) {
+      translatorAudio = new Audio();
+    }
+    // Silent 1-sample WAV to prime WebKit audio channel
+    translatorAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+    const p = translatorAudio.play();
+    if (p && typeof p.then === "function") {
+      p.then(() => translatorAudio.pause()).catch(() => {});
+    }
+  } catch (e) {}
+
+  if (window.speechSynthesis) {
+    try {
+      window.speechSynthesis.resume();
+    } catch (e) {}
+  }
+}
+
+async function speakText(text, lang, targetCardId = null) {
+  if (!text) return;
+  const cleanLang = (lang || "en").toLowerCase().split("-")[0];
+
+  const targetCard = targetCardId ? document.getElementById(targetCardId) : null;
+  const ttsBtn = targetCard ? targetCard.querySelector(".half-action-btn") : null;
+  const originalBtnText = ttsBtn ? ttsBtn.textContent : "";
+  if (ttsBtn) ttsBtn.textContent = "🔊 Грає...";
+
+  function resetBtn() {
+    if (ttsBtn) ttsBtn.textContent = originalBtnText || "🔊 Озвучити";
+  }
+
+  // Tier 1: Real MP3 audio via server TTS (Studio voice, works consistently across devices)
+  try {
+    const keyParam = state.secretKey ? `&key=${encodeURIComponent(state.secretKey)}` : "";
+    const ttsUrl = `${state.serverUrl}/api/v1/translator/tts?text=${encodeURIComponent(text.slice(0, 300))}&lang=${cleanLang}${keyParam}`;
+
+    if (!translatorAudio) {
+      translatorAudio = new Audio();
+    }
+    translatorAudio.src = ttsUrl;
+    translatorAudio.onended = resetBtn;
+    translatorAudio.onerror = () => {
+      resetBtn();
+      fallbackSpeechSynthesis(text, cleanLang, resetBtn);
+    };
+
+    await translatorAudio.play();
+    return;
+  } catch (err) {
+    console.warn("[TTS] Audio stream playback failed, trying Web Speech fallback:", err);
+    fallbackSpeechSynthesis(text, cleanLang, resetBtn);
+  }
+}
+
+function fallbackSpeechSynthesis(text, lang, onDone) {
+  if (!window.speechSynthesis) {
+    if (onDone) onDone();
+    return;
+  }
+  try {
+    window.speechSynthesis.resume();
+    const utterance = new SpeechSynthesisUtterance(text);
+    activeUtterance = utterance; // Prevent iOS Safari GC premature kill
+
+    const langMap = { uk: "uk-UA", ru: "ru-RU", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
+    utterance.lang = langMap[lang] || lang || "en-US";
+    utterance.rate = 0.95;
+
+    utterance.onend = () => {
+      activeUtterance = null;
+      if (onDone) onDone();
+    };
+    utterance.onerror = () => {
+      activeUtterance = null;
+      if (onDone) onDone();
+    };
+
+    window.speechSynthesis.speak(utterance);
+  } catch (e) {
+    console.warn("[TTS] Web Speech failed:", e);
+    if (onDone) onDone();
+  }
 }
 
 function initTranslatorScreen() {
@@ -1678,10 +1759,10 @@ function initTranslatorScreen() {
       if (res && res.translated_text) {
         if (isUserSpeaker) {
           if (foreignerOut) foreignerOut.textContent = res.translated_text;
-          speakText(res.translated_text, toLang);
+          speakText(res.translated_text, toLang, "translator-foreigner-card");
         } else {
           if (userOut) userOut.textContent = res.translated_text;
-          speakText(res.translated_text, toLang);
+          speakText(res.translated_text, toLang, "translator-user-card");
         }
       }
     } catch (e) {
@@ -1690,6 +1771,7 @@ function initTranslatorScreen() {
   }
 
   function startSpeechRecognition(fromLang, toLang, isUserSpeaker, btnEl) {
+    unlockAudioPlayback();
     if (SpeechRec) {
       if (isListening) {
         if (recognition) recognition.stop();
@@ -1738,22 +1820,30 @@ function initTranslatorScreen() {
   }
 
   userMicBtn?.addEventListener("click", () => {
+    unlockAudioPlayback();
     startSpeechRecognition(sSelect.value, tSelect.value, true, userMicBtn);
   });
 
   foreignerMicBtn?.addEventListener("click", () => {
+    unlockAudioPlayback();
     const sLang = sSelect.value === "auto" ? "uk" : sSelect.value;
     startSpeechRecognition(tSelect.value, sLang, false, foreignerMicBtn);
   });
 
   userTtsBtn?.addEventListener("click", () => {
-    const text = userOut?.textContent?.replace(/^Ви:\s*/, "")?.trim();
-    if (text) speakText(text, sSelect.value === "auto" ? "uk" : sSelect.value);
+    unlockAudioPlayback();
+    const raw = userOut?.textContent?.replace(/^Ви:\s*/, "")?.trim();
+    if (raw && raw !== "Перекладаю...") {
+      speakText(raw, sSelect.value === "auto" ? "uk" : sSelect.value, "translator-user-card");
+    }
   });
 
   foreignerTtsBtn?.addEventListener("click", () => {
-    const text = foreignerOut?.textContent?.replace(/^Співрозмовник:\s*/, "")?.trim();
-    if (text) speakText(text, tSelect.value);
+    unlockAudioPlayback();
+    const raw = foreignerOut?.textContent?.replace(/^Співрозмовник:\s*/, "")?.trim();
+    if (raw && raw !== "Перекладаю...") {
+      speakText(raw, tSelect.value, "translator-foreigner-card");
+    }
   });
 }
 
