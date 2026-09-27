@@ -154,8 +154,8 @@
         <span class="tab-label">Давление</span>
       </button>
       <button class="tab-btn" data-tab="media" role="tab" aria-selected="false">
-        <span class="tab-icon">🎬</span>
-        <span class="tab-label">Медиа</span>
+        <span class="tab-icon">🧠</span>
+        <span class="tab-label">Склерозник</span>
       </button>
       <button class="tab-btn" data-tab="inventory" role="tab" aria-selected="false">
         <span class="tab-icon">📦</span>
@@ -253,11 +253,17 @@
         </div>
       </section>
 
-      <!-- 5. MEDIA NOTES TAB -->
+      <!-- 5. СКЛЕРОЗНИК (Quick Notes & Brain Dumps) -->
       <section id="tab-media" class="tab-panel">
         <div class="panel-header">
-          <h2>Медиа и заметки</h2>
-          <button id="add-media-btn" class="action-btn-sm">+ Заметка</button>
+          <h2>🧠 Склерозник (Швидкі замітки)</h2>
+          <button id="add-media-btn" class="action-btn-sm">+ Запис</button>
+        </div>
+        <div style="background:var(--bg-card);border:1px dashed var(--border-color);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:12px;font-size:0.84rem;color:var(--text-sub);display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.3rem;">🎙️</span>
+          <div>
+            <strong>Голосові команди:</strong> Скажіть <em>«Склерозник: пароль від роутера 12345»</em> або <em>«Запиши в склерозник код шлагбаума 7788»</em> з головного екрана.
+          </div>
         </div>
         <div id="media-list" class="items-list">
           <!-- Populated by JS -->
@@ -823,19 +829,22 @@
           <button type="button" class="bp-range-btn active" data-days="90">3 місяці</button>
         </div>
       </div>
-      <button type="button" id="bp-chart-modal-close-btn" class="action-btn-sm" style="font-size:0.85rem;padding:6px 14px;border-radius:8px;background:var(--border-color);color:var(--text-main);border:none;cursor:pointer;">✕ Закрити</button>
+      <button type="button" id="bp-chart-modal-close-btn" class="bp-modal-close-btn" aria-label="Закрити графік">✕ Закрити</button>
     </div>
     <div class="chart-modal-body" id="bp-modal-viewport">
       <div class="chart-modal-scroller" id="bp-modal-scroller">
         <canvas id="bp-modal-chart"></canvas>
       </div>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:4px;">
-      <small style="color:var(--text-muted);font-size:0.78rem;">💡 Торкайтесь або наводьте курсор на точки для перегляду точного часу, ліків та заміток</small>
-      <small style="color:#30d158;font-size:0.78rem;font-weight:600;">— Референсна норма: 130 / 85</small>
+    <div class="chart-modal-footer">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
+        <small style="color:var(--text-muted);font-size:0.78rem;">💡 Торкайтесь або наводьте курсор на точки для перегляду точного часу, ліків та заміток</small>
+        <small style="color:#30d158;font-size:0.78rem;font-weight:600;">— Референсна норма: 130 / 85</small>
+      </div>
+      <button type="button" id="bp-chart-modal-bottom-close-btn" class="bp-modal-bottom-close-btn">✕ Закрити графік</button>
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.3.2"></script>
+  <script src="/static/app.js?v=3.3.3"></script>
 </body>
 </html>

@@ -26,7 +26,12 @@ SYSTEM_INSTRUCTION = """Ти — інтелектуальний персонал
    - УСІ дії або роботи, які треба зробити або виконати — обов'язково записуй як ОКРЕМІ елементи у domain="tasks"!
    - title: назва роботи («Постелити плитку», «Помити машину»), priority: "medium", category: "Роботи".
 
-4. "media_notes" — ТІЛЬКИ фільми, серіали, книги або загальні нотатки, які НЕ є покупками, роботами чи фінансами.
+4. "auto" — АВТОМОБІЛЬ, ГАРАЖ, пробіг машини, заміна масла, ТО, страховка («пробіг 120000», «пробіг машини 145 тис», «поміняв масло»).
+   - current_mileage: числове значення пробігу (наприклад 120000).
+   - event_type: "mileage", notes: опис.
+
+5. "media_notes" — **СКЛЕРОЗНИК**: будь-які швидкі замітки, паролі, коди, «всяка всячина», думки, коли кажуть «склерозник: ...», «запиши в склерозник ...», або якщо це не покупки, не роботи і не авто.
+   - title: назва або перші 4-5 слів, type: "note", comment: повний текст нотатки.
 
 ПРИКЛАД СКЛАДНОГО ЗАПИТУ:
 «купить молоко, хлеб, скотч, единорога, сделать, постелить плитку, убрать территорию, помыть машину, сделать химчистку»
@@ -72,7 +77,26 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
     lower = text.lower()
     summary_parts = []
 
-    # 1. Фінанси
+    # 1. Авто / Пробіг машини
+    if any(k in lower for k in ["пробіг", "пробег", "одометр"]):
+        m_dig = re.search(r'(\d+[\s\d]*)\s*(?:км|тыс|тис)?', lower)
+        if m_dig:
+            try:
+                ml = int(m_dig.group(1).replace(" ", ""))
+                if any(t in lower for t in ["тыс", "тис"]) and ml < 1000:
+                    ml *= 1000
+                actions.append({"domain": "auto", "data": {"current_mileage": ml, "event_type": "mileage", "notes": text}})
+                summary_parts.append(f"пробіг авто {ml} км")
+            except Exception:
+                pass
+
+    # 2. Склерозник
+    if "склерозник" in lower:
+        cl_note = re.sub(r'^(?:склерозник:?|запиши(?:\s+в|\s+у)?\s+склерозник:?|в\s+склерозник:?|склерозник\s+запис:?)\s*', '', text, flags=re.IGNORECASE).strip()
+        actions.append({"domain": "media_notes", "data": {"title": (cl_note or text)[:40], "type": "note", "comment": cl_note or text, "status": "to_review"}})
+        summary_parts.append(f"склерозник «{(cl_note or text)[:30]}»")
+
+    # 3. Фінанси
     price_match = re.search(r'(\d+[\.,]?\d*)\s*(грн|грив[еньяі]*|uah|usd|\$|дол|бакс[а-я]*|євро|евро|eur)?', lower)
     finance_kw = ["купив", "купил", "витратив", "потратил", "заплатив", "заплатил", "чек", "коштувало", "стоило"]
     if any(k in lower for k in finance_kw) and price_match:

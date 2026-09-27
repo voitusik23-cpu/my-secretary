@@ -21,14 +21,14 @@ class ProcessTextRequest(BaseModel):
 
 
 def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str, List[Any]]:
-    """
-    Сохраняет извлеченные AI действия в соответствующие таблицы базы данных.
-    """
+    """Зберігає вилучені AI дії у відповідні таблиці БД."""
     created_items: Dict[str, List[Any]] = {
         "finance": [],
         "shopping": [],
         "tasks": [],
         "media_notes": [],
+        "auto": [],
+        "health_vitals": [],
     }
 
     for action in actions:
@@ -62,7 +62,7 @@ def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str
                             due_date = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
                         except Exception:
                             due_date = None
-                    task = Task(title=title, description=data.get("description"), due_date=due_date, priority=data.get("priority", "medium"), category=data.get("category", "Личное"), is_completed=False)
+                    task = Task(title=title, description=data.get("description"), due_date=due_date, priority=data.get("priority", "medium"), category=data.get("category", "Роботи"), is_completed=False)
                     db.add(task); db.flush()
                     created_items["tasks"].append(TaskResponse.model_validate(task).model_dump())
 
@@ -73,13 +73,36 @@ def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str
                     db.add(note); db.flush()
                     created_items["media_notes"].append(MediaNoteResponse.model_validate(note).model_dump())
 
+            elif domain == "auto":
+                from app.modules.auto.models import AutoLog
+                ml = data.get("current_mileage") or data.get("mileage")
+                if isinstance(ml, str):
+                    m_d = re.search(r'\d+', ml.replace(" ", "").replace(",", ""))
+                    ml = int(m_d.group(0)) if m_d else None
+                ev = data.get("event_type", "mileage")
+                nt = data.get("notes") or data.get("description") or f"Пробіг: {ml} км"
+                log = AutoLog(event_type=ev, current_mileage=ml, encrypted_notes=nt, created_at=datetime.utcnow())
+                db.add(log); db.flush()
+                created_items["auto"].append({"id": log.id, "mileage": ml, "event_type": ev, "notes": nt})
+
+            elif domain == "health_vitals":
+                from app.modules.health_vitals.models import BloodPressureLog
+                from app.modules.health_vitals.service import infer_time_of_day
+                s_v, d_v = int(data.get("systolic", 0)), int(data.get("diastolic", 0))
+                if s_v > 0 and d_v > 0:
+                    p_v = int(data.get("pulse")) if data.get("pulse") else None
+                    rec_dt = datetime.utcnow()
+                    b_log = BloodPressureLog(recorded_at=rec_dt, systolic=s_v, diastolic=d_v, pulse=p_v, time_of_day=data.get("time_of_day") or infer_time_of_day(rec_dt), medications_taken=data.get("medications_taken"), encrypted_notes=data.get("notes"), created_at=rec_dt)
+                    db.add(b_log); db.flush()
+                    created_items["health_vitals"].append({"id": b_log.id, "reading": f"{s_v}/{d_v}"})
+
         except Exception:
             continue
 
     db.commit()
     try:
         from app.core.undo_service import record_action
-        for dom in ["shopping", "finance", "tasks", "media_notes"]:
+        for dom in ["shopping", "finance", "tasks", "media_notes", "auto", "health_vitals"]:
             its = created_items.get(dom, [])
             if its:
                 ids = [it["id"] for it in its if "id" in it]
@@ -92,9 +115,7 @@ def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str
 
 @router.post("/process", status_code=status.HTTP_200_OK)
 async def process_text_input(payload: ProcessTextRequest, db: Session = Depends(get_db)):
-    """
-    Принимает текст, анализирует через Gemini AI и распределяет по категориям.
-    """
+    """Аналізує текст через Gemini AI та розподіляє по категоріях."""
     text = payload.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Текст запроса не может быть пустым")
@@ -120,13 +141,11 @@ async def process_text_input(payload: ProcessTextRequest, db: Session = Depends(
 
 @router.post("/process/audio", status_code=status.HTTP_200_OK)
 async def process_audio_input(
-    audio: UploadFile = File(..., description="Аудиофайл голосовой заметки"),
-    text: Optional[str] = Form(None, description="Дополнительный текстовый контекст"),
+    audio: UploadFile = File(..., description="Аудіофайл"),
+    text: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
-    """
-    Принимает аудиозапись (m4a, webm, mp3, wav и т.д.), распознает и сохраняет действия.
-    """
+    """Приймає аудіозапис, розпізнає та зберігає дії."""
     audio_bytes = await audio.read()
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="Файл аудио пустой")
@@ -157,9 +176,7 @@ async def process_audio_input(
 
 @router.get("/feed", status_code=status.HTTP_200_OK)
 def get_unified_feed(db: Session = Depends(get_db), limit: int = 40):
-    """
-    Возвращает единую ленту последних действий со всех 4 категорий в хронологическом порядке.
-    """
+    """Повертає єдину стрічку останніх дій у хронологічному порядку."""
     feed = []
 
     # 1. Finance

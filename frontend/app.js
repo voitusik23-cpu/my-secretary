@@ -561,23 +561,36 @@ async function loadTasks() {
   }
 }
 
-// 5. Media Notes
+// 5. Media Notes / Склерозник
+window.copySclerozText = function(text, ev) {
+  if (ev) ev.stopPropagation();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast("📋 Скопійовано в буфер!");
+    }).catch(() => {
+      showToast("Не вдалося скопіювати");
+    });
+  } else {
+    showToast(`Текст: ${text}`);
+  }
+};
+
 async function loadMedia() {
   const list = document.getElementById("media-list");
   try {
     const notes = await apiFetch("/api/media_notes");
     if (!notes || notes.length === 0) {
-      list.innerHTML = `<div class="empty-state"><p>Заметок пока нет</p></div>`;
+      list.innerHTML = `<div class="empty-state"><span class="empty-icon">🧠</span><p>Склерозник порожній.<br><span style="font-size:0.82rem;color:var(--text-muted);">Скажіть голосом: <em>«Склерозник: код домофона 45»</em> або додайте кнопкою <strong>+ Запис</strong>.</span></p></div>`;
       return;
     }
 
     const typeIcons = {
-      movie: "🎬 Фильм",
-      series: "📺 Сериал",
+      note: "🧠 Склерозник",
+      movie: "🎬 Фільм",
+      series: "📺 Серіал",
       book: "📚 Книга",
       podcast: "🎧 Подкаст",
-      article: "📰 Статья",
-      note: "📝 Заметка",
+      article: "📰 Стаття",
     };
 
     list.innerHTML = notes
@@ -586,19 +599,20 @@ async function loadMedia() {
         <div class="item-card">
           <div class="item-content">
             <span class="item-title ${m.status === "completed" ? "completed" : ""}">${escapeHtml(m.title)}</span>
-            <span class="item-subtitle">${escapeHtml(m.author_creator || m.comment || "")}</span>
-            ${m.url ? `<a href="${escapeHtml(m.url)}" target="_blank" class="item-subtitle" style="color:var(--primary)">🔗 Открыть ссылку</a>` : ""}
-            <span class="item-badge badge-media">${typeIcons[m.type] || m.type}</span>
+            ${m.author_creator || m.comment ? `<span class="item-subtitle">${escapeHtml([m.author_creator, m.comment].filter(Boolean).join(" • "))}</span>` : ""}
+            ${m.url ? `<a href="${escapeHtml(m.url)}" target="_blank" class="item-subtitle" style="color:var(--primary)">🔗 Відкрити посилання</a>` : ""}
+            <span class="item-badge badge-media">${typeIcons[m.type] || "📝 " + m.type}</span>
           </div>
           <div class="item-actions">
+            <button class="action-btn-sm" style="padding:4px 8px;font-size:0.82rem;" onclick="copySclerozText('${escapeHtml(m.title).replace(/'/g, "\\'")}', event)" title="Копіювати">📋</button>
             <button class="custom-checkbox ${m.status === "completed" ? "checked" : ""}" onclick="toggleMedia(${m.id})">✓</button>
-            <button class="delete-btn" onclick="deleteItem('media_notes', ${m.id})" title="Удалить">🗑️</button>
+            <button class="delete-btn" onclick="deleteItem('media_notes', ${m.id})" title="Видалити">🗑️</button>
           </div>
         </div>`
       )
       .join("");
   } catch {
-    list.innerHTML = `<div class="empty-state"><p>Ошибка загрузки заметок</p></div>`;
+    list.innerHTML = `<div class="empty-state"><p>Помилка завантаження склерозника</p></div>`;
   }
 }
 
@@ -1139,25 +1153,25 @@ function initManualAddModal() {
         </select>
       `;
     } else if (domain === "media") {
-      titleEl.textContent = "Добавить медиа или заметку";
+      titleEl.textContent = "🧠 Додати запис у Склерозник";
       fieldsEl.innerHTML = `
-        <label>Название:</label>
-        <input type="text" name="title" required placeholder="Интерстеллар / Атомные привычки" />
+        <label>Текст замітки / Пароль / Назва:</label>
+        <input type="text" name="title" required placeholder="Код шлагбаума 7788 / Пароль Wi-Fi" />
         <label>Тип:</label>
         <select name="type">
-          <option value="movie">Фильм</option>
-          <option value="series">Сериал</option>
-          <option value="book">Книга</option>
-          <option value="podcast">Подкаст</option>
-          <option value="article">Статья</option>
-          <option value="note">Заметка</option>
+          <option value="note">🧠 Склерозник (Замітка / Код / Пароль)</option>
+          <option value="movie">🎬 Фільм</option>
+          <option value="series">📺 Серіал</option>
+          <option value="book">📚 Книга</option>
+          <option value="podcast">🎧 Подкаст</option>
+          <option value="article">📰 Стаття</option>
         </select>
-        <label>Автор / Режиссер:</label>
-        <input type="text" name="author_creator" placeholder="Кристофер Нолан" />
-        <label>Ссылка (если есть):</label>
+        <label>Підказка / Деталі (необов'язково):</label>
+        <input type="text" name="author_creator" placeholder="Під'їзд 2, кнопка зірочка" />
+        <label>Посилання (якщо є):</label>
         <input type="url" name="url" placeholder="https://..." />
-        <label>Заметка / Отзыв:</label>
-        <textarea name="comment" rows="2" placeholder="Хочу посмотреть на выходных"></textarea>
+        <label>Додатковий коментар:</label>
+        <textarea name="comment" rows="2" placeholder="Запасний варіант, уточнити в сусіда"></textarea>
       `;
     } else if (domain === "inventory") {
       titleEl.textContent = "Додати річ до інвентарю";
@@ -2460,7 +2474,9 @@ function renderBpModalChart(logs) {
 
   const chronLogs = [...logs].reverse();
   if (scroller && viewport) {
-    const neededWidth = Math.max(viewport.clientWidth, chronLogs.length * 36);
+    const isMobile = window.innerWidth < 640;
+    const step = isMobile ? 22 : 36;
+    const neededWidth = Math.max(viewport.clientWidth, chronLogs.length * step);
     scroller.style.width = `${neededWidth}px`;
     setTimeout(() => {
       viewport.scrollLeft = viewport.scrollWidth;
@@ -2565,27 +2581,33 @@ function initVitalsScreen() {
   const expandBtn = document.getElementById("bp-chart-expand-btn");
   const modal = document.getElementById("bp-chart-modal");
   const modalCloseBtn = document.getElementById("bp-chart-modal-close-btn");
+  const modalBottomCloseBtn = document.getElementById("bp-chart-modal-bottom-close-btn");
+
+  const closeBpModal = () => {
+    modal?.classList.add("hidden");
+    if (bpModalChartInstance) {
+      bpModalChartInstance.destroy();
+      bpModalChartInstance = null;
+    }
+  };
 
   expandBtn?.addEventListener("click", () => {
     modal?.classList.remove("hidden");
     renderBpModalChart(lastLoadedVitalsLogs);
   });
 
-  modalCloseBtn?.addEventListener("click", () => {
-    modal?.classList.add("hidden");
-    if (bpModalChartInstance) {
-      bpModalChartInstance.destroy();
-      bpModalChartInstance = null;
+  modalCloseBtn?.addEventListener("click", closeBpModal);
+  modalBottomCloseBtn?.addEventListener("click", closeBpModal);
+
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      closeBpModal();
     }
   });
 
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && modal && !modal.classList.contains("hidden")) {
-      modal.classList.add("hidden");
-      if (bpModalChartInstance) {
-        bpModalChartInstance.destroy();
-        bpModalChartInstance = null;
-      }
+      closeBpModal();
     }
   });
 
