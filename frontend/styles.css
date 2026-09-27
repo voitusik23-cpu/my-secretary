@@ -1186,3 +1186,137 @@ body {
   color: var(--text-muted);
 }
 
+/* --- Blood Pressure Chart Viewport & Fullscreen Expand --- */
+.bp-chart-viewport {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  scrollbar-width: thin;
+}
+
+.bp-chart-viewport::-webkit-scrollbar {
+  height: 6px;
+}
+
+.bp-chart-viewport::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.bp-chart-scroller {
+  position: relative;
+  height: 260px;
+  min-width: 100%;
+}
+
+/* Fullscreen Chart Modal */
+.chart-fullscreen-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  background: var(--bg-main);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.chart-fullscreen-modal .chart-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chart-fullscreen-modal .chart-modal-body {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.chart-fullscreen-modal .chart-modal-scroller {
+  height: 100%;
+  min-height: 380px;
+  min-width: 100%;
+  position: relative;
+}
+
+/* AI Agent interactive UI */
+.agent-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+
+.agent-chip {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.agent-chip:hover {
+  background: var(--bg-card-hover);
+  border-color: #06b6d4;
+  color: #06b6d4;
+}
+
+.agent-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #0a84ff;
+  text-decoration: underline;
+  word-break: break-all;
+  font-weight: 500;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: rgba(10, 132, 255, 0.08);
+}
+
+.agent-link:hover {
+  background: rgba(10, 132, 255, 0.16);
+}
+
+.icon-btn-mic {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s;
+}
+
+.icon-btn-mic:active {
+  transform: scale(0.9);
+}
+
+.icon-btn-mic.recording {
+  animation: pulse-mic 1s infinite;
+  background: rgba(255, 69, 58, 0.2);
+}
+

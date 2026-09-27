@@ -524,7 +524,7 @@ async function loadTasks() {
   try {
     const tasks = await apiFetch("/api/tasks");
     if (!tasks || tasks.length === 0) {
-      list.innerHTML = `<div class="empty-state"><p>Нет активных задач</p></div>`;
+      list.innerHTML = `<div class="empty-state"><p>Немає активних робіт. Скажіть мікрофону: «Постелити плитку, помити авто...»</p></div>`;
       return;
     }
 
@@ -1125,17 +1125,17 @@ function initManualAddModal() {
         <input type="text" name="category" value="Продукты" />
       `;
     } else if (domain === "tasks") {
-      titleEl.textContent = "Добавить задачу";
+      titleEl.textContent = "Додати роботу / справу";
       fieldsEl.innerHTML = `
-        <label>Название задачи:</label>
-        <input type="text" name="title" required placeholder="Позвонить в банк" />
-        <label>Срок выполнения:</label>
+        <label>Назва роботи або справи:</label>
+        <input type="text" name="title" required placeholder="Постелити плитку, помити авто..." />
+        <label>Термін виконання:</label>
         <input type="datetime-local" name="due_date" />
-        <label>Приоритет:</label>
+        <label>Пріоритет:</label>
         <select name="priority">
-          <option value="low">Низкий</option>
-          <option value="medium" selected>Средний</option>
-          <option value="high">Высокий</option>
+          <option value="low">Низький</option>
+          <option value="medium" selected>Середній</option>
+          <option value="high">Високий / Терміново</option>
         </select>
       `;
     } else if (domain === "media") {
@@ -1359,7 +1359,7 @@ function initStep2Handlers() {
     if (e.key === "Enter") runInventorySearch();
   });
 
-  // 3. Web Search Agent
+  // 3. Web Search Agent (Розумний AI-Агент)
   const agentForm = document.getElementById("agent-search-form");
   const agentInput = document.getElementById("agent-query-input");
   const agentLoader = document.getElementById("agent-loading");
@@ -1368,6 +1368,96 @@ function initStep2Handlers() {
   const agentAnswerEl = document.getElementById("agent-res-answer");
   const agentSourcesBox = document.getElementById("agent-res-sources");
   const agentSourcesList = document.getElementById("agent-sources-list");
+  const agentVoiceBtn = document.getElementById("agent-voice-btn");
+  const agentTtsBtn = document.getElementById("agent-tts-btn");
+  const agentCopyBtn = document.getElementById("agent-copy-btn");
+
+  let lastAgentRawAnswer = "";
+
+  function formatAgentMarkdown(text) {
+    if (!text) return "";
+    let html = escapeHtml(text);
+    // Bold
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Headers
+    html = html.replace(/^### (.*$)/gim, '<h4 style="margin:10px 0 4px;font-size:0.95rem;color:var(--text-main);">$1</h4>');
+    html = html.replace(/^## (.*$)/gim, '<h3 style="margin:12px 0 6px;font-size:1.02rem;color:var(--text-main);">$1</h3>');
+    // Bullet lists
+    html = html.replace(/^\* (.*$)/gim, '<div style="margin-left:10px;">• $1</div>');
+    html = html.replace(/^- (.*$)/gim, '<div style="margin-left:10px;">• $1</div>');
+    // Markdown links [text](url)
+    html = html.replace(/\[(.*?)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="agent-link">🔗 $1</a>');
+    // Raw URLs into clickable links
+    html = html.replace(/(https?:\/\/[^\s<]+)/g, (match, url) => {
+      if (url.includes('class="agent-link"')) return match;
+      return `<a href="${url}" target="_blank" rel="noopener" class="agent-link">🔗 ${url.replace(/^https?:\/\/(?:www\.)?/, '').slice(0, 30)}...</a>`;
+    });
+    return html;
+  }
+
+  // Voice recognition for agent
+  if (agentVoiceBtn) {
+    let agentSpeech = null;
+    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      agentSpeech = new SpeechRec();
+      agentSpeech.continuous = false;
+      agentSpeech.interimResults = false;
+      agentSpeech.lang = "uk-UA";
+
+      agentSpeech.onresult = (evt) => {
+        const tr = evt.results[0][0].transcript;
+        if (tr && agentInput) {
+          agentInput.value = tr;
+          agentForm?.dispatchEvent(new Event("submit"));
+        }
+      };
+      agentSpeech.onend = () => agentVoiceBtn.classList.remove("recording");
+      agentSpeech.onerror = () => agentVoiceBtn.classList.remove("recording");
+    }
+
+    agentVoiceBtn.addEventListener("click", () => {
+      if (!agentSpeech) {
+        showToast("Голосове розпізнавання не підтримується у цьому браузері");
+        return;
+      }
+      try {
+        agentVoiceBtn.classList.add("recording");
+        agentSpeech.start();
+      } catch (err) {
+        agentVoiceBtn.classList.remove("recording");
+      }
+    });
+  }
+
+  // Suggestion chips
+  document.querySelectorAll(".agent-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const q = chip.dataset.q;
+      if (q && agentInput) {
+        agentInput.value = q;
+        agentForm?.dispatchEvent(new Event("submit"));
+      }
+    });
+  });
+
+  // TTS speak button
+  agentTtsBtn?.addEventListener("click", () => {
+    if (!lastAgentRawAnswer) return;
+    unlockAudioPlayback();
+    const cleanSpeech = lastAgentRawAnswer.replace(/[*#_~`\[\]\(\)]/g, " ").replace(/https?:\/\/\S+/g, "").trim();
+    if (cleanSpeech) {
+      speakText(cleanSpeech, "uk-UA");
+    }
+  });
+
+  // Copy button
+  agentCopyBtn?.addEventListener("click", () => {
+    if (!lastAgentRawAnswer) return;
+    navigator.clipboard?.writeText(lastAgentRawAnswer)
+      .then(() => showToast("📋 Текст відповіді скопійовано!"))
+      .catch(() => showToast("Не вдалося скопіювати"));
+  });
 
   agentForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1376,6 +1466,7 @@ function initStep2Handlers() {
 
     agentLoader.classList.remove("hidden");
     agentCard.classList.add("hidden");
+    agentTtsBtn?.classList.add("hidden");
 
     try {
       const res = await apiFetch("/api/v1/agent/ask", {
@@ -1386,14 +1477,17 @@ function initStep2Handlers() {
       agentLoader.classList.add("hidden");
       agentCard.classList.remove("hidden");
       agentQueryEl.textContent = res.query;
-      agentAnswerEl.textContent = res.answer;
+      lastAgentRawAnswer = res.answer || "";
+      agentAnswerEl.innerHTML = formatAgentMarkdown(res.answer);
+
+      if (agentTtsBtn) agentTtsBtn.classList.remove("hidden");
 
       if (res.sources && res.sources.length > 0) {
         agentSourcesBox.classList.remove("hidden");
         agentSourcesList.innerHTML = res.sources
           .map(
             (s) =>
-              `<a href="${escapeHtml(s.url)}" target="_blank" class="item-badge badge-media" style="text-decoration:none;">🔗 ${escapeHtml(s.title || "Джерело")}</a>`
+              `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener" class="item-badge badge-media agent-link" style="text-decoration:none;">🔗 ${escapeHtml(s.title || "Джерело")}</a>`
           )
           .join("");
       } else {
@@ -2041,6 +2135,8 @@ function initStep5Handlers() {
 // ==========================================================================
 let vitalsSelectedDays = 90;
 let bpChartInstance = null;
+let bpModalChartInstance = null;
+let lastLoadedVitalsLogs = [];
 
 async function loadVitals() {
   const avgEl = document.getElementById("stat-bp-avg");
@@ -2062,6 +2158,7 @@ async function loadVitals() {
     ]);
 
     if (!analytics || !logs) return;
+    lastLoadedVitalsLogs = logs;
 
     // 1. Stats Cards
     if (analytics.total_readings > 0) {
@@ -2184,8 +2281,128 @@ async function loadVitals() {
   }
 }
 
+function createBpChartConfig(chronLogs, isFullscreen) {
+  const labels = chronLogs.map(l => {
+    const dt = new Date(l.recorded_at);
+    return `${dt.getDate()}.${dt.getMonth() + 1} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2, '0')}`;
+  });
+
+  const sysData = chronLogs.map(l => l.systolic);
+  const diaData = chronLogs.map(l => l.diastolic);
+  const pulseData = chronLogs.map(l => l.pulse || null);
+
+  const isDark = document.documentElement.getAttribute("data-theme") !== "light";
+  const gridColor = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)";
+  const textColor = isDark ? "#8e9bb0" : "#555";
+  const pointRad = isFullscreen ? 5 : (chronLogs.length > 25 ? 3 : 4);
+
+  return {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Систолічний (SYS)",
+          data: sysData,
+          borderColor: "#ff453a",
+          backgroundColor: "rgba(255, 69, 58, 0.12)",
+          borderWidth: isFullscreen ? 3 : 2.5,
+          tension: 0.25,
+          pointRadius: pointRad,
+          pointHoverRadius: 7,
+          pointBackgroundColor: "#ff453a",
+        },
+        {
+          label: "Діастолічний (DIA)",
+          data: diaData,
+          borderColor: "#0a84ff",
+          backgroundColor: "rgba(10, 132, 255, 0.1)",
+          borderWidth: isFullscreen ? 3 : 2.5,
+          tension: 0.25,
+          pointRadius: pointRad,
+          pointHoverRadius: 7,
+          pointBackgroundColor: "#0a84ff",
+        },
+        {
+          label: "Пульс (BPM)",
+          data: pulseData,
+          borderColor: "#af52de",
+          borderDash: [4, 4],
+          borderWidth: 2,
+          tension: 0.25,
+          pointRadius: pointRad > 2 ? pointRad - 1 : 2,
+          pointHoverRadius: 6,
+          pointBackgroundColor: "#af52de",
+          yAxisID: "y1",
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false,
+      },
+      plugins: {
+        legend: {
+          position: "top",
+          labels: {
+            color: textColor,
+            boxWidth: 14,
+            font: { size: isFullscreen ? 13 : 11 }
+          }
+        },
+        tooltip: {
+          backgroundColor: isDark ? "#1b2234" : "#ffffff",
+          titleColor: isDark ? "#ffffff" : "#111111",
+          bodyColor: isDark ? "#e0e6ed" : "#333333",
+          borderColor: isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)",
+          borderWidth: 1,
+          padding: 10,
+          callbacks: {
+            afterBody: function(items) {
+              if (!items || items.length === 0) return "";
+              const idx = items[0].dataIndex;
+              const log = chronLogs[idx];
+              if (!log) return "";
+              const lines = [];
+              if (log.medications_taken) lines.push(`💊 ${log.medications_taken}`);
+              if (log.notes) lines.push(`📝 ${log.notes}`);
+              return lines.length ? "\n" + lines.join("\n") : "";
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { size: isFullscreen ? 11 : 9 }, maxRotation: 45 }
+        },
+        y: {
+          min: 40,
+          max: 200,
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { size: isFullscreen ? 12 : 10 } },
+          title: { display: true, text: "мм рт. ст.", color: textColor, font: { size: 10 } }
+        },
+        y1: {
+          position: "right",
+          min: 40,
+          max: 160,
+          grid: { drawOnChartArea: false },
+          ticks: { color: "#af52de", font: { size: isFullscreen ? 12 : 10 } },
+          title: { display: true, text: "уд/хв", color: "#af52de", font: { size: 10 } }
+        }
+      }
+    }
+  };
+}
+
 function renderBpChart(logs) {
   const canvas = document.getElementById("bp-chart");
+  const scroller = document.getElementById("bp-chart-scroller");
+  const viewport = document.getElementById("bp-chart-viewport");
   if (!canvas) return;
 
   if (bpChartInstance) {
@@ -2205,104 +2422,53 @@ function renderBpChart(logs) {
   }
 
   const chronLogs = [...logs].reverse();
-  const labels = chronLogs.map(l => {
-    const dt = new Date(l.recorded_at);
-    return `${dt.getDate()}.${dt.getMonth() + 1} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2, '0')}`;
-  });
 
-  const sysData = chronLogs.map(l => l.systolic);
-  const diaData = chronLogs.map(l => l.diastolic);
-  const pulseData = chronLogs.map(l => l.pulse || null);
-
-  const isDark = document.documentElement.getAttribute("data-theme") !== "light";
-  const gridColor = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)";
-  const textColor = isDark ? "#8e9bb0" : "#555";
-
-  bpChartInstance = new window.Chart(canvas, {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: "Систолічний (SYS)",
-          data: sysData,
-          borderColor: "#ff453a",
-          backgroundColor: "rgba(255, 69, 58, 0.15)",
-          borderWidth: 2.5,
-          tension: 0.25,
-          pointRadius: 4,
-          pointBackgroundColor: "#ff453a",
-        },
-        {
-          label: "Діастолічний (DIA)",
-          data: diaData,
-          borderColor: "#0a84ff",
-          backgroundColor: "rgba(10, 132, 255, 0.12)",
-          borderWidth: 2.5,
-          tension: 0.25,
-          pointRadius: 4,
-          pointBackgroundColor: "#0a84ff",
-        },
-        {
-          label: "Пульс (BPM)",
-          data: pulseData,
-          borderColor: "#af52de",
-          borderDash: [4, 4],
-          borderWidth: 1.8,
-          tension: 0.25,
-          pointRadius: 3,
-          pointBackgroundColor: "#af52de",
-          yAxisID: "y1",
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: "index",
-        intersect: false,
-      },
-      plugins: {
-        legend: {
-          position: "top",
-          labels: {
-            color: textColor,
-            boxWidth: 12,
-            font: { size: 11 }
-          }
-        },
-        tooltip: {
-          backgroundColor: isDark ? "#1b2234" : "#ffffff",
-          titleColor: isDark ? "#ffffff" : "#111111",
-          bodyColor: isDark ? "#e0e6ed" : "#333333",
-          borderColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)",
-          borderWidth: 1,
-        }
-      },
-      scales: {
-        x: {
-          grid: { color: gridColor },
-          ticks: { color: textColor, font: { size: 10 }, maxRotation: 45 }
-        },
-        y: {
-          min: 40,
-          max: 200,
-          grid: { color: gridColor },
-          ticks: { color: textColor, font: { size: 11 } },
-          title: { display: true, text: "мм рт. ст.", color: textColor, font: { size: 10 } }
-        },
-        y1: {
-          position: "right",
-          min: 40,
-          max: 160,
-          grid: { drawOnChartArea: false },
-          ticks: { color: "#af52de", font: { size: 10 } },
-          title: { display: true, text: "уд/хв", color: "#af52de", font: { size: 10 } }
-        }
-      }
+  // Dynamic horizontal scroll on phone for 3 months
+  if (scroller && viewport) {
+    if (chronLogs.length > 15) {
+      const neededWidth = Math.max(viewport.clientWidth, chronLogs.length * 28);
+      scroller.style.width = `${neededWidth}px`;
+      setTimeout(() => {
+        viewport.scrollLeft = viewport.scrollWidth;
+      }, 60);
+    } else {
+      scroller.style.width = "100%";
     }
-  });
+  }
+
+  const config = createBpChartConfig(chronLogs, false);
+  bpChartInstance = new window.Chart(canvas, config);
+
+  const modal = document.getElementById("bp-chart-modal");
+  if (modal && !modal.classList.contains("hidden")) {
+    renderBpModalChart(logs);
+  }
+}
+
+function renderBpModalChart(logs) {
+  const canvas = document.getElementById("bp-modal-chart");
+  const scroller = document.getElementById("bp-modal-scroller");
+  const viewport = document.getElementById("bp-modal-viewport");
+  if (!canvas || !window.Chart) return;
+
+  if (bpModalChartInstance) {
+    bpModalChartInstance.destroy();
+    bpModalChartInstance = null;
+  }
+
+  if (!logs || logs.length === 0) return;
+
+  const chronLogs = [...logs].reverse();
+  if (scroller && viewport) {
+    const neededWidth = Math.max(viewport.clientWidth, chronLogs.length * 36);
+    scroller.style.width = `${neededWidth}px`;
+    setTimeout(() => {
+      viewport.scrollLeft = viewport.scrollWidth;
+    }, 60);
+  }
+
+  const config = createBpChartConfig(chronLogs, true);
+  bpModalChartInstance = new window.Chart(canvas, config);
 }
 
 function initVitalsScreen() {
@@ -2381,14 +2547,46 @@ function initVitalsScreen() {
     }
   });
 
+  // Range buttons synced across main card and fullscreen modal
   const rangeBtns = document.querySelectorAll(".bp-range-btn");
   rangeBtns.forEach(btn => {
     btn.addEventListener("click", () => {
-      rangeBtns.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      vitalsSelectedDays = parseInt(btn.dataset.days) || 90;
+      const days = parseInt(btn.dataset.days) || 90;
+      rangeBtns.forEach(b => {
+        if (parseInt(b.dataset.days) === days) b.classList.add("active");
+        else b.classList.remove("active");
+      });
+      vitalsSelectedDays = days;
       loadVitals();
     });
+  });
+
+  // Fullscreen Modal Controls
+  const expandBtn = document.getElementById("bp-chart-expand-btn");
+  const modal = document.getElementById("bp-chart-modal");
+  const modalCloseBtn = document.getElementById("bp-chart-modal-close-btn");
+
+  expandBtn?.addEventListener("click", () => {
+    modal?.classList.remove("hidden");
+    renderBpModalChart(lastLoadedVitalsLogs);
+  });
+
+  modalCloseBtn?.addEventListener("click", () => {
+    modal?.classList.add("hidden");
+    if (bpModalChartInstance) {
+      bpModalChartInstance.destroy();
+      bpModalChartInstance = null;
+    }
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal && !modal.classList.contains("hidden")) {
+      modal.classList.add("hidden");
+      if (bpModalChartInstance) {
+        bpModalChartInstance.destroy();
+        bpModalChartInstance = null;
+      }
+    }
   });
 
   document.getElementById("export-bp-csv-btn")?.addEventListener("click", () => {

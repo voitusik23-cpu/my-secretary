@@ -10,25 +10,39 @@ logger = logging.getLogger("my_secretary.ai_parser")
 SYSTEM_INSTRUCTION = """Ти — інтелектуальний персональний AI-секретар («Мій Секретар»).
 Користувач з України. Ти вільно розумієш українську та російську мови.
 
-Твоє завдання — проаналізувати вхідний текст або аудіо та виділити дії в одну або декілька категорій:
-1. "finance" — витрати або доходи (купив каву, таксі, зарплата тощо).
+Твоє завдання — проаналізувати вхідний текст або аудіо та виділити ВСІ зазначені дії у відповідні категорії.
+ВАЖЛИВО: Одне повідомлення може містити ОДНОЧАСНО кілька дій з РІЗНИХ категорій! Ніколи не втрачай і не пропускай жодну частину!
+
+Категорії дій:
+1. "finance" — витрати або доходи (купив каву 75 грн, таксі 200 грн, зарплата тощо).
    - ВАЛЮТА: "UAH" за замовчуванням, "USD" якщо долари, "EUR" якщо євро.
    - type: "expense" (витрата) або "income" (дохід).
-2. "shopping" — товари в список покупок (продукти, побутова хімія, аптека тощо).
-   - БУДЬ-ЯКІ фрази: «купи...», «купити...», «купить...», «додай у покупки...», «добавь в покупки...», «список покупок...», «треба взяти...» — це СУВОРО категорія "shopping" (НЕ media_notes і НЕ tasks)!
-   - Кожен товар записуй як окремий елемент у масив actions: domain="shopping", item="Назва", category="Продукти" (або Дім/Аптека), quantity="1 шт" (або названа).
-3. "tasks" — завдання, справи, нагадування (подзвонити, надіслати, зробити).
-   - priority: "low", "medium", "high". due_date у форматі ISO YYYY-MM-DDTHH:MM:SS відносно поточної дати.
-4. "media_notes" — ТІЛЬКИ фільми, серіали, книги, статті або загальні замітки, які НЕ стосуються покупок, завдань чи фінансів.
+
+2. "shopping" — товари, матеріали чи речі в список покупок (продукти, скотч, побутова хімія, аптека тощо).
+   - БУДЬ-ЯКІ товари чи предмети, які треба придбати: «купити молоко, хліб, скотч, єдинорога» -> КОЖЕН предмет окремо у domain="shopping".
+   - item: "Назва", category="Продукти" (або Дім/Аптека/Різне), quantity="1 шт" (або вказана).
+
+3. "tasks" — РОБОТИ, справи, доручення, ремонт, прибирання, послуги, дзвінки («постелити плитку», «прибрати територію», «помити машину», «зробити хімчистку», «зателефонувати»).
+   - УСІ дії або роботи, які треба зробити або виконати — обов'язково записуй як ОКРЕМІ елементи у domain="tasks"!
+   - title: назва роботи («Постелити плитку», «Помити машину»), priority: "medium", category: "Роботи".
+
+4. "media_notes" — ТІЛЬКИ фільми, серіали, книги або загальні нотатки, які НЕ є покупками, роботами чи фінансами.
+
+ПРИКЛАД СКЛАДНОГО ЗАПИТУ:
+«купить молоко, хлеб, скотч, единорога, сделать, постелить плитку, убрать территорию, помыть машину, сделать химчистку»
+ВІДПОВІДЬ ПОВИННА МІСТИТИ:
+- 4 дії "shopping": Молоко, Хліб, Скотч, Єдиноріг.
+- 4 дії "tasks": Постелити плитку, Прибрати територію, Помити машину, Зробити хімчистку.
 
 Поточна дата і час: {current_time}.
 
 Формат відповіді СУВОРО JSON:
 {{
-  "summary": "Коротке резюме (наприклад: 'Додав хліб та молоко до списку покупок')",
+  "summary": "Коротке резюме (наприклад: 'Додано 4 товари в покупки та 4 роботи в список справ')",
   "transcription": "Текст сказаного (якщо було аудіо)",
   "actions": [
-    {{"domain": "shopping", "data": {{"item": "Хліб", "category": "Продукти", "quantity": "1 шт", "notes": null}}}}
+    {{"domain": "shopping", "data": {{"item": "Хліб", "category": "Продукти", "quantity": "1 шт", "notes": null}}}},
+    {{"domain": "tasks", "data": {{"title": "Постелити плитку", "priority": "medium", "category": "Роботи"}}}}
   ]
 }}
 Поверни ТІЛЬКИ валідний JSON без markdown."""
@@ -53,57 +67,72 @@ def detect_audio_mime(audio_bytes: bytes, fallback_mime: str = "audio/webm") -> 
 
 
 def _heuristic_fallback(text: str) -> Dict[str, Any]:
-    """Резервний евристичний парсер на випадок збою AI."""
+    """Резервний евристичний парсер на випадок збою AI з підтримкою змішаних запитів."""
     actions = []
     lower = text.lower()
     summary_parts = []
 
     # 1. Фінанси
     price_match = re.search(r'(\d+[\.,]?\d*)\s*(грн|грив[еньяі]*|uah|usd|\$|дол|бакс[а-я]*|євро|евро|eur)?', lower)
-    finance_kw = ["купив", "купил", "витратив", "потратил", "заплатив", "заплатил", "чек", "коштувало", "стоило", "грн", "uah", "$", "usd"]
+    finance_kw = ["купив", "купил", "витратив", "потратил", "заплатив", "заплатил", "чек", "коштувало", "стоило"]
     if any(k in lower for k in finance_kw) and price_match:
         try:
             amount = float(price_match.group(1).replace(",", "."))
             curr_str = (price_match.group(2) or "").lower()
             currency = "USD" if any(k in curr_str for k in ["$", "usd", "дол", "бакс"]) else ("EUR" if any(k in curr_str for k in ["євро", "евро", "eur"]) else "UAH")
-            cat = "Кафе" if any(k in lower for k in ["кава", "кофе", "обід", "обед", "вечеря", "ужин", "кафе", "ресторан"]) else ("Транспорт" if any(k in lower for k in ["таксі", "такси", "метро", "бензин", "пальне", "автобус"]) else ("Продукти" if any(k in lower for k in ["продукти", "магазин", "сільпо", "атб", "фора"]) else "Різне"))
+            cat = "Кафе" if any(k in lower for k in ["кава", "кофе", "обід", "обед", "вечеря", "ужин"]) else ("Транспорт" if any(k in lower for k in ["таксі", "такси", "метро", "бензин"]) else "Різне")
             actions.append({
                 "domain": "finance",
                 "data": {"amount": amount, "currency": currency, "category": cat, "type": "expense", "description": text}
             })
             symbol = "₴" if currency == "UAH" else ("$" if currency == "USD" else "€")
-            summary_parts.append(f"витрата {amount} {symbol} ({cat})")
+            summary_parts.append(f"витрата {amount} {symbol}")
         except Exception:
             pass
 
-    # 2. Покупки
-    shop_kw = ["купити", "купить", "купи", "покупки", "покупка", "покупок", "в магазині", "в магазине", "додай", "добав", "список покупок"]
-    if any(k in lower for k in shop_kw) and not (actions and any(a["domain"] == "finance" for a in actions)):
-        cleaned = re.sub(
-            r"^(?:запиши(?:\s+у|\s+в)?\s+покупки|дода(?:й|йте)(?:\s+у|\s+в)?\s+покупки|добав(?:ь|ьте)?(?:\s+у|\s+в)?\s+покупки|в\s+список\s+покупок:?|список\s+покупок:?|треба\s+купити|потрібно\s+купити|надо\s+купить|нужно\s+купить|купи(?:ти|ть)?(?:\s+мені|\s+мне)?|треба|потрібно|нужно|надо|запиши)\s*",
-            "",
-            text,
-            flags=re.IGNORECASE
-        ).strip()
-        parts = re.split(r"[,;]|\s+(?:та|і|и|and)\s+", cleaned)
-        for item_name in parts:
-            item_name = item_name.strip()
-            if item_name and not re.search(r'\d+\s*(грн|uah|\$|€)', item_name.lower()):
-                actions.append({
-                    "domain": "shopping",
-                    "data": {"item": item_name.capitalize(), "category": "Продукти", "quantity": "1 шт"}
-                })
-                summary_parts.append(f"покупка «{item_name.capitalize()}»")
+    # 2. Розбиття на частини для змішаного введення (покупки та роботи)
+    work_triggers = ["зробити", "сделать", "постелити", "постелить", "прибрати", "убрать", "помити", "помыть", "хімчистк", "химчистк", "плитк", "ремонт", "подзвонити", "позвонить", "нагадай", "напомни"]
+    shop_triggers = ["купити", "купить", "купи", "покупки", "покупка", "список покупок", "взяти"]
 
-    # 3. Завдання
-    task_kw = ["нагадай", "напомни", "завдання", "задача", "зробити", "сделать", "подзвонити", "позвонить", "відправити", "отправить"]
-    if any(k in lower for k in task_kw) and not actions:
-        title = re.sub(r'^(?:нагадай|напомни|завдання|задача|не забудь|треба|надо)\s*', '', text, flags=re.IGNORECASE).strip()
-        actions.append({
-            "domain": "tasks",
-            "data": {"title": title.capitalize() if title else text, "description": None, "priority": "medium", "category": "Особисте"}
-        })
-        summary_parts.append(f"завдання «{(title or text)[:30]}»")
+    # Розбиваємо за комами, крапками з комою або союзами
+    tokens = re.split(r"[,;]|\s+(?:та|і|и|and)\s+", text)
+    in_work_mode = False
+    in_shop_mode = False
+
+    for raw_tok in tokens:
+        tok = raw_tok.strip()
+        if not tok:
+            continue
+        tok_low = tok.lower()
+
+        # Визначаємо зміну контексту
+        if any(w in tok_low for w in ["зробити", "сделать", "роботи", "работы", "завдання", "задачи"]):
+            in_work_mode = True
+            in_shop_mode = False
+            tok_clean = re.sub(r'^(?:зробити|сделать|роботи|работы|завдання|задачи):?\s*', '', tok, flags=re.IGNORECASE).strip()
+            if tok_clean:
+                actions.append({"domain": "tasks", "data": {"title": tok_clean.capitalize(), "priority": "medium", "category": "Роботи"}})
+                summary_parts.append(f"робота «{tok_clean}»")
+            continue
+
+        if any(s in tok_low for s in ["купити", "купить", "купи", "покупки"]):
+            in_shop_mode = True
+            in_work_mode = False
+            tok_clean = re.sub(r'^(?:купити|купить|купи|покупки|додай у покупки|добавь в покупки):?\s*', '', tok, flags=re.IGNORECASE).strip()
+            if tok_clean:
+                actions.append({"domain": "shopping", "data": {"item": tok_clean.capitalize(), "category": "Продукти", "quantity": "1 шт"}})
+                summary_parts.append(f"покупка «{tok_clean}»")
+            continue
+
+        # Якщо токен явно містить дію роботи
+        if any(w in tok_low for w in work_triggers) or in_work_mode:
+            actions.append({"domain": "tasks", "data": {"title": tok.capitalize(), "priority": "medium", "category": "Роботи"}})
+            summary_parts.append(f"робота «{tok}»")
+        elif in_shop_mode or any(s in tok_low for s in shop_triggers):
+            tok_clean = re.sub(r'^(?:купити|купить|купи|треба|потрібно|надо|нужно)\s*', '', tok, flags=re.IGNORECASE).strip()
+            if tok_clean:
+                actions.append({"domain": "shopping", "data": {"item": tok_clean.capitalize(), "category": "Продукти", "quantity": "1 шт"}})
+                summary_parts.append(f"покупка «{tok_clean}»")
 
     # 4. Якщо нічого іншого не підійшло
     if not actions:

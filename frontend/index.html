@@ -138,8 +138,8 @@
         <span class="tab-label">Покупки</span>
       </button>
       <button class="tab-btn" data-tab="tasks" role="tab" aria-selected="false">
-        <span class="tab-icon">✅</span>
-        <span class="tab-label">Задачи</span>
+        <span class="tab-icon">🛠️</span>
+        <span class="tab-label">Работы</span>
       </button>
       <button class="tab-btn" data-tab="translator" role="tab" aria-selected="false">
         <span class="tab-icon">🌐</span>
@@ -242,11 +242,11 @@
         </div>
       </section>
 
-      <!-- 4. TASKS TAB -->
+      <!-- 4. TASKS / WORKS TAB -->
       <section id="tab-tasks" class="tab-panel">
         <div class="panel-header">
-          <h2>Задачи и дела</h2>
-          <button id="add-task-btn" class="action-btn-sm">+ Задача</button>
+          <h2>Список работ</h2>
+          <button id="add-task-btn" class="action-btn-sm">+ Работа</button>
         </div>
         <div id="tasks-list" class="items-list">
           <!-- Populated by JS -->
@@ -341,18 +341,28 @@
       <!-- 9. WEB SEARCH AGENT TAB -->
       <section id="tab-agent" class="tab-panel">
         <div class="panel-header">
-          <h2>🔍 AI-Агент (Google Search)</h2>
+          <h2>🔍 AI-Агент (Розумний Пошук)</h2>
+          <button id="agent-tts-btn" class="action-btn-sm hidden" title="Озвучити відповідь голосом">🔊 Озвучити</button>
         </div>
 
         <div class="stat-card" style="margin-bottom:8px;background:rgba(6,182,212,0.08);border-color:rgba(6,182,212,0.25);">
-          <p style="font-size:0.85rem;color:var(--text-main);">
-            Запитайте будь-що у реальному часі: погоду, актуальні курси валют, технічні характеристики чи інструкції.
+          <p style="font-size:0.85rem;color:var(--text-main);margin:0;">
+            🤖 Запитуйте будь-що у реальному часі: погоду, актуальні курси, ремонт, інструкції чи сайти. Голосом або текстом!
           </p>
         </div>
 
-        <!-- Agent Search Form -->
-        <form id="agent-search-form" class="quick-input-form" style="margin-top:0;">
-          <input type="text" id="agent-query-input" placeholder="«Яка погода у Львові?», «Характеристики M3 Max»..." autocomplete="off" />
+        <!-- Quick suggestion chips -->
+        <div class="agent-chips-container" id="agent-chips-container">
+          <button type="button" class="agent-chip" data-q="Яка погода в Одесі на найближчі дні?">🌤️ Погода в Одесі</button>
+          <button type="button" class="agent-chip" data-q="Актуальний курс долара та євро в Україні сьогодні">💶 Курс валют</button>
+          <button type="button" class="agent-chip" data-q="Покрокова інструкція як правильно класти плитку у дворі">🧱 Як класти плитку</button>
+          <button type="button" class="agent-chip" data-q="Коли за законом міняти літню гуму на зимову в Україні">🚗 Зимова гума</button>
+        </div>
+
+        <!-- Agent Search Form with dedicated Voice Mic -->
+        <form id="agent-search-form" class="quick-input-form" style="margin-top:2px;">
+          <button type="button" id="agent-voice-btn" class="icon-btn-mic" title="Диктувати запит голосом">🎙️</button>
+          <input type="text" id="agent-query-input" placeholder="«Яка погода в Одесі?», «Як полагодити...»" autocomplete="off" />
           <button type="submit" class="send-btn" title="Запитати агента">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
           </button>
@@ -360,17 +370,20 @@
 
         <div id="agent-loading" class="empty-state hidden" style="padding:20px;">
           <div style="font-size:1.5rem;animation:pulse-mic 1s infinite;">🌐</div>
-          <p>Агент шукає відповідь в інтернеті...</p>
+          <p>Агент шукає та аналізує дані в інтернеті...</p>
         </div>
 
         <div id="agent-response-card" class="stat-card hidden" style="margin-top:10px;">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-            <span style="font-size:1.1rem;">💡</span>
-            <strong id="agent-res-query" style="font-size:0.95rem;"></strong>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:6px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:1.1rem;">💡</span>
+              <strong id="agent-res-query" style="font-size:0.95rem;"></strong>
+            </div>
+            <button id="agent-copy-btn" class="action-btn-sm" style="font-size:0.75rem;padding:3px 8px;">📋 Копіювати</button>
           </div>
-          <div id="agent-res-answer" style="font-size:0.9rem;line-height:1.6;white-space:pre-wrap;color:var(--text-main);"></div>
+          <div id="agent-res-answer" style="font-size:0.9rem;line-height:1.6;color:var(--text-main);"></div>
           <div id="agent-res-sources" style="margin-top:12px;border-top:1px solid var(--border-color);padding-top:8px;" class="hidden">
-            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">Джерела Google:</span>
+            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">Джерела та корисні сайти:</span>
             <div id="agent-sources-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;"></div>
           </div>
         </div>
@@ -652,18 +665,27 @@
           </div>
         </div>
 
-        <!-- Interactive Chart with Range Selector -->
-        <div class="stat-card" style="margin-bottom:12px;">
+        <!-- Interactive Chart with Range Selector & Fullscreen Toggle -->
+        <div class="stat-card" id="bp-chart-card" style="margin-bottom:12px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
-            <strong style="font-size:0.95rem;">📈 Динаміка тиску та пульсу</strong>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <strong style="font-size:0.95rem;">📈 Динаміка тиску та пульсу</strong>
+              <button type="button" id="bp-chart-expand-btn" class="action-btn-sm" style="font-size:0.75rem;padding:3px 8px;border-radius:6px;background:var(--bg-card-hover);color:var(--text-main);border:1px solid var(--border-color);cursor:pointer;" title="Розгорнути на весь екран">⛶ На весь екран</button>
+            </div>
             <div class="bp-timeframe-picker" style="display:flex;gap:4px;">
               <button type="button" class="bp-range-btn" data-days="7">7 днів</button>
               <button type="button" class="bp-range-btn" data-days="30">30 днів</button>
               <button type="button" class="bp-range-btn active" data-days="90">3 місяці</button>
             </div>
           </div>
-          <div style="position:relative;height:240px;width:100%;">
-            <canvas id="bp-chart"></canvas>
+          <div class="bp-chart-viewport" id="bp-chart-viewport">
+            <div class="bp-chart-scroller" id="bp-chart-scroller">
+              <canvas id="bp-chart"></canvas>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:4px;">
+            <small style="color:var(--text-muted);font-size:0.72rem;">👈 Прокручуйте вліво/вправо для перегляду всіх 3 місяців 👉</small>
+            <small style="color:#30d158;font-size:0.72rem;font-weight:600;">— Норма (130/85)</small>
           </div>
         </div>
 
@@ -787,10 +809,33 @@
       <span class="undo-icon">⚡</span>
       <span id="undo-text" class="undo-text">Дію збережено</span>
       <button id="undo-banner-btn" class="undo-btn">↩️ Відмінити</button>
-      <button id="undo-close-btn" class="undo-close">&times;</button>
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.3.1"></script>
+  <!-- Fullscreen Chart Modal for Vitals -->
+  <div id="bp-chart-modal" class="chart-fullscreen-modal hidden">
+    <div class="chart-modal-header">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <strong style="font-size:1.05rem;">📈 Динаміка тиску та пульсу (Повний екран)</strong>
+        <div class="bp-timeframe-picker" style="display:flex;gap:4px;">
+          <button type="button" class="bp-range-btn" data-days="7">7 днів</button>
+          <button type="button" class="bp-range-btn" data-days="30">30 днів</button>
+          <button type="button" class="bp-range-btn active" data-days="90">3 місяці</button>
+        </div>
+      </div>
+      <button type="button" id="bp-chart-modal-close-btn" class="action-btn-sm" style="font-size:0.85rem;padding:6px 14px;border-radius:8px;background:var(--border-color);color:var(--text-main);border:none;cursor:pointer;">✕ Закрити</button>
+    </div>
+    <div class="chart-modal-body" id="bp-modal-viewport">
+      <div class="chart-modal-scroller" id="bp-modal-scroller">
+        <canvas id="bp-modal-chart"></canvas>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:4px;">
+      <small style="color:var(--text-muted);font-size:0.78rem;">💡 Торкайтесь або наводьте курсор на точки для перегляду точного часу, ліків та заміток</small>
+      <small style="color:#30d158;font-size:0.78rem;font-weight:600;">— Референсна норма: 130 / 85</small>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=3.3.2"></script>
 </body>
 </html>
