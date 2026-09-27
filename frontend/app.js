@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.4.2")
+      .register("/sw.js?v=3.5.0")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -506,7 +506,8 @@ async function loadShopping() {
           </button>
           <div class="item-content">
             <span class="item-title ${i.is_purchased ? "completed" : ""}">${escapeHtml(i.item)}</span>
-            <span class="item-subtitle">${escapeHtml(i.quantity)} • ${escapeHtml(i.category)}</span>
+            ${i.quantity ? `<span class="item-subtitle">Кількість: ${escapeHtml(i.quantity)}</span>` : ""}
+            <span class="item-badge badge-shopping">🛒 ${escapeHtml(i.category || "Покупка")}</span>
           </div>
           <div class="item-actions">
             <button class="delete-btn" onclick="deleteItem('shopping', ${i.id})" title="Удалить">🗑️</button>
@@ -541,6 +542,9 @@ async function loadTasks() {
           });
         }
 
+        const prioColor = t.priority === "high" ? "badge-finance" : (t.priority === "medium" ? "badge-tasks" : "badge-auto");
+        const prioLabel = t.priority === "high" ? "🔥 Терміново" : (t.priority === "medium" ? "⚡ Середній" : "☕ Низький");
+
         return `
           <div class="item-card">
             <button class="custom-checkbox ${t.is_completed ? "checked" : ""}" onclick="toggleTask(${t.id})">
@@ -549,7 +553,7 @@ async function loadTasks() {
             <div class="item-content">
               <span class="item-title ${t.is_completed ? "completed" : ""}">${escapeHtml(t.title)}</span>
               <span class="item-subtitle">📅 ${dueStr} • ${escapeHtml(t.category)}</span>
-              <span class="item-badge badge-tasks">Приоритет: ${t.priority}</span>
+              <span class="item-badge ${prioColor}">${prioLabel}</span>
             </div>
             <div class="item-actions">
               <button class="delete-btn" onclick="deleteItem('tasks', ${t.id})" title="Удалить">🗑️</button>
