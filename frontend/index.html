@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.2.4">
+  <link rel="stylesheet" href="/static/styles.css?v=3.2.5">
 </head>
 <body>
   <!-- Offline banner -->
@@ -494,10 +494,20 @@
           </select>
         </div>
 
-        <div class="translator-tip-bar" style="text-align:center;margin:-4px 0 12px 0;">
+        <div class="translator-tip-bar" style="text-align:center;margin:-4px 0 10px 0;">
           <small style="color:var(--text-muted);font-size:0.75rem;">
-            🔊 <em>На iPhone переконайтеся, що перемикач на лівій грані телефону не в режимі «Без звуку».</em>
+            🔊 <em>На iPhone звук має бути увімкнено (перемикач на лівій грані телефону).</em>
           </small>
+        </div>
+
+        <!-- 1-Tap Native iPhone Apps Integration -->
+        <div class="native-translator-shortcuts" style="display:flex;gap:8px;justify-content:center;margin-bottom:12px;flex-wrap:wrap;">
+          <button id="open-apple-app-btn" class="action-btn-sm" style="display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;background:rgba(255,255,255,0.08);border:1px solid var(--border-color);color:var(--text-main);cursor:pointer;" title="Відкрити стандартний додаток Перекладач Apple на iPhone">
+            <span>🍎 Відкрити Apple Перекладач</span>
+          </button>
+          <button id="open-google-app-btn" class="action-btn-sm" style="display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;background:rgba(66,133,244,0.18);border:1px solid rgba(66,133,244,0.4);color:var(--text-main);cursor:pointer;" title="Відкрити Google Перекладач (App Store / Native)">
+            <span>🌐 Google Перекладач</span>
+          </button>
         </div>
 
         <div class="split-translator-container">
@@ -652,6 +662,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.2.4"></script>
+  <script src="/static/app.js?v=3.2.5"></script>
 </body>
 </html>

@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.2.4")
+      .register("/sw.js?v=3.2.5")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -1965,6 +1965,24 @@ function initTranslatorScreen() {
     const raw = foreignerOut?.textContent?.replace(/^Співрозмовник:\s*/, "")?.trim();
     if (raw && raw !== "Перекладаю...") {
       speakText(raw, tSelect.value, "translator-foreigner-card");
+    }
+  });
+
+  document.getElementById("open-apple-app-btn")?.addEventListener("click", () => {
+    window.location.href = "translate://";
+  });
+
+  document.getElementById("open-google-app-btn")?.addEventListener("click", () => {
+    const sl = sSelect.value === "auto" ? "ru" : sSelect.value;
+    const tl = tSelect.value;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      window.location.href = "googletranslate://";
+      setTimeout(() => {
+        window.open(`https://translate.google.com/?sl=${sl}&tl=${tl}&op=translate`, "_blank");
+      }, 1200);
+    } else {
+      window.open(`https://translate.google.com/?sl=${sl}&tl=${tl}&op=translate`, "_blank");
     }
   });
 }
