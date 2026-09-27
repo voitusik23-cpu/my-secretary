@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.2.3")
+      .register("/sw.js?v=3.2.4")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -1615,13 +1615,21 @@ function initDelegationModal() {
 let translatorAudio = null;
 let activeUtterance = null;
 let audioUnlocked = false;
+let autoDialogEnabled = false;
+let autoDialogTimer = null;
 
-// Stop any currently playing speech/audio immediately so mic is clear
+// Stop any currently playing speech/audio immediately and reset iOS audio session
 function stopAllAudio() {
+  if (autoDialogTimer) {
+    clearTimeout(autoDialogTimer);
+    autoDialogTimer = null;
+  }
   if (translatorAudio) {
     try {
       translatorAudio.pause();
-      translatorAudio.currentTime = 0;
+      // Crucial for iOS Safari: remove src and load() to release AVAudioSession from playback
+      translatorAudio.removeAttribute("src");
+      translatorAudio.load();
     } catch (e) {}
   }
   if (window.speechSynthesis) {
@@ -1657,7 +1665,7 @@ function unlockAudioPlayback() {
   }
 }
 
-async function speakText(text, lang, targetCardId = null, audioBase64 = null) {
+async function speakText(text, lang, targetCardId = null, audioBase64 = null, onAudioDone = null) {
   if (!text) return;
   stopAllAudio();
 
@@ -1667,8 +1675,15 @@ async function speakText(text, lang, targetCardId = null, audioBase64 = null) {
   const originalBtnText = ttsBtn ? ttsBtn.textContent : "";
   if (ttsBtn) ttsBtn.textContent = "🔊 Грає...";
 
-  function resetBtn() {
+  function handleFinished() {
     if (ttsBtn) ttsBtn.textContent = originalBtnText || "🔊 Озвучити";
+    if (translatorAudio) {
+      try {
+        translatorAudio.removeAttribute("src");
+        translatorAudio.load();
+      } catch (e) {}
+    }
+    if (onAudioDone) onAudioDone();
   }
 
   // Tier 1: Zero-roundtrip inline base64 audio from translation response
@@ -1676,10 +1691,10 @@ async function speakText(text, lang, targetCardId = null, audioBase64 = null) {
     try {
       if (!translatorAudio) translatorAudio = new Audio();
       translatorAudio.src = "data:audio/mpeg;base64," + audioBase64;
-      translatorAudio.onended = resetBtn;
+      translatorAudio.onended = handleFinished;
       translatorAudio.onerror = () => {
-        resetBtn();
-        fallbackSpeechSynthesis(text, cleanLang, resetBtn);
+        handleFinished();
+        fallbackSpeechSynthesis(text, cleanLang, onAudioDone);
       };
       await translatorAudio.play();
       return;
@@ -1695,17 +1710,17 @@ async function speakText(text, lang, targetCardId = null, audioBase64 = null) {
 
     if (!translatorAudio) translatorAudio = new Audio();
     translatorAudio.src = ttsUrl;
-    translatorAudio.onended = resetBtn;
+    translatorAudio.onended = handleFinished;
     translatorAudio.onerror = () => {
-      resetBtn();
-      fallbackSpeechSynthesis(text, cleanLang, resetBtn);
+      handleFinished();
+      fallbackSpeechSynthesis(text, cleanLang, onAudioDone);
     };
 
     await translatorAudio.play();
     return;
   } catch (err) {
     console.warn("[TTS] Audio stream playback failed, trying Web Speech fallback:", err);
-    fallbackSpeechSynthesis(text, cleanLang, resetBtn);
+    fallbackSpeechSynthesis(text, cleanLang, onAudioDone);
   }
 }
 
@@ -1719,8 +1734,8 @@ function fallbackSpeechSynthesis(text, lang, onDone) {
     const utterance = new SpeechSynthesisUtterance(text);
     activeUtterance = utterance;
 
-    const langMap = { uk: "uk-UA", ru: "ru-RU", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
-    utterance.lang = langMap[lang] || lang || "en-US";
+    const langMap = { ru: "ru-RU", uk: "uk-UA", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
+    utterance.lang = langMap[lang] || (lang === "ru" ? "ru-RU" : "uk-UA");
     utterance.rate = 0.95;
 
     utterance.onend = () => {
@@ -1743,6 +1758,7 @@ function initTranslatorScreen() {
   const sSelect = document.getElementById("translator-source-lang");
   const tSelect = document.getElementById("translator-target-lang");
   const swapBtn = document.getElementById("translator-swap-btn");
+  const autoDialogBtn = document.getElementById("auto-dialog-btn");
   const foreignerOut = document.getElementById("foreigner-output-text");
   const userOut = document.getElementById("user-output-text");
   const userMicBtn = document.getElementById("user-mic-btn");
@@ -1753,8 +1769,26 @@ function initTranslatorScreen() {
   if (!userMicBtn || userMicBtn.dataset.bound) return;
   userMicBtn.dataset.bound = "true";
 
+  // Auto-dialogue toggle handler
+  autoDialogBtn?.addEventListener("click", () => {
+    autoDialogEnabled = !autoDialogEnabled;
+    if (autoDialogEnabled) {
+      autoDialogBtn.classList.add("active");
+      autoDialogBtn.textContent = "🔄 Авто-діалог: УВІМК";
+      showToast("Режим авто-діалогу увімкнено! Черга переходитиме автоматично.");
+      unlockAudioPlayback();
+    } else {
+      autoDialogBtn.classList.remove("active");
+      autoDialogBtn.textContent = "🔄 Авто-діалог: ВИМК";
+      stopAllAudio();
+      stopCurrentRecognition();
+    }
+  });
+
   swapBtn?.addEventListener("click", () => {
-    const temp = sSelect.value === "auto" ? "uk" : sSelect.value;
+    stopAllAudio();
+    stopCurrentRecognition();
+    const temp = sSelect.value === "auto" ? "ru" : sSelect.value;
     sSelect.value = tSelect.value;
     tSelect.value = temp;
     updateMicLabels();
@@ -1789,6 +1823,7 @@ function initTranslatorScreen() {
     }
     isListening = false;
     document.querySelectorAll(".face-mic-btn").forEach((b) => b.classList.remove("recording"));
+    document.querySelectorAll(".translator-half").forEach((c) => c.classList.remove("listening-card"));
   }
 
   async function translateAndDisplay(spokenText, fromLang, toLang, isUserSpeaker) {
@@ -1808,12 +1843,26 @@ function initTranslatorScreen() {
       });
 
       if (res && res.translated_text) {
+        const nextSpeakerCallback = () => {
+          if (!autoDialogEnabled) return;
+          autoDialogTimer = setTimeout(() => {
+            if (isUserSpeaker) {
+              // Now foreigner's turn to speak in their language
+              const sLang = sSelect.value === "auto" ? "ru" : sSelect.value;
+              startSpeechRecognition(tSelect.value, sLang, false, foreignerMicBtn);
+            } else {
+              // Now user's turn to speak
+              startSpeechRecognition(sSelect.value, tSelect.value, true, userMicBtn);
+            }
+          }, 450);
+        };
+
         if (isUserSpeaker) {
           if (foreignerOut) foreignerOut.textContent = res.translated_text;
-          speakText(res.translated_text, toLang, "translator-foreigner-card", res.audio_base64);
+          speakText(res.translated_text, toLang, "translator-foreigner-card", res.audio_base64, nextSpeakerCallback);
         } else {
           if (userOut) userOut.textContent = res.translated_text;
-          speakText(res.translated_text, toLang, "translator-user-card", res.audio_base64);
+          speakText(res.translated_text, toLang, "translator-user-card", res.audio_base64, nextSpeakerCallback);
         }
       }
     } catch (e) {
@@ -1824,56 +1873,70 @@ function initTranslatorScreen() {
   function startSpeechRecognition(fromLang, toLang, isUserSpeaker, btnEl) {
     unlockAudioPlayback();
 
-    // Toggle: if this specific button was already actively recording, user clicked to stop
+    // Toggle: if user taps the same button that is actively recording, stop it
     if (isListening && btnEl.classList.contains("recording")) {
       stopCurrentRecognition();
       return;
     }
 
-    // Stop any currently playing audio so the mic channel is 100% free and quiet
+    // Stop previous audio and recognition cleanly
     stopAllAudio();
     stopCurrentRecognition();
 
     if (SpeechRec) {
-      try {
-        const rec = new SpeechRec();
-        activeRecognition = rec;
-        rec.continuous = false;
-        rec.interimResults = false;
-        const langMap = { uk: "uk-UA", ru: "ru-RU", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
-        rec.lang = langMap[fromLang] || "uk-UA";
+      const rec = new SpeechRec();
+      activeRecognition = rec;
+      rec.continuous = false;
+      rec.interimResults = false;
+      const langMap = { ru: "ru-RU", uk: "uk-UA", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
+      rec.lang = langMap[fromLang] || (fromLang === "ru" ? "ru-RU" : "uk-UA");
 
-        rec.onstart = () => {
-          isListening = true;
-          btnEl.classList.add("recording");
-        };
+      const activeCard = isUserSpeaker ? document.getElementById("translator-user-card") : document.getElementById("translator-foreigner-card");
+      if (activeCard) activeCard.classList.add("listening-card");
 
-        rec.onresult = (event) => {
-          const transcript = event.results && event.results[0] && event.results[0][0] ? event.results[0][0].transcript : "";
-          // CRITICAL FIX: Stop recognition immediately on result to free mic and prevent speaker echo/lag
-          stopCurrentRecognition();
-          if (transcript) {
-            translateAndDisplay(transcript, fromLang, toLang, isUserSpeaker);
-          }
-        };
+      rec.onstart = () => {
+        isListening = true;
+        btnEl.classList.add("recording");
+      };
 
-        rec.onerror = (e) => {
-          console.warn("[Translator SpeechRec error]:", e.error);
-          stopCurrentRecognition();
-          if (e.error !== "no-speech" && e.error !== "aborted") {
-            showToast("Не вдалося розпізнати мову. Спробуйте ще раз.");
-          }
-        };
-
-        rec.onend = () => {
-          stopCurrentRecognition();
-        };
-
-        rec.start();
-      } catch (err) {
-        console.warn("[Translator SpeechRec start exception]:", err);
+      rec.onresult = (event) => {
+        const transcript = event.results && event.results[0] && event.results[0][0] ? event.results[0][0].transcript : "";
+        // CRITICAL: Immediately abort microphone session on result so audio playback starts on a quiet, released channel
         stopCurrentRecognition();
+        if (transcript) {
+          translateAndDisplay(transcript, fromLang, toLang, isUserSpeaker);
+        }
+      };
+
+      rec.onerror = (e) => {
+        console.warn("[Translator SpeechRec error]:", e.error);
+        stopCurrentRecognition();
+        if (e.error !== "no-speech" && e.error !== "aborted") {
+          showToast("Не вдалося розпізнати мову. Спробуйте ще раз.");
+        }
+      };
+
+      rec.onend = () => {
+        stopCurrentRecognition();
+      };
+
+      // Resilient start for iOS WebKit (avoids InvalidStateError with retry)
+      let attempt = 0;
+      function attemptStart() {
+        attempt++;
+        try {
+          rec.start();
+        } catch (err) {
+          if (attempt <= 3) {
+            setTimeout(attemptStart, 120);
+          } else {
+            console.warn("[Translator] rec.start failed:", err);
+            stopCurrentRecognition();
+          }
+        }
       }
+      // Small 60ms delay ensures iOS audio session completely resets to Record
+      setTimeout(attemptStart, 60);
     } else {
       const text = prompt("Введіть текст для перекладу:");
       if (text) translateAndDisplay(text, fromLang, toLang, isUserSpeaker);
@@ -1885,7 +1948,7 @@ function initTranslatorScreen() {
   });
 
   foreignerMicBtn?.addEventListener("click", () => {
-    const sLang = sSelect.value === "auto" ? "uk" : sSelect.value;
+    const sLang = sSelect.value === "auto" ? "ru" : sSelect.value;
     startSpeechRecognition(tSelect.value, sLang, false, foreignerMicBtn);
   });
 
@@ -1893,7 +1956,7 @@ function initTranslatorScreen() {
     unlockAudioPlayback();
     const raw = userOut?.textContent?.replace(/^Ви:\s*/, "")?.trim();
     if (raw && raw !== "Перекладаю...") {
-      speakText(raw, sSelect.value === "auto" ? "uk" : sSelect.value, "translator-user-card");
+      speakText(raw, sSelect.value === "auto" ? "ru" : sSelect.value, "translator-user-card");
     }
   });
 

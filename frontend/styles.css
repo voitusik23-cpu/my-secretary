@@ -950,6 +950,35 @@ body {
   background: linear-gradient(135deg, rgba(48, 209, 88, 0.05), var(--bg-card));
 }
 
+.translator-half.listening-card {
+  border-color: #ff3b30 !important;
+  box-shadow: 0 0 16px rgba(255, 59, 48, 0.45);
+}
+
+.auto-dialog-btn {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.auto-dialog-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+}
+
+.auto-dialog-btn.active {
+  background: rgba(48, 209, 88, 0.2);
+  border-color: #30d158;
+  color: #30d158;
+  box-shadow: 0 0 12px rgba(48, 209, 88, 0.35);
+}
+
 .half-header {
   display: flex;
   align-items: center;

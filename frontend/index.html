@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.2.3">
+  <link rel="stylesheet" href="/static/styles.css?v=3.2.4">
 </head>
 <body>
   <!-- Offline banner -->
@@ -469,22 +469,25 @@
       <section id="tab-translator" class="tab-panel">
         <div class="panel-header">
           <h2>Перекладач (Віч-на-віч)</h2>
+          <button id="auto-dialog-btn" class="auto-dialog-btn" title="Автоматично передавати чергу після озвучення">
+            🔄 Авто-діалог: ВИМК
+          </button>
         </div>
         <div class="translator-lang-bar">
           <select id="translator-source-lang" class="lang-select">
-            <option value="auto">🌐 Автовизначення</option>
-            <option value="uk" selected>🇺🇦 Українська</option>
-            <option value="ru">Русский</option>
+            <option value="ru" selected>🇷🇺 Русский</option>
+            <option value="uk">🇺🇦 Українська</option>
             <option value="en">🇬🇧 English</option>
             <option value="pl">🇵🇱 Polski</option>
             <option value="de">🇩🇪 Deutsch</option>
             <option value="es">🇪🇸 Español</option>
+            <option value="auto">🌐 Автовизначення</option>
           </select>
           <button id="translator-swap-btn" class="icon-swap-btn" title="Поміняти мови місцями">⇄</button>
           <select id="translator-target-lang" class="lang-select">
             <option value="en" selected>🇬🇧 English</option>
+            <option value="ru">🇷🇺 Русский</option>
             <option value="uk">🇺🇦 Українська</option>
-            <option value="ru">Русский</option>
             <option value="pl">🇵🇱 Polski</option>
             <option value="de">🇩🇪 Deutsch</option>
             <option value="es">🇪🇸 Español</option>
@@ -649,6 +652,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.2.3"></script>
+  <script src="/static/app.js?v=3.2.4"></script>
 </body>
 </html>
