@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.2.5")
+      .register("/sw.js?v=3.2.6")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -1675,7 +1675,10 @@ async function speakText(text, lang, targetCardId = null, audioBase64 = null, on
   const originalBtnText = ttsBtn ? ttsBtn.textContent : "";
   if (ttsBtn) ttsBtn.textContent = "🔊 Грає...";
 
+  let finishedCalled = false;
   function handleFinished() {
+    if (finishedCalled) return;
+    finishedCalled = true;
     if (ttsBtn) ttsBtn.textContent = originalBtnText || "🔊 Озвучити";
     if (translatorAudio) {
       try {
@@ -1686,41 +1689,51 @@ async function speakText(text, lang, targetCardId = null, audioBase64 = null, on
     if (onAudioDone) onAudioDone();
   }
 
-  // Tier 1: Zero-roundtrip inline base64 audio from translation response
-  if (audioBase64) {
+  function fallbackTts() {
+    // Fallback 1: inline base64 from backend
+    if (audioBase64) {
+      try {
+        if (!translatorAudio) translatorAudio = new Audio();
+        translatorAudio.src = "data:audio/mpeg;base64," + audioBase64;
+        translatorAudio.onended = handleFinished;
+        translatorAudio.onerror = () => fallbackSpeechSynthesis(text, cleanLang, handleFinished);
+        translatorAudio.play().catch(() => fallbackSpeechSynthesis(text, cleanLang, handleFinished));
+        return;
+      } catch (e) {}
+    }
+
+    // Fallback 2: MacBook backend TTS stream endpoint
     try {
+      const keyParam = state.secretKey ? `&key=${encodeURIComponent(state.secretKey)}` : "";
+      const ttsUrl = `${state.serverUrl}/api/v1/translator/tts?text=${encodeURIComponent(text.slice(0, 300))}&lang=${cleanLang}${keyParam}`;
+
       if (!translatorAudio) translatorAudio = new Audio();
-      translatorAudio.src = "data:audio/mpeg;base64," + audioBase64;
+      translatorAudio.src = ttsUrl;
       translatorAudio.onended = handleFinished;
       translatorAudio.onerror = () => {
-        handleFinished();
-        fallbackSpeechSynthesis(text, cleanLang, onAudioDone);
+        fallbackSpeechSynthesis(text, cleanLang, handleFinished);
       };
-      await translatorAudio.play();
-      return;
+      translatorAudio.play().catch(() => fallbackSpeechSynthesis(text, cleanLang, handleFinished));
     } catch (err) {
-      console.warn("[TTS] Inline base64 playback failed, trying server stream:", err);
+      fallbackSpeechSynthesis(text, cleanLang, handleFinished);
     }
   }
 
-  // Tier 2: Real MP3 audio via server TTS stream endpoint
+  // Tier 1: Direct Google Translate TTS on iPhone (instant audio stream directly from Google CDN)
   try {
-    const keyParam = state.secretKey ? `&key=${encodeURIComponent(state.secretKey)}` : "";
-    const ttsUrl = `${state.serverUrl}/api/v1/translator/tts?text=${encodeURIComponent(text.slice(0, 300))}&lang=${cleanLang}${keyParam}`;
-
+    const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text.slice(0, 200))}&tl=${cleanLang}&client=tw-ob`;
     if (!translatorAudio) translatorAudio = new Audio();
-    translatorAudio.src = ttsUrl;
+    translatorAudio.src = googleTtsUrl;
     translatorAudio.onended = handleFinished;
     translatorAudio.onerror = () => {
-      handleFinished();
-      fallbackSpeechSynthesis(text, cleanLang, onAudioDone);
+      console.warn("[TTS] Direct Google TTS failed, attempting fallback...");
+      fallbackTts();
     };
 
     await translatorAudio.play();
-    return;
   } catch (err) {
-    console.warn("[TTS] Audio stream playback failed, trying Web Speech fallback:", err);
-    fallbackSpeechSynthesis(text, cleanLang, onAudioDone);
+    console.warn("[TTS] Direct Google TTS play failed, trying fallback:", err);
+    fallbackTts();
   }
 }
 
@@ -1826,23 +1839,53 @@ function initTranslatorScreen() {
     document.querySelectorAll(".translator-half").forEach((c) => c.classList.remove("listening-card"));
   }
 
+  async function fetchDirectGoogleTranslation(text, sourceLang, targetLang) {
+    const sl = sourceLang === "auto" ? "auto" : sourceLang;
+    const tl = targetLang;
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(sl)}&tl=${encodeURIComponent(tl)}&dt=t&q=${encodeURIComponent(text)}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    if (!resp.ok) throw new Error(`Google HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (!data || !data[0] || !Array.isArray(data[0])) throw new Error("Invalid Google translation payload");
+    const translatedText = data[0].map((seg) => seg[0]).filter(Boolean).join("").trim();
+    if (!translatedText) throw new Error("Empty translation result");
+    return translatedText;
+  }
+
   async function translateAndDisplay(spokenText, fromLang, toLang, isUserSpeaker) {
     if (!spokenText) return;
     try {
       if (isUserSpeaker) {
         if (userOut) userOut.textContent = `Ви: ${spokenText}`;
-        if (foreignerOut) foreignerOut.textContent = "Перекладаю...";
+        if (foreignerOut) foreignerOut.textContent = "⚡ Перекладаю (Google)...";
       } else {
         if (foreignerOut) foreignerOut.textContent = `Співрозмовник: ${spokenText}`;
-        if (userOut) userOut.textContent = "Перекладаю...";
+        if (userOut) userOut.textContent = "⚡ Перекладаю (Google)...";
       }
 
-      const res = await apiFetch("/api/v1/translator/translate-text", {
-        method: "POST",
-        body: JSON.stringify({ text: spokenText, source_lang: fromLang, target_lang: toLang })
-      });
+      let translatedText = "";
+      let audioBase64 = null;
 
-      if (res && res.translated_text) {
+      // Tier 1: Direct Google Translate on iPhone (ultra-fast ~0.1s, zero MacBook roundtrip)
+      try {
+        translatedText = await fetchDirectGoogleTranslation(spokenText, fromLang, toLang);
+      } catch (err) {
+        console.warn("[Translator] Direct Google failed, falling back to backend:", err);
+      }
+
+      // Tier 2: Backend translation fallback (MacBook / Gemini / Turbo)
+      if (!translatedText) {
+        const res = await apiFetch("/api/v1/translator/translate-text", {
+          method: "POST",
+          body: JSON.stringify({ text: spokenText, source_lang: fromLang, target_lang: toLang })
+        });
+        if (res && res.translated_text) {
+          translatedText = res.translated_text;
+          audioBase64 = res.audio_base64 || null;
+        }
+      }
+
+      if (translatedText) {
         const nextSpeakerCallback = () => {
           if (!autoDialogEnabled) return;
           autoDialogTimer = setTimeout(() => {
@@ -1858,11 +1901,11 @@ function initTranslatorScreen() {
         };
 
         if (isUserSpeaker) {
-          if (foreignerOut) foreignerOut.textContent = res.translated_text;
-          speakText(res.translated_text, toLang, "translator-foreigner-card", res.audio_base64, nextSpeakerCallback);
+          if (foreignerOut) foreignerOut.textContent = translatedText;
+          speakText(translatedText, toLang, "translator-foreigner-card", audioBase64, nextSpeakerCallback);
         } else {
-          if (userOut) userOut.textContent = res.translated_text;
-          speakText(res.translated_text, toLang, "translator-user-card", res.audio_base64, nextSpeakerCallback);
+          if (userOut) userOut.textContent = translatedText;
+          speakText(translatedText, toLang, "translator-user-card", audioBase64, nextSpeakerCallback);
         }
       }
     } catch (e) {
@@ -1968,19 +2011,15 @@ function initTranslatorScreen() {
     }
   });
 
-  document.getElementById("open-apple-app-btn")?.addEventListener("click", () => {
-    window.location.href = "translate://";
-  });
-
   document.getElementById("open-google-app-btn")?.addEventListener("click", () => {
-    const sl = sSelect.value === "auto" ? "ru" : sSelect.value;
+    const sl = sSelect.value === "auto" ? "auto" : sSelect.value;
     const tl = tSelect.value;
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     if (isIOS) {
-      window.location.href = "googletranslate://";
+      window.location.href = `googletranslate://?sl=${sl}&tl=${tl}`;
       setTimeout(() => {
         window.open(`https://translate.google.com/?sl=${sl}&tl=${tl}&op=translate`, "_blank");
-      }, 1200);
+      }, 1500);
     } else {
       window.open(`https://translate.google.com/?sl=${sl}&tl=${tl}&op=translate`, "_blank");
     }
