@@ -157,6 +157,10 @@
         <span class="tab-icon">🧠</span>
         <span class="tab-label">Склерозник</span>
       </button>
+      <button class="tab-btn" data-tab="movies" role="tab" aria-selected="false">
+        <span class="tab-icon">🎬</span>
+        <span class="tab-label">Фільми</span>
+      </button>
       <button class="tab-btn" data-tab="inventory" role="tab" aria-selected="false">
         <span class="tab-icon">📦</span>
         <span class="tab-label">Инвентарь</span>
@@ -270,7 +274,46 @@
         </div>
       </section>
 
-      <!-- 6. INVENTORY TAB (Where is what) -->
+      <!-- 6. ФІЛЬМИ (AI Movie Search) -->
+      <section id="tab-movies" class="tab-panel">
+        <div class="panel-header">
+          <h2>🎬 Фільми та серіали</h2>
+          <button id="movies-watchlist-toggle-btn" class="action-btn-sm" style="font-size:0.8rem;">📋 Список</button>
+        </div>
+
+        <!-- Movie Search -->
+        <div style="background:var(--bg-card);border:1px dashed var(--border-color);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:12px;font-size:0.84rem;color:var(--text-sub);display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.3rem;">🎙️</span>
+          <div><strong>Голосовий пошук:</strong> Скажіть назву фільму після натискання мікрофону на головному екрані, або введіть нижче.</div>
+        </div>
+
+        <div class="quick-input-form" style="margin-top:0;margin-bottom:16px;">
+          <input type="text" id="movie-search-input" placeholder="🎬 Назва фільму або серіалу..." />
+          <button id="movie-search-btn" class="send-btn" title="Знайти фільм">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </button>
+        </div>
+
+        <!-- Movie AI Result Card -->
+        <div id="movie-result-card" class="hidden" style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px;">
+          <div id="movie-result-inner"><!-- Populated by JS --></div>
+        </div>
+
+        <!-- Watchlist -->
+        <div id="movies-watchlist-section">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <h3 style="font-size:0.95rem;font-weight:700;margin:0;">📌 Список перегляду</h3>
+            <div style="display:flex;gap:4px;">
+              <button class="movies-type-btn active" data-type="all" style="font-size:0.77rem;padding:3px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-card);cursor:pointer;">Всі</button>
+              <button class="movies-type-btn" data-type="movie" style="font-size:0.77rem;padding:3px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-card);cursor:pointer;">🎬 Фільми</button>
+              <button class="movies-type-btn" data-type="series" style="font-size:0.77rem;padding:3px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-card);cursor:pointer;">📺 Серіали</button>
+            </div>
+          </div>
+          <div id="movies-watchlist-list" class="items-list"><!-- Populated by JS --></div>
+        </div>
+      </section>
+
+      <!-- 7. INVENTORY TAB (Where is what) -->
       <section id="tab-inventory" class="tab-panel">
         <div class="panel-header">
           <h2>Де що лежить (Інвентар)</h2>
@@ -845,6 +888,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.3.3"></script>
+  <script src="/static/app.js?v=3.4.0"></script>
 </body>
 </html>

@@ -25,6 +25,7 @@ from app.modules.hospitality import hospitality_router, Booking
 from app.modules.delegation import delegation_router, FamilyContact
 from app.modules.translator import translator_router
 from app.modules.health_vitals import health_vitals_router, BloodPressureLog
+from app.modules.movies import movies_router
 from app.core import web_agent_router, gemini_router, system_router, start_nightly_backup_task
 from app.core.undo_service import router as undo_router
 from app.database import Base, engine
@@ -87,6 +88,7 @@ api_v1.include_router(delegation_router)
 api_v1.include_router(translator_router)
 api_v1.include_router(undo_router)
 api_v1.include_router(health_vitals_router)
+api_v1.include_router(movies_router)
 
 # Dormant Hospitality Module (Feature-flagged)
 if settings.ENABLE_HOSPITALITY:
