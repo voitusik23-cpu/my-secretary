@@ -141,7 +141,7 @@ function showToast(message) {
 // --- Audio & Voice Recording ---
 function initVoice() {
   const micBtn = document.getElementById("mic-btn");
-  const pulseRing = document.getElementById("pulse-ring");
+  const pulseRings = document.querySelectorAll(".mic-pulse-ring");
   const statusText = document.getElementById("voice-status-text");
   const timerEl = document.getElementById("recording-timer");
 
@@ -203,7 +203,6 @@ function initVoice() {
       state.isRecording = true;
 
       micBtn.classList.add("recording");
-      pulseRing.classList.add("active");
       statusText.textContent = "Слушаю... Нажмите ещё раз для отправки";
       timerEl.classList.remove("hidden");
 
@@ -235,7 +234,6 @@ function initVoice() {
     }
     state.isRecording = false;
     micBtn.classList.remove("recording");
-    pulseRing.classList.remove("active");
     clearInterval(state.recordInterval);
     timerEl.classList.add("hidden");
     statusText.textContent = "Обрабатываю запись через Gemini AI...";
