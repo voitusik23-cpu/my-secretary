@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.5.0")
+      .register("/sw.js?v=3.5.1")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
