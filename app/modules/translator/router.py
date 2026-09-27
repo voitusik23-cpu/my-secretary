@@ -1,5 +1,6 @@
 import json
 import re
+import base64
 import urllib.parse
 import logging
 from typing import Dict, Any, Optional
@@ -97,11 +98,27 @@ async def translate_text_endpoint(payload: TranslateTextRequest):
         target_lang=payload.target_lang
     )
 
+    audio_b64 = None
+    translated = res.get("translated_text", "").strip()
+    if translated and not translated.startswith("["):
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=2.5) as client:
+                clean_lang = (payload.target_lang or "en").lower().split("-")[0]
+                q = urllib.parse.quote(translated[:300])
+                url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={q}&tl={clean_lang}&client=tw-ob"
+                tts_resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+                if tts_resp.status_code == 200 and tts_resp.content:
+                    audio_b64 = base64.b64encode(tts_resp.content).decode("ascii")
+        except Exception as e:
+            logger.warning(f"Inline TTS generation failed: {e}")
+
     return TranslateTextResponse(
         original_text=text,
         translated_text=res["translated_text"],
         detected_source_lang=res["detected_source_lang"],
-        target_lang=payload.target_lang
+        target_lang=payload.target_lang,
+        audio_base64=audio_b64
     )
 
 

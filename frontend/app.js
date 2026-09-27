@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.2.2")
+      .register("/sw.js?v=3.2.3")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -1614,14 +1614,35 @@ function initDelegationModal() {
 // ==========================================================================
 let translatorAudio = null;
 let activeUtterance = null;
+let audioUnlocked = false;
 
-// iOS Safari requires audio playback / speech to be unlocked during a direct user touch/click
+// Stop any currently playing speech/audio immediately so mic is clear
+function stopAllAudio() {
+  if (translatorAudio) {
+    try {
+      translatorAudio.pause();
+      translatorAudio.currentTime = 0;
+    } catch (e) {}
+  }
+  if (window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch (e) {}
+  }
+  activeUtterance = null;
+  document.querySelectorAll(".half-action-btn").forEach((btn) => {
+    btn.textContent = "🔊 Озвучити";
+  });
+}
+
+// iOS Safari requires audio to be primed on first direct user gesture
 function unlockAudioPlayback() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
   try {
     if (!translatorAudio) {
       translatorAudio = new Audio();
     }
-    // Silent 1-sample WAV to prime WebKit audio channel
     translatorAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
     const p = translatorAudio.play();
     if (p && typeof p.then === "function") {
@@ -1636,10 +1657,11 @@ function unlockAudioPlayback() {
   }
 }
 
-async function speakText(text, lang, targetCardId = null) {
+async function speakText(text, lang, targetCardId = null, audioBase64 = null) {
   if (!text) return;
-  const cleanLang = (lang || "en").toLowerCase().split("-")[0];
+  stopAllAudio();
 
+  const cleanLang = (lang || "en").toLowerCase().split("-")[0];
   const targetCard = targetCardId ? document.getElementById(targetCardId) : null;
   const ttsBtn = targetCard ? targetCard.querySelector(".half-action-btn") : null;
   const originalBtnText = ttsBtn ? ttsBtn.textContent : "";
@@ -1649,14 +1671,29 @@ async function speakText(text, lang, targetCardId = null) {
     if (ttsBtn) ttsBtn.textContent = originalBtnText || "🔊 Озвучити";
   }
 
-  // Tier 1: Real MP3 audio via server TTS (Studio voice, works consistently across devices)
+  // Tier 1: Zero-roundtrip inline base64 audio from translation response
+  if (audioBase64) {
+    try {
+      if (!translatorAudio) translatorAudio = new Audio();
+      translatorAudio.src = "data:audio/mpeg;base64," + audioBase64;
+      translatorAudio.onended = resetBtn;
+      translatorAudio.onerror = () => {
+        resetBtn();
+        fallbackSpeechSynthesis(text, cleanLang, resetBtn);
+      };
+      await translatorAudio.play();
+      return;
+    } catch (err) {
+      console.warn("[TTS] Inline base64 playback failed, trying server stream:", err);
+    }
+  }
+
+  // Tier 2: Real MP3 audio via server TTS stream endpoint
   try {
     const keyParam = state.secretKey ? `&key=${encodeURIComponent(state.secretKey)}` : "";
     const ttsUrl = `${state.serverUrl}/api/v1/translator/tts?text=${encodeURIComponent(text.slice(0, 300))}&lang=${cleanLang}${keyParam}`;
 
-    if (!translatorAudio) {
-      translatorAudio = new Audio();
-    }
+    if (!translatorAudio) translatorAudio = new Audio();
     translatorAudio.src = ttsUrl;
     translatorAudio.onended = resetBtn;
     translatorAudio.onerror = () => {
@@ -1680,7 +1717,7 @@ function fallbackSpeechSynthesis(text, lang, onDone) {
   try {
     window.speechSynthesis.resume();
     const utterance = new SpeechSynthesisUtterance(text);
-    activeUtterance = utterance; // Prevent iOS Safari GC premature kill
+    activeUtterance = utterance;
 
     const langMap = { uk: "uk-UA", ru: "ru-RU", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
     utterance.lang = langMap[lang] || lang || "en-US";
@@ -1736,9 +1773,23 @@ function initTranslatorScreen() {
   tSelect?.addEventListener("change", updateMicLabels);
   updateMicLabels();
 
+  let activeRecognition = null;
   let isListening = false;
-  let recognition = null;
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  function stopCurrentRecognition() {
+    if (activeRecognition) {
+      try {
+        activeRecognition.onresult = null;
+        activeRecognition.onerror = null;
+        activeRecognition.onend = null;
+        activeRecognition.abort();
+      } catch (e) {}
+      activeRecognition = null;
+    }
+    isListening = false;
+    document.querySelectorAll(".face-mic-btn").forEach((b) => b.classList.remove("recording"));
+  }
 
   async function translateAndDisplay(spokenText, fromLang, toLang, isUserSpeaker) {
     if (!spokenText) return;
@@ -1759,10 +1810,10 @@ function initTranslatorScreen() {
       if (res && res.translated_text) {
         if (isUserSpeaker) {
           if (foreignerOut) foreignerOut.textContent = res.translated_text;
-          speakText(res.translated_text, toLang, "translator-foreigner-card");
+          speakText(res.translated_text, toLang, "translator-foreigner-card", res.audio_base64);
         } else {
           if (userOut) userOut.textContent = res.translated_text;
-          speakText(res.translated_text, toLang, "translator-user-card");
+          speakText(res.translated_text, toLang, "translator-user-card", res.audio_base64);
         }
       }
     } catch (e) {
@@ -1772,46 +1823,56 @@ function initTranslatorScreen() {
 
   function startSpeechRecognition(fromLang, toLang, isUserSpeaker, btnEl) {
     unlockAudioPlayback();
+
+    // Toggle: if this specific button was already actively recording, user clicked to stop
+    if (isListening && btnEl.classList.contains("recording")) {
+      stopCurrentRecognition();
+      return;
+    }
+
+    // Stop any currently playing audio so the mic channel is 100% free and quiet
+    stopAllAudio();
+    stopCurrentRecognition();
+
     if (SpeechRec) {
-      if (isListening) {
-        if (recognition) recognition.stop();
-        isListening = false;
-        btnEl.classList.remove("recording");
-        return;
-      }
-
-      recognition = new SpeechRec();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      const langMap = { uk: "uk-UA", ru: "ru-RU", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
-      recognition.lang = langMap[fromLang] || "uk-UA";
-
-      recognition.onstart = () => {
-        isListening = true;
-        btnEl.classList.add("recording");
-        playAudioBeep();
-      };
-
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        translateAndDisplay(transcript, fromLang, toLang, isUserSpeaker);
-      };
-
-      recognition.onerror = (e) => {
-        console.warn("SpeechRec error:", e);
-        showToast("Не вдалося розпізнати мову. Спробуйте ще раз.");
-      };
-
-      recognition.onend = () => {
-        isListening = false;
-        btnEl.classList.remove("recording");
-      };
-
       try {
-        recognition.start();
+        const rec = new SpeechRec();
+        activeRecognition = rec;
+        rec.continuous = false;
+        rec.interimResults = false;
+        const langMap = { uk: "uk-UA", ru: "ru-RU", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
+        rec.lang = langMap[fromLang] || "uk-UA";
+
+        rec.onstart = () => {
+          isListening = true;
+          btnEl.classList.add("recording");
+        };
+
+        rec.onresult = (event) => {
+          const transcript = event.results && event.results[0] && event.results[0][0] ? event.results[0][0].transcript : "";
+          // CRITICAL FIX: Stop recognition immediately on result to free mic and prevent speaker echo/lag
+          stopCurrentRecognition();
+          if (transcript) {
+            translateAndDisplay(transcript, fromLang, toLang, isUserSpeaker);
+          }
+        };
+
+        rec.onerror = (e) => {
+          console.warn("[Translator SpeechRec error]:", e.error);
+          stopCurrentRecognition();
+          if (e.error !== "no-speech" && e.error !== "aborted") {
+            showToast("Не вдалося розпізнати мову. Спробуйте ще раз.");
+          }
+        };
+
+        rec.onend = () => {
+          stopCurrentRecognition();
+        };
+
+        rec.start();
       } catch (err) {
-        isListening = false;
-        btnEl.classList.remove("recording");
+        console.warn("[Translator SpeechRec start exception]:", err);
+        stopCurrentRecognition();
       }
     } else {
       const text = prompt("Введіть текст для перекладу:");
@@ -1820,12 +1881,10 @@ function initTranslatorScreen() {
   }
 
   userMicBtn?.addEventListener("click", () => {
-    unlockAudioPlayback();
     startSpeechRecognition(sSelect.value, tSelect.value, true, userMicBtn);
   });
 
   foreignerMicBtn?.addEventListener("click", () => {
-    unlockAudioPlayback();
     const sLang = sSelect.value === "auto" ? "uk" : sSelect.value;
     startSpeechRecognition(tSelect.value, sLang, false, foreignerMicBtn);
   });

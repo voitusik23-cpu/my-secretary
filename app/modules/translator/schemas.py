@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -12,3 +13,4 @@ class TranslateTextResponse(BaseModel):
     translated_text: str
     detected_source_lang: str
     target_lang: str
+    audio_base64: Optional[str] = None
