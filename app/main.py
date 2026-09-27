@@ -24,6 +24,7 @@ from app.modules.fitness import fitness_router, FitnessLog
 from app.modules.hospitality import hospitality_router, Booking
 from app.modules.delegation import delegation_router, FamilyContact
 from app.modules.translator import translator_router
+from app.modules.health_vitals import health_vitals_router, BloodPressureLog
 from app.core import web_agent_router, gemini_router, system_router, start_nightly_backup_task
 from app.core.undo_service import router as undo_router
 from app.database import Base, engine
@@ -81,10 +82,11 @@ api_v1.include_router(gemini_router)
 api_v1.include_router(fitness_router)
 api_v1.include_router(system_router)
 
-# Step 5 Modules (Delegation, Translator, Undo)
+# Step 5 & 6 Modules (Delegation, Translator, Undo, Health Vitals)
 api_v1.include_router(delegation_router)
 api_v1.include_router(translator_router)
 api_v1.include_router(undo_router)
+api_v1.include_router(health_vitals_router)
 
 # Dormant Hospitality Module (Feature-flagged)
 if settings.ENABLE_HOSPITALITY:
@@ -118,6 +120,7 @@ def get_system_health():
         "delegation",
         "translator",
         "undo",
+        "health_vitals",
     ]
     if settings.ENABLE_HOSPITALITY:
         active_modules.append("hospitality")

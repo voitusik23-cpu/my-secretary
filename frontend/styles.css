@@ -1110,3 +1110,79 @@ body {
   font-size: 0.78rem;
   color: var(--text-muted);
 }
+
+/* --- Step 6: Blood Pressure & Vitals Styling --- */
+.bp-input-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.bp-big-input {
+  width: 100%;
+  font-size: 1.45rem;
+  font-weight: 700;
+  text-align: center;
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  outline: none;
+  font-family: monospace, -apple-system, sans-serif;
+}
+
+.tod-pill, .factor-pill, .bp-range-btn {
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tod-pill.active, .bp-range-btn.active {
+  background: #ff453a;
+  color: #fff;
+  border-color: #ff453a;
+  font-weight: 600;
+}
+
+.factor-pill.active {
+  background: #0a84ff;
+  color: #fff;
+  border-color: #0a84ff;
+  font-weight: 600;
+}
+
+.bp-log-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.bp-log-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bp-reading-val {
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-family: monospace, sans-serif;
+}
+
+.bp-pulse-val {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+

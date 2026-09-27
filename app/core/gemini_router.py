@@ -40,7 +40,8 @@ EXTENDED_CLASSIFICATION_INSTRUCTION = """Ти — інтелектуальний
 8. "auto" — авто ("запиши пробіг 120000", "заміна масла", "коли ТО"). action: "status"|"log", event_type, current_mileage, notes.
 9. "utility" — показники лічильників ("світло 1234", "вода 45", "газ 780"). meter_type, reading_value.
 10. "fitness" — спорт/активність ("скільки кроків", "лижні спуски", "запиши 10000 кроків"). action: "query_steps"|"query_skiing"|"log", steps, distance_km.
-11. "web_search" — пошук в інтернеті, факти, погода, курс валют.
+11. "health_vitals" — тиск і пульс ("тиск 130 на 80 пульс 72", "утром 140 на 90 выпил таблетку", "вечером 145/95 2 бокала вина", "дай таблицу давления"). action: "log"|"query", systolic, diastolic, pulse, time_of_day: "morning"|"afternoon"|"evening"|"night", medications_taken, notes.
+12. "web_search" — пошук в інтернеті, факти, погода, курс валют.
 
 Поточна дата: {current_time}.
 Формат відповіді СУВОРО JSON:
@@ -102,6 +103,21 @@ async def process_intent(payload: ProcessRequest, db: Session = Depends(get_db))
                 parsed_intent = "utility"
             elif any(k in lower for k in ["крок", "шаг", "лиж", "лыж"]):
                 parsed_intent, data = "fitness", {"action": "query_skiing" if ("лиж" in lower or "лыж" in lower) else "query_steps"}
+            elif any(k in lower for k in ["тиск", "давлен", "пульс"]) and re.search(r"(\d{2,3})\s*(?:на|\/|\-)\s*(\d{2,3})", lower):
+                m_bp = re.search(r"(\d{2,3})\s*(?:на|\/|\-)\s*(\d{2,3})", lower)
+                m_pulse = re.search(r"пульс\s*(\d{2,3})", lower)
+                tod = "morning" if any(k in lower for k in ["утр", "ранок", "ранку"]) else ("evening" if any(k in lower for k in ["вечер", "вечір", "вечора"]) else None)
+                parsed_intent = "health_vitals"
+                data = {
+                    "action": "log",
+                    "systolic": int(m_bp.group(1)),
+                    "diastolic": int(m_bp.group(2)),
+                    "pulse": int(m_pulse.group(1)) if m_pulse else None,
+                    "time_of_day": tod,
+                    "notes": text
+                }
+            elif any(k in lower for k in ["тиск", "давлен"]) and any(k in lower for k in ["таблиц", "статистик", "покажи", "який", "какое", "истори"]):
+                parsed_intent, data = "health_vitals", {"action": "query"}
             else:
                 parsed_intent = "web_search"
 
@@ -187,7 +203,12 @@ async def process_intent(payload: ProcessRequest, db: Session = Depends(get_db))
         msg = f"Записано активність: {steps} кроків"
         return {"intent": "fitness", "reply": msg, "summary": msg, "created": {"id": f_log.id}}
 
-    # 8. STANDARD ROUTER (Finance, Shopping, Tasks, Media)
+    # 8. HEALTH VITALS (Blood Pressure & Pulse)
+    if parsed_intent == "health_vitals":
+        from app.modules.health_vitals.intent_handler import handle_vitals_intent
+        return handle_vitals_intent(db=db, data=data, raw_text=text)
+
+    # 9. STANDARD ROUTER (Finance, Shopping, Tasks, Media)
     from app.routers.process import _save_parsed_actions
     created = _save_parsed_actions([{"domain": parsed_intent, "data": data}], db)
     return {"intent": parsed_intent, "reply": summary or "Дію збережено", "summary": summary or "Збережено", "created": created}

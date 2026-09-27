@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.2.6")
+      .register("/sw.js?v=3.3.0")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -364,6 +364,9 @@ function loadTabData(tab) {
       break;
     case "fitness":
       loadFitness();
+      break;
+    case "vitals":
+      loadVitals();
       break;
     case "hospitality":
       loadHospitality();
@@ -2032,6 +2035,378 @@ function initStep5Handlers() {
   initTranslatorScreen();
 }
 
+// ==========================================================================
+// --- Step 6: Blood Pressure & Vitals Health Journal ---
+// ==========================================================================
+let vitalsSelectedDays = 90;
+let bpChartInstance = null;
+
+async function loadVitals() {
+  const avgEl = document.getElementById("stat-bp-avg");
+  const rangeEl = document.getElementById("stat-bp-range");
+  const pulseEl = document.getElementById("stat-bp-pulse");
+  const normPctEl = document.getElementById("stat-bp-norm-pct");
+  const totalCountEl = document.getElementById("stat-bp-total-count");
+  const morningAvgEl = document.getElementById("stat-bp-morning-avg");
+  const eveningAvgEl = document.getElementById("stat-bp-evening-avg");
+  const correlationsCard = document.getElementById("bp-correlations-card");
+  const correlationsList = document.getElementById("bp-correlations-list");
+  const logsContainer = document.getElementById("bp-logs-container");
+  const tableCountLabel = document.getElementById("bp-table-count-label");
+
+  try {
+    const [analytics, logs] = await Promise.all([
+      apiFetch(`/api/v1/vitals/bp/analytics?days=${vitalsSelectedDays}`),
+      apiFetch(`/api/v1/vitals/bp?days=${vitalsSelectedDays}`),
+    ]);
+
+    if (!analytics || !logs) return;
+
+    // 1. Stats Cards
+    if (analytics.total_readings > 0) {
+      if (avgEl) avgEl.textContent = `${analytics.avg_systolic} / ${analytics.avg_diastolic}`;
+      if (rangeEl) rangeEl.textContent = `Мін: ${analytics.min_systolic}/${analytics.min_diastolic} • Макс: ${analytics.max_systolic}/${analytics.max_diastolic}`;
+      if (pulseEl) pulseEl.textContent = analytics.avg_pulse ? `${analytics.avg_pulse} уд/хв` : "—";
+      if (normPctEl) normPctEl.textContent = `${analytics.normal_percentage}% в нормі (SYS<130, DIA<85)`;
+      if (totalCountEl) totalCountEl.textContent = `${analytics.total_readings} вимірів`;
+
+      if (morningAvgEl) {
+        morningAvgEl.textContent = analytics.morning_avg
+          ? `${analytics.morning_avg.systolic} / ${analytics.morning_avg.diastolic} (${analytics.morning_avg.count})`
+          : "— / —";
+      }
+      if (eveningAvgEl) {
+        eveningAvgEl.textContent = analytics.evening_avg
+          ? `${analytics.evening_avg.systolic} / ${analytics.evening_avg.diastolic} (${analytics.evening_avg.count})`
+          : "— / —";
+      }
+    } else {
+      if (avgEl) avgEl.textContent = "— / —";
+      if (rangeEl) rangeEl.textContent = "Немає даних за цей період";
+      if (pulseEl) pulseEl.textContent = "—";
+      if (normPctEl) normPctEl.textContent = "0 вимірів";
+      if (totalCountEl) totalCountEl.textContent = "0 вимірів";
+      if (morningAvgEl) morningAvgEl.textContent = "— / —";
+      if (eveningAvgEl) eveningAvgEl.textContent = "— / —";
+    }
+
+    if (tableCountLabel) {
+      tableCountLabel.textContent = `Всього вимірів: ${logs.length}`;
+    }
+
+    // 2. Lifestyle Correlations
+    if (correlationsCard && correlationsList) {
+      const corrs = analytics.lifestyle_correlations || [];
+      if (corrs.length > 0) {
+        correlationsCard.classList.remove("hidden");
+        correlationsList.innerHTML = corrs.map(c => {
+          const sign = c.delta > 0 ? `+${c.delta}` : `${c.delta}`;
+          const color = c.impact === "negative" ? "#ff453a" : (c.impact === "positive" ? "#30d158" : "var(--text-muted)");
+          return `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:6px;">
+              <span><strong>${escapeHtml(c.factor)}</strong> (${c.count} вимірів)</span>
+              <span style="font-weight:700;color:${color};">${sign} мм рт. ст. (середній: ${c.avg_systolic})</span>
+            </div>
+          `;
+        }).join("");
+      } else {
+        correlationsCard.classList.add("hidden");
+      }
+    }
+
+    // 3. Render Chart
+    renderBpChart(logs);
+
+    // 4. Render Table / List
+    if (logsContainer) {
+      if (logs.length === 0) {
+        logsContainer.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-icon">🩺</span>
+            <p>За вибраний період немає вимірювань тиску.</p>
+            <p style="font-size:0.8rem;color:var(--text-muted);">Скористайтеся формою швидкого запису вище або скажіть: «Давление 120 на 80 пульс 70».</p>
+          </div>
+        `;
+        return;
+      }
+
+      const todIcons = { morning: "☀️ Ранок", afternoon: "🌤️ День", evening: "🌙 Вечір", night: "🌌 Ніч" };
+
+      logsContainer.innerHTML = logs.map(l => {
+        const dt = new Date(l.recorded_at);
+        const dateStr = dt.toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit", year: "numeric" });
+        const timeStr = dt.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" });
+        const todText = todIcons[l.time_of_day] || l.time_of_day;
+        const notesText = [l.medications_taken ? `💊 ${l.medications_taken}` : "", l.notes ? `📝 ${l.notes}` : ""].filter(Boolean).join(" • ");
+
+        return `
+          <div class="bp-log-card" data-id="${l.id}">
+            <div class="bp-log-left">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span class="bp-reading-val" style="color:${l.color || 'var(--text-main)'};">${l.systolic} / ${l.diastolic}</span>
+                <span class="item-badge" style="background:${l.color}22;color:${l.color};border:1px solid ${l.color}44;font-size:0.75rem;">${escapeHtml(l.classification)}</span>
+                ${l.pulse ? `<span class="bp-pulse-val">💓 ${l.pulse}</span>` : ""}
+              </div>
+              <div style="font-size:0.78rem;color:var(--text-muted);display:flex;gap:6px;margin-top:2px;">
+                <span>📅 ${dateStr} ${timeStr}</span>
+                <span>• ${todText}</span>
+              </div>
+              ${notesText ? `<div style="font-size:0.8rem;color:var(--text-main);margin-top:3px;">${escapeHtml(notesText)}</div>` : ""}
+            </div>
+            <button class="delete-bp-btn icon-btn-danger" data-id="${l.id}" title="Видалити замір" style="background:transparent;border:none;color:#ff453a;cursor:pointer;padding:6px;">
+              🗑️
+            </button>
+          </div>
+        `;
+      }).join("");
+
+      // Bind delete buttons
+      logsContainer.querySelectorAll(".delete-bp-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const id = btn.dataset.id;
+          if (confirm("Видалити цей запис тиску?")) {
+            try {
+              await apiFetch(`/api/v1/vitals/bp/${id}`, { method: "DELETE" });
+              showToast("Запис видалено");
+              loadVitals();
+            } catch (err) {
+              showToast(`Помилка: ${err.message}`);
+            }
+          }
+        });
+      });
+    }
+
+  } catch (err) {
+    console.error("[Vitals] Load failed:", err);
+  }
+}
+
+function renderBpChart(logs) {
+  const canvas = document.getElementById("bp-chart");
+  if (!canvas) return;
+
+  if (bpChartInstance) {
+    bpChartInstance.destroy();
+    bpChartInstance = null;
+  }
+
+  if (!window.Chart) {
+    console.warn("[Chart.js] Not loaded yet.");
+    return;
+  }
+
+  if (!logs || logs.length === 0) {
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+
+  const chronLogs = [...logs].reverse();
+  const labels = chronLogs.map(l => {
+    const dt = new Date(l.recorded_at);
+    return `${dt.getDate()}.${dt.getMonth() + 1} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2, '0')}`;
+  });
+
+  const sysData = chronLogs.map(l => l.systolic);
+  const diaData = chronLogs.map(l => l.diastolic);
+  const pulseData = chronLogs.map(l => l.pulse || null);
+
+  const isDark = document.documentElement.getAttribute("data-theme") !== "light";
+  const gridColor = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)";
+  const textColor = isDark ? "#8e9bb0" : "#555";
+
+  bpChartInstance = new window.Chart(canvas, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Систолічний (SYS)",
+          data: sysData,
+          borderColor: "#ff453a",
+          backgroundColor: "rgba(255, 69, 58, 0.15)",
+          borderWidth: 2.5,
+          tension: 0.25,
+          pointRadius: 4,
+          pointBackgroundColor: "#ff453a",
+        },
+        {
+          label: "Діастолічний (DIA)",
+          data: diaData,
+          borderColor: "#0a84ff",
+          backgroundColor: "rgba(10, 132, 255, 0.12)",
+          borderWidth: 2.5,
+          tension: 0.25,
+          pointRadius: 4,
+          pointBackgroundColor: "#0a84ff",
+        },
+        {
+          label: "Пульс (BPM)",
+          data: pulseData,
+          borderColor: "#af52de",
+          borderDash: [4, 4],
+          borderWidth: 1.8,
+          tension: 0.25,
+          pointRadius: 3,
+          pointBackgroundColor: "#af52de",
+          yAxisID: "y1",
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false,
+      },
+      plugins: {
+        legend: {
+          position: "top",
+          labels: {
+            color: textColor,
+            boxWidth: 12,
+            font: { size: 11 }
+          }
+        },
+        tooltip: {
+          backgroundColor: isDark ? "#1b2234" : "#ffffff",
+          titleColor: isDark ? "#ffffff" : "#111111",
+          bodyColor: isDark ? "#e0e6ed" : "#333333",
+          borderColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)",
+          borderWidth: 1,
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { size: 10 }, maxRotation: 45 }
+        },
+        y: {
+          min: 40,
+          max: 200,
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { size: 11 } },
+          title: { display: true, text: "мм рт. ст.", color: textColor, font: { size: 10 } }
+        },
+        y1: {
+          position: "right",
+          min: 40,
+          max: 160,
+          grid: { drawOnChartArea: false },
+          ticks: { color: "#af52de", font: { size: 10 } },
+          title: { display: true, text: "уд/хв", color: "#af52de", font: { size: 10 } }
+        }
+      }
+    }
+  });
+}
+
+function initVitalsScreen() {
+  const todPills = document.querySelectorAll("#bp-tod-group .tod-pill");
+  let selectedTod = "morning";
+
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) selectedTod = "morning";
+  else if (hour >= 12 && hour < 17) selectedTod = "afternoon";
+  else if (hour >= 17 && hour < 23) selectedTod = "evening";
+  else selectedTod = "night";
+
+  todPills.forEach(p => {
+    if (p.dataset.tod === selectedTod) p.classList.add("active");
+    else p.classList.remove("active");
+
+    p.addEventListener("click", () => {
+      todPills.forEach(btn => btn.classList.remove("active"));
+      p.classList.add("active");
+      selectedTod = p.dataset.tod;
+    });
+  });
+
+  const factorPills = document.querySelectorAll("#bp-factors-group .factor-pill");
+  factorPills.forEach(pill => {
+    pill.addEventListener("click", () => {
+      pill.classList.toggle("active");
+    });
+  });
+
+  const saveBtn = document.getElementById("bp-quick-save-btn");
+  saveBtn?.addEventListener("click", async () => {
+    const sysInput = document.getElementById("bp-input-systolic");
+    const diaInput = document.getElementById("bp-input-diastolic");
+    const pulseInput = document.getElementById("bp-input-pulse");
+    const notesInput = document.getElementById("bp-input-notes");
+
+    const sys = parseInt(sysInput?.value);
+    const dia = parseInt(diaInput?.value);
+    const pulse = pulseInput?.value ? parseInt(pulseInput.value) : null;
+
+    if (!sys || !dia || sys < 50 || dia < 30) {
+      showToast("Введіть коректні значення тиску (SYS і DIA)!");
+      return;
+    }
+
+    const selectedFactors = Array.from(document.querySelectorAll("#bp-factors-group .factor-pill.active"))
+      .map(b => b.dataset.factor);
+    const rawNotes = notesInput?.value?.trim() || "";
+    const combinedNotes = [...selectedFactors, rawNotes].filter(Boolean).join(", ");
+
+    try {
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Зберігаю...";
+
+      await apiFetch("/api/v1/vitals/bp", {
+        method: "POST",
+        body: JSON.stringify({
+          systolic: sys,
+          diastolic: dia,
+          pulse: pulse,
+          time_of_day: selectedTod,
+          notes: combinedNotes || null
+        })
+      });
+
+      showToast(`✅ Замір ${sys}/${dia} збережено!`);
+      if (notesInput) notesInput.value = "";
+      factorPills.forEach(p => p.classList.remove("active"));
+      loadVitals();
+    } catch (err) {
+      showToast(`Помилка: ${err.message}`);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Зберегти";
+    }
+  });
+
+  const rangeBtns = document.querySelectorAll(".bp-range-btn");
+  rangeBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      rangeBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      vitalsSelectedDays = parseInt(btn.dataset.days) || 90;
+      loadVitals();
+    });
+  });
+
+  document.getElementById("export-bp-csv-btn")?.addEventListener("click", () => {
+    const keyParam = state.secretKey ? `&key=${encodeURIComponent(state.secretKey)}` : "";
+    const exportUrl = `${state.serverUrl}/api/v1/vitals/bp/export?days=${vitalsSelectedDays}${keyParam}`;
+    const link = document.createElement("a");
+    link.href = exportUrl;
+    link.setAttribute("download", `blood_pressure_journal_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("📥 Завантаження таблиці тиску CSV розпочато...");
+  });
+
+  document.getElementById("scroll-to-bp-form-btn")?.addEventListener("click", () => {
+    document.getElementById("bp-quick-input-card")?.scrollIntoView({ behavior: "smooth" });
+  });
+}
+
 // --- Offline Listener ---
 function initNetworkListeners() {
   const banner = document.getElementById("offline-banner");
@@ -2067,6 +2442,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initStep2Handlers();
   initStep3Handlers();
   initStep5Handlers();
+  initVitalsScreen();
   initNetworkListeners();
   checkHealth();
   checkSystemFeatures();

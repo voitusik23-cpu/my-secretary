@@ -29,7 +29,8 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.2.6">
+  <link rel="stylesheet" href="/static/styles.css?v=3.3.0">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <!-- Offline banner -->
@@ -147,6 +148,10 @@
       <button class="tab-btn" data-tab="fitness" role="tab" aria-selected="false">
         <span class="tab-icon">🏃</span>
         <span class="tab-label">Спорт</span>
+      </button>
+      <button class="tab-btn" data-tab="vitals" role="tab" aria-selected="false">
+        <span class="tab-icon">❤️</span>
+        <span class="tab-label">Давление</span>
       </button>
       <button class="tab-btn" data-tab="media" role="tab" aria-selected="false">
         <span class="tab-icon">🎬</span>
@@ -553,6 +558,127 @@
           </div>
         </div>
       </section>
+
+      <!-- 11. BLOOD PRESSURE & VITALS TAB (Щоденник артеріального тиску) -->
+      <section id="tab-vitals" class="tab-panel">
+        <div class="panel-header">
+          <h2>❤️ Щоденник тиску та пульсу</h2>
+          <div class="panel-actions">
+            <button id="export-bp-csv-btn" class="action-btn-sm" title="Експортувати вимірювання в CSV">📥 Скачати CSV</button>
+            <button id="scroll-to-bp-form-btn" class="action-btn-sm btn-primary">+ Замір</button>
+          </div>
+        </div>
+
+        <!-- Quick BP Log Card with large readable inputs -->
+        <div class="stat-card bp-quick-card" id="bp-quick-input-card" style="margin-bottom:14px;border-left:4px solid #ff453a;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+            <strong style="font-size:0.95rem;">⚡ Швидкий запис заміру</strong>
+            <div class="time-of-day-picker" id="bp-tod-group" style="display:flex;gap:4px;">
+              <button type="button" class="tod-pill active" data-tod="morning">☀️ Ранок</button>
+              <button type="button" class="tod-pill" data-tod="afternoon">🌤️ День</button>
+              <button type="button" class="tod-pill" data-tod="evening">🌙 Вечір</button>
+              <button type="button" class="tod-pill" data-tod="night">🌌 Ніч</button>
+            </div>
+          </div>
+
+          <div class="bp-inputs-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
+            <div class="bp-input-box">
+              <label for="bp-input-systolic" style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:2px;">SYS (Верхній)</label>
+              <input type="number" id="bp-input-systolic" value="120" min="50" max="250" class="bp-big-input" />
+              <small style="font-size:0.68rem;color:var(--text-muted);">мм рт. ст.</small>
+            </div>
+            <div class="bp-input-box">
+              <label for="bp-input-diastolic" style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:2px;">DIA (Нижній)</label>
+              <input type="number" id="bp-input-diastolic" value="80" min="30" max="180" class="bp-big-input" />
+              <small style="font-size:0.68rem;color:var(--text-muted);">мм рт. ст.</small>
+            </div>
+            <div class="bp-input-box">
+              <label for="bp-input-pulse" style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:2px;">Пульс</label>
+              <input type="number" id="bp-input-pulse" value="70" min="30" max="220" class="bp-big-input" />
+              <small style="font-size:0.68rem;color:var(--text-muted);">уд. / хв</small>
+            </div>
+          </div>
+
+          <!-- Quick Lifestyle Tags -->
+          <div style="margin-bottom:10px;">
+            <small style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:4px;">Фактори впливу / Ліки:</small>
+            <div class="bp-factors-pills" id="bp-factors-group" style="display:flex;flex-wrap:wrap;gap:6px;">
+              <button type="button" class="factor-pill" data-factor="☕ Кава">☕ Кава</button>
+              <button type="button" class="factor-pill" data-factor="🍷 Алкоголь">🍷 Алкоголь</button>
+              <button type="button" class="factor-pill" data-factor="💊 Таблетка">💊 Таблетка</button>
+              <button type="button" class="factor-pill" data-factor="⚡ Стрес">⚡ Стрес</button>
+              <button type="button" class="factor-pill" data-factor="🏃 Спорт">🏃 Спорт</button>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:6px;">
+            <input type="text" id="bp-input-notes" placeholder="Додатково (еналаприл 10мг, після тренування...)" style="flex:1;font-size:0.85rem;" />
+            <button id="bp-quick-save-btn" class="btn-primary" style="white-space:nowrap;padding:8px 16px;">Зберегти</button>
+          </div>
+        </div>
+
+        <!-- Summary Vitals Metric Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">❤️ Середній тиск</span>
+            <span id="stat-bp-avg" class="stat-val positive">— / —</span>
+            <span id="stat-bp-range" class="stat-subval">Мін: — • Макс: —</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">💓 Пульс</span>
+            <span id="stat-bp-pulse" class="stat-val">—</span>
+            <span id="stat-bp-norm-pct" class="stat-subval">100% в нормі</span>
+          </div>
+        </div>
+
+        <!-- Morning vs Evening Comparison Card -->
+        <div class="stat-card" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong style="font-size:0.95rem;">⚖️ Ранок vs Вечір:</strong>
+            <span id="stat-bp-total-count" class="item-badge badge-finance">0 вимірів</span>
+          </div>
+          <div style="display:flex;justify-content:space-around;margin-top:8px;text-align:center;">
+            <div>
+              <small style="color:var(--text-muted);display:block;">☀️ Ранок (середнє)</small>
+              <strong id="stat-bp-morning-avg" style="font-size:1.1rem;color:var(--text-main);">— / —</strong>
+            </div>
+            <div>
+              <small style="color:var(--text-muted);display:block;">🌙 Вечір (середнє)</small>
+              <strong id="stat-bp-evening-avg" style="font-size:1.1rem;color:var(--text-main);">— / —</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Chart with Range Selector -->
+        <div class="stat-card" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+            <strong style="font-size:0.95rem;">📈 Динаміка тиску та пульсу</strong>
+            <div class="bp-timeframe-picker" style="display:flex;gap:4px;">
+              <button type="button" class="bp-range-btn" data-days="7">7 днів</button>
+              <button type="button" class="bp-range-btn" data-days="30">30 днів</button>
+              <button type="button" class="bp-range-btn active" data-days="90">3 місяці</button>
+            </div>
+          </div>
+          <div style="position:relative;height:240px;width:100%;">
+            <canvas id="bp-chart"></canvas>
+          </div>
+        </div>
+
+        <!-- Lifestyle Correlations Section -->
+        <div id="bp-correlations-card" class="stat-card hidden" style="margin-bottom:12px;border-left:4px solid #ffd60a;">
+          <strong style="font-size:0.95rem;display:block;margin-bottom:6px;">🔬 Вплив факторів на тиск:</strong>
+          <div id="bp-correlations-list" style="display:flex;flex-direction:column;gap:6px;font-size:0.85rem;"></div>
+        </div>
+
+        <!-- Recent Logs Table -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px;">
+          <h3 style="font-size:0.95rem;color:var(--text-muted);margin:0;">Історія вимірювань</h3>
+          <small id="bp-table-count-label" style="color:var(--text-muted);font-size:0.75rem;"></small>
+        </div>
+        <div id="bp-logs-container" class="items-list">
+          <!-- Populated by JS -->
+        </div>
+      </section>
     </main>
 
     <!-- Family Delegation Modal -->
@@ -662,6 +788,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.2.6"></script>
+  <script src="/static/app.js?v=3.3.0"></script>
 </body>
 </html>
