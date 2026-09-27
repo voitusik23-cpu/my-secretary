@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     DEFAULT_CURRENCY: str = "UAH"
     USD_UAH_RATE: float = 44.8
 
-    # AI Model preference
-    AI_MODEL: str = "gemini-3.8-flash"
+    # AI Model preference (gemini-3.1-flash-lite is fast, low latency, and highly available)
+    AI_MODEL: str = "gemini-3.1-flash-lite"
 
     # Step 3: Dormant Hospitality Module flag
     ENABLE_HOSPITALITY: bool = False

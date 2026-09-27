@@ -253,7 +253,8 @@ function initVoice() {
 
       if (data) {
         statusText.textContent = "Нажмите и говорите или введите текст";
-        showToast(`✅ ${data.summary}`);
+        const icon = data.status === "warning" ? "⚠️" : "✅";
+        showToast(`${icon} ${data.summary}`);
         reloadCurrentTab();
       }
     } catch (err) {

@@ -154,10 +154,14 @@ async def process_audio_input(
     actions = parsed.get("actions", [])
     created = _save_parsed_actions(actions, db)
 
+    transcription = parsed.get("transcription", "")
+    summary = parsed.get("summary", "Голосовая заметка сохранена")
+    resp_status = "success" if (actions or transcription) else "warning"
+
     return {
-        "status": "success",
-        "summary": parsed.get("summary", "Голосовая заметка сохранена"),
-        "transcription": parsed.get("transcription", "Голосовое сообщение"),
+        "status": resp_status,
+        "summary": summary,
+        "transcription": transcription,
         "actions_count": len(actions),
         "created": created,
     }
