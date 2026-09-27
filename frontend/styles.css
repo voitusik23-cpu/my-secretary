@@ -95,8 +95,9 @@ body {
   transition: transform 0.3s ease;
 }
 
-.offline-banner.hidden {
-  display: none;
+.offline-banner.hidden,
+.hidden {
+  display: none !important;
 }
 
 /* Main Container */
@@ -377,43 +378,50 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Navigation Tabs (2-row grid for 10 modules) */
+/* Navigation Tabs: Modern Horizontal Scrollable Segmented Bar */
 .nav-tabs {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   background: var(--bg-card);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 6px;
-  margin: 16px 0;
-  gap: 6px;
+  padding: 6px 8px;
+  margin: 12px 0 16px 0;
+  gap: 8px;
+}
+
+.nav-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-btn {
-  display: flex;
-  flex-direction: column;
+  flex: 0 0 auto;
+  display: inline-flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   color: var(--text-muted);
-  padding: 8px 2px;
-  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  border-radius: 20px;
   cursor: pointer;
-  font-size: 0.70rem;
+  font-size: 0.84rem;
   font-weight: 600;
   font-family: inherit;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  min-width: 0;
-  text-align: center;
+  white-space: nowrap;
 }
 
 .tab-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-main);
-  transform: translateY(-1px);
 }
 
 .tab-btn:active {
@@ -421,36 +429,29 @@ body {
 }
 
 .tab-btn .tab-icon {
-  font-size: 1.2rem;
-  margin-bottom: 2px;
+  font-size: 1.1rem;
   line-height: 1;
 }
 
 .tab-btn .tab-label {
-  display: block;
-  width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .tab-btn.active {
   background: var(--primary);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
   box-shadow: 0 2px 10px var(--primary-glow);
 }
 
 @media (min-width: 768px) {
   .nav-tabs {
-    grid-template-columns: repeat(10, 1fr);
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 8px;
     padding: 8px;
-  }
-  .tab-btn {
-    padding: 10px 4px;
-    font-size: 0.78rem;
   }
 }
 
@@ -826,10 +827,10 @@ body {
    ========================================================================== */
 .undo-floating-banner {
   position: fixed;
-  bottom: 84px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
-  z-index: 999;
+  z-index: 10000;
   width: calc(100% - 24px);
   max-width: 480px;
   animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);

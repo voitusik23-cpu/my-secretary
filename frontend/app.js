@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.1.3")
+      .register("/sw.js?v=3.2.1")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -314,6 +314,7 @@ function initTabs() {
       });
       tab.classList.add("active");
       tab.setAttribute("aria-selected", "true");
+      tab.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
 
       const target = tab.dataset.tab;
       state.activeTab = target;

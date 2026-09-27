@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.1.3">
+  <link rel="stylesheet" href="/static/styles.css?v=3.2.1">
 </head>
 <body>
   <!-- Offline banner -->
@@ -118,16 +118,6 @@
         <div class="toast-content">
           <span class="toast-icon">✨</span>
           <p id="toast-message">Действие обработано</p>
-        </div>
-      </div>
-
-      <!-- Step 5: Floating Action Undo Banner -->
-      <div id="undo-banner" class="undo-floating-banner hidden">
-        <div class="undo-inner">
-          <span class="undo-icon">⚡</span>
-          <span id="undo-text" class="undo-text">Дію збережено</span>
-          <button id="undo-banner-btn" class="undo-btn">↩️ Відмінити</button>
-          <button id="undo-close-btn" class="undo-close">&times;</button>
         </div>
       </div>
     </section>
@@ -479,26 +469,26 @@
       <section id="tab-translator" class="tab-panel">
         <div class="panel-header">
           <h2>Перекладач (Віч-на-віч)</h2>
-          <div class="translator-lang-bar">
-            <select id="translator-source-lang" class="lang-select">
-              <option value="auto">🌐 Автовизначення</option>
-              <option value="uk" selected>🇺🇦 Українська</option>
-              <option value="ru">Русский</option>
-              <option value="en">🇬🇧 English</option>
-              <option value="pl">🇵🇱 Polski</option>
-              <option value="de">🇩🇪 Deutsch</option>
-              <option value="es">🇪🇸 Español</option>
-            </select>
-            <button id="translator-swap-btn" class="icon-swap-btn" title="Поміняти мови місцями">⇄</button>
-            <select id="translator-target-lang" class="lang-select">
-              <option value="en" selected>🇬🇧 English</option>
-              <option value="uk">🇺🇦 Українська</option>
-              <option value="ru">Русский</option>
-              <option value="pl">🇵🇱 Polski</option>
-              <option value="de">🇩🇪 Deutsch</option>
-              <option value="es">🇪🇸 Español</option>
-            </select>
-          </div>
+        </div>
+        <div class="translator-lang-bar">
+          <select id="translator-source-lang" class="lang-select">
+            <option value="auto">🌐 Автовизначення</option>
+            <option value="uk" selected>🇺🇦 Українська</option>
+            <option value="ru">Русский</option>
+            <option value="en">🇬🇧 English</option>
+            <option value="pl">🇵🇱 Polski</option>
+            <option value="de">🇩🇪 Deutsch</option>
+            <option value="es">🇪🇸 Español</option>
+          </select>
+          <button id="translator-swap-btn" class="icon-swap-btn" title="Поміняти мови місцями">⇄</button>
+          <select id="translator-target-lang" class="lang-select">
+            <option value="en" selected>🇬🇧 English</option>
+            <option value="uk">🇺🇦 Українська</option>
+            <option value="ru">Русский</option>
+            <option value="pl">🇵🇱 Polski</option>
+            <option value="de">🇩🇪 Deutsch</option>
+            <option value="es">🇪🇸 Español</option>
+          </select>
         </div>
 
         <div class="split-translator-container">
@@ -643,6 +633,16 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.2.0"></script>
+  <!-- Step 5: Floating Action Undo Banner (Global Toast) -->
+  <div id="undo-banner" class="undo-floating-banner hidden">
+    <div class="undo-inner">
+      <span class="undo-icon">⚡</span>
+      <span id="undo-text" class="undo-text">Дію збережено</span>
+      <button id="undo-banner-btn" class="undo-btn">↩️ Відмінити</button>
+      <button id="undo-close-btn" class="undo-close">&times;</button>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=3.2.1"></script>
 </body>
 </html>
