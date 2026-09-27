@@ -31,8 +31,11 @@ SYSTEM_INSTRUCTION = """Ти — інтелектуальний персонал
    - current_mileage: числове значення пробігу (наприклад 120000).
    - event_type: "mileage", notes: опис.
 
-5. "media_notes" — **СКЛЕРОЗНИК**: будь-які швидкі замітки, паролі, коди, «всяка всячина», думки, коли кажуть «склерозник: ...», «запиши в склерозник ...», або якщо це не покупки, не роботи і не авто.
-   - title: назва або перші 4-5 слів, type: "note", comment: повний текст нотатки.
+5. "media_notes" — **СКЛЕРОЗНИК**: швидкі замітки, паролі, коди («склерозник: ...»), якщо це не покупки, роботи, авто чи тиск.
+   - title: назва, type: "note", comment: текст.
+
+6. "health_vitals" — ТИСК ТА ПУЛЬС («тиск 130 на 80 пульс 72», «159 на 90 пульс 60», «утром 140/90 таблетка»).
+   - systolic: верхній тиск (число), diastolic: нижній тиск (число), pulse: пульс (число або null), medications_taken: ліки (або null), notes: опис.
 
 ПРИКЛАД СКЛАДНОГО ЗАПИТУ:
 «купить молоко, хлеб, скотч, единорога, сделать, постелить плитку, убрать территорию, помыть машину, сделать химчистку»
@@ -57,19 +60,12 @@ SYSTEM_INSTRUCTION = """Ти — інтелектуальний персонал
 def detect_audio_mime(audio_bytes: bytes, fallback_mime: str = "audio/webm") -> str:
     """Визначає точний MIME-тип аудіо за сигнатурою байтів."""
     if len(audio_bytes) >= 12:
-        if audio_bytes[4:8] == b"ftyp":
-            return "audio/mp4"
-        if audio_bytes[:4] == b"RIFF" and audio_bytes[8:12] == b"WAVE":
-            return "audio/wav"
-        if audio_bytes[:4] == b"\x1a\x45\xdf\xa3":
-            return "audio/webm"
-        if audio_bytes[:4] == b"OggS":
-            return "audio/ogg"
-        if audio_bytes[:3] == b"ID3" or (audio_bytes[0] == 0xff and (audio_bytes[1] & 0xe0) == 0xe0):
-            return "audio/mp3"
-
-    base_mime = fallback_mime.split(";")[0].strip() if fallback_mime else "audio/webm"
-    return base_mime or "audio/webm"
+        if audio_bytes[4:8] == b"ftyp": return "audio/mp4"
+        if audio_bytes[:4] == b"RIFF" and audio_bytes[8:12] == b"WAVE": return "audio/wav"
+        if audio_bytes[:4] == b"\x1a\x45\xdf\xa3": return "audio/webm"
+        if audio_bytes[:4] == b"OggS": return "audio/ogg"
+        if audio_bytes[:3] == b"ID3" or (audio_bytes[0] == 0xff and (audio_bytes[1] & 0xe0) == 0xe0): return "audio/mp3"
+    return (fallback_mime.split(";")[0].strip() if fallback_mime else "audio/webm") or "audio/webm"
 
 
 def _heuristic_fallback(text: str) -> Dict[str, Any]:
@@ -112,6 +108,17 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
             })
             symbol = "₴" if currency == "UAH" else ("$" if currency == "USD" else "€")
             summary_parts.append(f"витрата {amount} {symbol}")
+        except Exception:
+            pass
+
+    # 4. Тиск та пульс (health_vitals)
+    bp_m = re.search(r'(\d{2,3})\s*(?:на|/)\s*(\d{2,3})(?:\s*(?:пульс|серце)?\s*(\d{2,3}))?', lower)
+    if bp_m and (any(k in lower for k in ["тиск", "давлен", "пульс"]) or ("на" in lower and int(bp_m.group(1)) > 75)):
+        try:
+            s_v, d_v = int(bp_m.group(1)), int(bp_m.group(2))
+            p_v = int(bp_m.group(3)) if bp_m.group(3) else None
+            actions.append({"domain": "health_vitals", "data": {"systolic": s_v, "diastolic": d_v, "pulse": p_v, "notes": text}})
+            summary_parts.append(f"тиск {s_v}/{d_v}" + (f" пульс {p_v}" if p_v else ""))
         except Exception:
             pass
 
@@ -183,11 +190,7 @@ async def parse_with_gemini(text: Optional[str] = None, audio_bytes: Optional[by
 
     prompt = SYSTEM_INSTRUCTION.format(current_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    candidate_models = [settings.AI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"]
-    models_to_try = []
-    for m in candidate_models:
-        if m and m not in models_to_try:
-            models_to_try.append(m)
+    models_to_try = list(dict.fromkeys([m for m in [settings.AI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"] if m]))
 
     last_error = None
 
