@@ -2017,6 +2017,7 @@ function initTranslatorScreen() {
   document.getElementById("open-google-app-btn")?.addEventListener("click", () => {
     const sl = sSelect.value === "auto" ? "auto" : sSelect.value;
     const tl = tSelect.value;
+    showToast("В Google Translate натисніть внизу «Спілкування» (або Conversation) ➔ «Авто» для режиму на столі!", 4500);
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     if (isIOS) {
       window.location.href = `googletranslate://?sl=${sl}&tl=${tl}`;
