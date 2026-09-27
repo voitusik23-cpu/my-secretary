@@ -156,6 +156,12 @@ if os.path.exists(frontend_dir):
     async def serve_sw():
         return FileResponse(os.path.join(frontend_dir, "sw.js"), media_type="application/javascript")
 
+    @app.api_route("/apple-touch-icon.png", methods=["GET", "HEAD"])
+    @app.api_route("/apple-touch-icon-120x120.png", methods=["GET", "HEAD"])
+    @app.api_route("/apple-touch-icon-precomposed.png", methods=["GET", "HEAD"])
+    async def serve_apple_touch_icon():
+        return FileResponse(os.path.join(frontend_dir, "icons", "icon.svg"), media_type="image/svg+xml")
+
 
 if __name__ == "__main__":
     import uvicorn
