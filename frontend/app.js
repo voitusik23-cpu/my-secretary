@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.1.2")
+      .register("/sw.js?v=3.1.3")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -158,17 +158,32 @@ function initVoice() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       state.audioChunks = [];
 
-      // Determine supported MIME type
-      let mimeType = "audio/webm";
-      if (!MediaRecorder.isTypeSupported("audio/webm")) {
+      // Determine supported MIME type for Safari / iOS / Chrome
+      let options = {};
+      let mimeType = "audio/mp4";
+      if (typeof MediaRecorder.isTypeSupported === "function") {
         if (MediaRecorder.isTypeSupported("audio/mp4")) {
+          options = { mimeType: "audio/mp4" };
           mimeType = "audio/mp4";
+        } else if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+          options = { mimeType: "audio/webm;codecs=opus" };
+          mimeType = "audio/webm;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+          options = { mimeType: "audio/webm" };
+          mimeType = "audio/webm";
         } else if (MediaRecorder.isTypeSupported("audio/aac")) {
+          options = { mimeType: "audio/aac" };
           mimeType = "audio/aac";
         }
       }
 
-      state.mediaRecorder = new MediaRecorder(stream, { credentials: mimeType });
+      try {
+        state.mediaRecorder = new MediaRecorder(stream, options);
+      } catch (recErr) {
+        console.warn("MediaRecorder with options failed, fallback to stream default:", recErr);
+        state.mediaRecorder = new MediaRecorder(stream);
+        mimeType = state.mediaRecorder.mimeType || "audio/mp4";
+      }
 
       state.mediaRecorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
@@ -178,8 +193,9 @@ function initVoice() {
 
       state.mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-        const audioBlob = new Blob(state.audioChunks, { type: mimeType });
-        await uploadAudio(audioBlob, mimeType);
+        const actualMime = state.mediaRecorder.mimeType || mimeType;
+        const audioBlob = new Blob(state.audioChunks, { type: actualMime });
+        await uploadAudio(audioBlob, actualMime);
       };
 
       state.mediaRecorder.start();
@@ -198,9 +214,17 @@ function initVoice() {
         timerEl.textContent = `${mins}:${secs}`;
       }, 500);
     } catch (err) {
-      console.error("Microphone access denied:", err);
-      statusText.textContent = "Ошибка: доступ к микрофону заблокирован";
-      showToast("❌ Разрешите доступ к микрофону в браузере");
+      console.error("Microphone access or recorder error:", err);
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        statusText.textContent = "Доступ к микрофону заблокирован";
+        showToast("❌ Разрешите микрофон: кнопка «аА» в Safari → Настройки веб-сайта → Микрофон: Разрешить");
+      } else if (!window.isSecureContext) {
+        statusText.textContent = "Требуется защищенное соединение (HTTPS)";
+        showToast("⚠️ Откройте сайт по ссылке https://macbook-pro-vadym.tail19f124.ts.net");
+      } else {
+        statusText.textContent = `Ошибка микрофона: ${err.message || err.name}`;
+        showToast(`❌ Ошибка: ${err.message || err.name}`);
+      }
     }
   }
 
@@ -218,7 +242,8 @@ function initVoice() {
 
   async function uploadAudio(blob, mimeType) {
     const formData = new FormData();
-    formData.append("audio", blob, "voice_record.webm");
+    const ext = mimeType.includes("mp4") ? "mp4" : (mimeType.includes("aac") ? "aac" : (mimeType.includes("wav") ? "wav" : "webm"));
+    formData.append("audio", blob, `voice_record.${ext}`);
 
     try {
       const data = await apiFetch("/api/process/audio", {
