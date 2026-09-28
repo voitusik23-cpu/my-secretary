@@ -20,16 +20,9 @@ class ProcessTextRequest(BaseModel):
     text: str = Field(..., description="Голосовая расшифровка или текст команды")
 
 
-def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str, List[Any]]:
+async def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str, List[Any]]:
     """Зберігає вилучені AI дії у відповідні таблиці БД."""
-    created_items: Dict[str, List[Any]] = {
-        "finance": [],
-        "shopping": [],
-        "tasks": [],
-        "media_notes": [],
-        "auto": [],
-        "health_vitals": [],
-    }
+    created_items: Dict[str, List[Any]] = {k: [] for k in ["finance", "shopping", "tasks", "media_notes", "auto", "health_vitals", "movies"]}
 
     for action in actions:
         domain = action.get("domain")
@@ -56,12 +49,9 @@ def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str
                 title = data.get("title", "").strip()
                 if title:
                     due_date = None
-                    raw_date = data.get("due_date")
-                    if raw_date:
-                        try:
-                            due_date = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
-                        except Exception:
-                            due_date = None
+                    if data.get("due_date"):
+                        try: due_date = datetime.fromisoformat(data["due_date"].replace("Z", "+00:00"))
+                        except Exception: due_date = None
                     task = Task(title=title, description=data.get("description"), due_date=due_date, priority=data.get("priority", "medium"), category=data.get("category", "Роботи"), is_completed=False)
                     db.add(task); db.flush()
                     created_items["tasks"].append(TaskResponse.model_validate(task).model_dump())
@@ -96,18 +86,23 @@ def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str
                     db.add(b_log); db.flush()
                     created_items["health_vitals"].append({"id": b_log.id, "reading": f"{s_v}/{d_v}"})
 
-        except Exception:
+            elif domain == "movies":
+                from app.modules.movies.service import process_voice_movie
+                m_res = await process_voice_movie(data, db)
+                if m_res:
+                    created_items["movies"].append(m_res)
+
+        except Exception as e:
             continue
 
     db.commit()
     try:
         from app.core.undo_service import record_action
-        for dom in ["shopping", "finance", "tasks", "media_notes", "auto", "health_vitals"]:
+        for dom in ["shopping", "finance", "tasks", "media_notes", "auto", "health_vitals", "movies"]:
             its = created_items.get(dom, [])
             if its:
                 ids = [it["id"] for it in its if "id" in it]
-                if ids:
-                    record_action(dom, ids, f"{dom}: {len(ids)} записів")
+                if ids: record_action(dom, ids, f"{dom}: {len(ids)} записів")
     except Exception:
         pass
     return created_items
@@ -128,7 +123,7 @@ async def process_text_input(payload: ProcessTextRequest, db: Session = Depends(
 
     parsed = await parse_with_gemini(text=text)
     actions = parsed.get("actions", [])
-    created = _save_parsed_actions(actions, db)
+    created = await _save_parsed_actions(actions, db)
 
     return {
         "status": "success",
@@ -161,7 +156,7 @@ async def process_audio_input(
         return {"status": u_res.get("status", "success"), "summary": u_res.get("message", "Дію скасовано"), "transcription": transcription, "actions_count": 0, "created": {}}
 
     actions = parsed.get("actions", [])
-    created = _save_parsed_actions(actions, db)
+    created = await _save_parsed_actions(actions, db)
     summary = parsed.get("summary", "Голосовая заметка сохранена")
     resp_status = "success" if (actions or transcription) else "warning"
 
