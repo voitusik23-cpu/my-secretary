@@ -1657,4 +1657,18 @@ body {
   color: #c4b5fd;
 }
 
+.movie-link-netflix {
+  background: rgba(229, 9, 20, 0.18);
+  border: 1px solid rgba(229, 9, 20, 0.45);
+  color: #ff4d5a;
+  font-weight: 700;
+}
+
+.movie-link-netflix:hover {
+  background: #e50914;
+  color: #ffffff;
+  border-color: #e50914;
+  box-shadow: 0 4px 14px rgba(229, 9, 20, 0.4);
+}
+
 

@@ -17,7 +17,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.5.2")
+      .register("/sw.js?v=3.5.3")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -703,14 +703,23 @@ function renderMovieResult(m) {
   const genre = Array.isArray(m.genre) ? m.genre.join(", ") : (m.genre || "");
   const cast = Array.isArray(m.cast) ? m.cast.slice(0, 4).join(", ") : (m.cast || "");
 
+  const netflixLinks = (m.watch_links || []).filter(w => w.platform && w.platform.includes("Netflix"));
+  const otherOfficialLinks = (m.watch_links || []).filter(w => w.category === "official" && (!w.platform || !w.platform.includes("Netflix")));
   const onlineLinks = (m.watch_links || []).filter(w => w.category === "online");
   const torrentLinks = (m.watch_links || []).filter(w => w.category === "torrent");
-  const officialLinks = (m.watch_links || []).filter(w => w.category === "official");
 
   let watchLinksHtml = "";
-  if (onlineLinks.length || torrentLinks.length || officialLinks.length) {
+  if (netflixLinks.length || otherOfficialLinks.length || onlineLinks.length || torrentLinks.length) {
     watchLinksHtml = `
       <div class="movie-links-section">
+        ${(netflixLinks.length || otherOfficialLinks.length) ? `
+          <div class="movie-links-group">
+            <span class="movie-links-label">🔴 Стрімінг (Ваш Netflix акаунт & Megogo):</span>
+            <div class="movie-links-grid">
+              ${netflixLinks.map(w => `<a href="${escapeHtml(w.url)}" target="_blank" rel="noopener noreferrer" class="movie-link-btn movie-link-netflix">${escapeHtml(w.platform)}</a>`).join("")}
+              ${otherOfficialLinks.map(w => `<a href="${escapeHtml(w.url)}" target="_blank" rel="noopener noreferrer" class="movie-link-btn movie-link-official">${escapeHtml(w.platform)}</a>`).join("")}
+            </div>
+          </div>` : ""}
         ${onlineLinks.length ? `
           <div class="movie-links-group">
             <span class="movie-links-label">🍿 Дивитись онлайн безкоштовно:</span>
@@ -723,13 +732,6 @@ function renderMovieResult(m) {
             <span class="movie-links-label">🧲 Торренти (завантажити):</span>
             <div class="movie-links-grid">
               ${torrentLinks.map(w => `<a href="${escapeHtml(w.url)}" target="_blank" rel="noopener noreferrer" class="movie-link-btn movie-link-torrent">${escapeHtml(w.platform)}</a>`).join("")}
-            </div>
-          </div>` : ""}
-        ${officialLinks.length ? `
-          <div class="movie-links-group">
-            <span class="movie-links-label">📺 Стрімінги:</span>
-            <div class="movie-links-grid">
-              ${officialLinks.map(w => `<a href="${escapeHtml(w.url)}" target="_blank" rel="noopener noreferrer" class="movie-link-btn movie-link-official">${escapeHtml(w.platform)}</a>`).join("")}
             </div>
           </div>` : ""}
       </div>
@@ -826,8 +828,9 @@ async function loadMoviesWatchlist() {
         <div class="item-content">
           <span class="item-title ${m.status === "completed" ? "completed" : ""}">${escapeHtml(m.title)}</span>
           ${m.comment ? `<span class="item-subtitle">${escapeHtml(m.comment)}</span>` : ""}
-          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;">
             <span class="item-badge badge-media">${m.type === "series" ? "📺 Серіал" : "🎬 Фільм"}</span>
+            <a href="https://www.netflix.com/search?q=${encodeURIComponent(m.title)}" target="_blank" rel="noopener noreferrer" class="movie-link-btn movie-link-netflix" style="padding:2px 8px;font-size:0.78rem;border-radius:6px;text-decoration:none;">🔴 Netflix</a>
             <button onclick="quickSearchMovie('${escapeHtml(m.title).replace(/'/g, "\\'")}')" style="background:rgba(14,165,233,0.12);border:1px solid rgba(14,165,233,0.3);color:var(--primary);border-radius:6px;padding:2px 8px;font-size:0.78rem;font-weight:600;cursor:pointer;">🔍 Де дивитись / Торренти</button>
           </div>
         </div>

@@ -115,8 +115,8 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
             pass
 
     # 5. Фільми та серіали (movies)
-    if any(k in lower for k in ["фільм", "фильм", "кіно", "кино", "серіал", "сериал"]):
-        m_t = re.sub(r'^(?:подивитися|посмотреть|глянути|знайти|найти|додай|добавь|запиши)?\s*(?:фільм|фильм|кіно|кино|серіал|сериал):?\s*', '', text, flags=re.IGNORECASE).strip(" '\"«»")
+    if any(k in lower for k in ["фільм", "фильм", "кіно", "кино", "серіал", "сериал", "нетфлікс", "нетфликс", "netflix"]):
+        m_t = re.sub(r'^(?:подивитися|посмотреть|глянути|знайти|найти|додай|добавь|запиши)?\s*(?:на\s+(?:нетфлікс|нетфликс|netflix)\s+)?(?:фільм|фильм|кіно|кино|серіал|сериал)?\s*(?:на\s+(?:нетфлікс|нетфликс|netflix))?:?\s*', '', text, flags=re.IGNORECASE).strip(" '\"«»")
         m_t = re.sub(r'^(?:про|о)\s+', '', m_t, flags=re.IGNORECASE).strip(" '\"«»")
         if m_t:
             m_type = "series" if any(s in lower for s in ["серіал", "сериал"]) else "movie"

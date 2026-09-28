@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.5.2">
+  <link rel="stylesheet" href="/static/styles.css?v=3.5.3">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -289,11 +289,19 @@
           <div><strong>Голосовий пошук:</strong> Скажіть назву фільму після натискання мікрофону на головному екрані, або введіть нижче.</div>
         </div>
 
-        <div class="quick-input-form" style="margin-top:0;margin-bottom:16px;">
-          <input type="text" id="movie-search-input" placeholder="🎬 Назва фільму або серіалу..." />
+        <div class="quick-input-form" style="margin-top:0;margin-bottom:10px;">
+          <input type="text" id="movie-search-input" placeholder="🎬 Назва фільму або запит (напр. «що подивитись на Netflix»)..." />
           <button id="movie-search-btn" class="send-btn" title="Знайти фільм">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           </button>
+        </div>
+
+        <!-- Quick movie recommendation chips with Netflix -->
+        <div class="agent-chips-container" id="movie-chips-container" style="margin-bottom:14px;">
+          <button type="button" class="agent-chip" onclick="quickSearchMovie('Найкращі нові фільми на Netflix')">🔴 Новинки Netflix</button>
+          <button type="button" class="agent-chip" onclick="quickSearchMovie('Топ серіалів на Netflix')">🍿 Топ серіалів Netflix</button>
+          <button type="button" class="agent-chip" onclick="quickSearchMovie('Найкращі бойовики та трилери на Netflix')">💥 Бойовики на Netflix</button>
+          <button type="button" class="agent-chip" onclick="quickSearchMovie('Фільми з високим рейтингом на Netflix')">⭐ Рейтингові на Netflix</button>
         </div>
 
         <!-- Movie AI Result Card -->
@@ -895,6 +903,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.5.2"></script>
+  <script src="/static/app.js?v=3.5.3"></script>
 </body>
 </html>

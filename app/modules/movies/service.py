@@ -32,25 +32,30 @@ MOVIE_SEARCH_PROMPT = """Ти — кіноексперт-асистент. Шу�
   "duration_min": 136,
   "country": "США",
   "description": "Докладний опис фільму українською мовою (3-4 речення).",
-  "review": "Короткий відгук, чому варто подивитись (2-3 речення)."
+  "review": "Короткий відгук, чому варто подивитись (2-3 речення). Якщо фільм доступний на Netflix (або це оригінал Netflix) — обов'язково окремо зазнач це у відгуку, оскільки у користувача є активний акаунт Netflix."
 }}
 Якщо фільм/серіал не знайдено: {{"found": false, "title": "{title}", "description": "Не знайдено"}}.
 """
 
 
 def build_watch_links(title: str, original_title: Optional[str] = None, year: Optional[int] = None) -> List[Dict[str, str]]:
-    """Генерує робочі посилання на онлайн-перегляд, торренти та стрімінги."""
+    """Генерує робочі посилання на онлайн-перегляд, торренти та стрімінги з пріоритетом Netflix."""
     clean_title = title.strip()
     year_str = f" {year}" if year else ""
     search_query = f"{clean_title}{year_str}"
     encoded_title = urllib.parse.quote(clean_title)
     encoded_query = urllib.parse.quote(search_query)
     
-    # Використовуємо оригінальну назву як альт-пошук для точних торрентів
+    # Використовуємо оригінальну назву як альт-пошук для точних торрентів та Netflix
     orig = (original_title or "").strip()
     encoded_orig = urllib.parse.quote(f"{orig}{year_str}") if orig else encoded_query
+    netflix_q = urllib.parse.quote(orig if orig else clean_title)
 
     return [
+        # Офіційні стрімінги (Перший пріоритет: Netflix, оскільки у користувача є акаунт)
+        {"category": "official", "platform": "🔴 Netflix (Мій акаунт)", "url": f"https://www.netflix.com/search?q={netflix_q}"},
+        {"category": "official", "platform": "📺 Megogo", "url": f"https://megogo.net/ua/search?q={encoded_title}"},
+
         # Онлайн кінотеатри (безкоштовно)
         {"category": "online", "platform": "🎬 Kinogo", "url": f"https://www.google.com/search?q={encoded_query}+смотреть+онлайн+kinogo"},
         {"category": "online", "platform": "🍿 HDRezka", "url": f"https://rezka.ag/search/?q={encoded_title}"},
@@ -61,10 +66,6 @@ def build_watch_links(title: str, original_title: Optional[str] = None, year: Op
         {"category": "torrent", "platform": "🧲 Toloka (Гуртом, укр)", "url": f"https://toloka.to/tracker.php?nm={encoded_title}"},
         {"category": "torrent", "platform": "⚡ Rutor (без реєстрації)", "url": f"https://rutor.info/search/0/0/0/0/{encoded_orig}"},
         {"category": "torrent", "platform": "💾 Rutracker", "url": f"https://rutracker.org/forum/tracker.php?nm={encoded_orig}"},
-
-        # Офіційні стрімінги
-        {"category": "official", "platform": "📺 Megogo", "url": f"https://megogo.net/ua/search?q={encoded_title}"},
-        {"category": "official", "platform": "🔴 Netflix", "url": f"https://www.netflix.com/search?q={encoded_title}"},
 
         # Трейлер
         {"category": "trailer", "platform": "▶️ YouTube Трейлер", "url": f"https://www.youtube.com/results?search_query={encoded_query}+трейлер"}
@@ -136,17 +137,14 @@ async def process_voice_movie(data: Dict[str, Any], db: Session) -> Optional[Dic
     if rev: comment_parts.append(rev[:250])
 
     trailer_url = movie_info.get("trailer_search") or ""
-    # Зберігаємо перше робоче посилання на Kinogo або Rezka як головний url
-    online_url = trailer_url
-    for w in movie_info.get("watch_links", []):
-        if "Rezka" in w.get("platform", "") or "Kinogo" in w.get("platform", ""):
-            online_url = w.get("url")
-            break
+    # Зберігаємо посилання на Netflix як головне, оскільки у користувача є акаунт
+    netflix_q = urllib.parse.quote(orig if orig else main_title)
+    main_url = f"https://www.netflix.com/search?q={netflix_q}"
 
     note = MediaNote(
         title=main_title,
         type=movie_info.get("type", "movie"),
-        url=online_url,
+        url=main_url,
         author_creator=movie_info.get("director"),
         comment=" | ".join(comment_parts) if comment_parts else None,
         status="to_watch",
