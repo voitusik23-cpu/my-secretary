@@ -23,7 +23,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.5.7")
+      .register("/sw.js?v=3.5.8")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -2217,13 +2217,15 @@ function initTranslatorScreen() {
         const nextSpeakerCallback = () => {
           if (!autoDialogEnabled) return;
           autoDialogTimer = setTimeout(() => {
+            if (!autoDialogEnabled) return;
+            stopAllAudio();
             if (isUserSpeaker) {
               const sLang = sSelect.value === "auto" ? "ru" : sSelect.value;
               startSpeechRecognition(tSelect.value, sLang, false, foreignerMicBtn);
             } else {
               startSpeechRecognition(sSelect.value, tSelect.value, true, userMicBtn);
             }
-          }, 350);
+          }, 550);
         };
 
         if (isUserSpeaker) {
@@ -2260,6 +2262,9 @@ function initTranslatorScreen() {
       const langMap = { ru: "ru-RU", uk: "uk-UA", en: "en-US", pl: "pl-PL", de: "de-DE", es: "es-ES" };
       rec.lang = langMap[fromLang] || (fromLang === "ru" ? "ru-RU" : "uk-UA");
 
+      let latestTranscript = "";
+      let hasDispatched = false;
+
       const activeCard = isUserSpeaker ? document.getElementById("translator-user-card") : document.getElementById("translator-foreigner-card");
       if (activeCard) activeCard.classList.add("listening-card");
 
@@ -2281,6 +2286,7 @@ function initTranslatorScreen() {
 
         const currentSpoken = (finalTranscript || interimTranscript).trim();
         if (currentSpoken) {
+          latestTranscript = currentSpoken;
           if (isUserSpeaker && userOut) {
             userOut.textContent = `Ви: ${currentSpoken}`;
           } else if (!isUserSpeaker && foreignerOut) {
@@ -2288,22 +2294,49 @@ function initTranslatorScreen() {
           }
         }
 
-        if (finalTranscript.trim()) {
+        if (finalTranscript.trim() && !hasDispatched) {
+          hasDispatched = true;
+          const textToSend = finalTranscript.trim();
+          latestTranscript = "";
           stopCurrentRecognition();
-          translateAndDisplay(finalTranscript.trim(), fromLang, toLang, isUserSpeaker);
+          translateAndDisplay(textToSend, fromLang, toLang, isUserSpeaker);
         }
       };
 
       rec.onerror = (e) => {
         console.warn("[Translator SpeechRec error]:", e.error);
         stopCurrentRecognition();
-        if (e.error !== "no-speech" && e.error !== "aborted") {
+        if (autoDialogEnabled) {
+          // If in auto-dialog mode, automatically keep listening without giving up!
+          autoDialogTimer = setTimeout(() => {
+            if (autoDialogEnabled) {
+              startSpeechRecognition(fromLang, toLang, isUserSpeaker, btnEl);
+            }
+          }, 450);
+        } else if (e.error !== "no-speech" && e.error !== "aborted") {
           showToast("Не вдалося розпізнати мову. Спробуйте ще раз.");
         }
       };
 
       rec.onend = () => {
         stopCurrentRecognition();
+        // If speech ended with captured text that wasn't dispatched via isFinal (iOS Safari quirk)
+        if (latestTranscript.trim() && !hasDispatched) {
+          hasDispatched = true;
+          const textToSend = latestTranscript.trim();
+          latestTranscript = "";
+          translateAndDisplay(textToSend, fromLang, toLang, isUserSpeaker);
+          return;
+        }
+
+        // If nothing was spoken, but auto-dialogue is active: stay listening!
+        if (autoDialogEnabled && !hasDispatched) {
+          autoDialogTimer = setTimeout(() => {
+            if (autoDialogEnabled) {
+              startSpeechRecognition(fromLang, toLang, isUserSpeaker, btnEl);
+            }
+          }, 400);
+        }
       };
 
       // Resilient start for iOS WebKit (avoids InvalidStateError with retry)
@@ -2314,15 +2347,19 @@ function initTranslatorScreen() {
           rec.start();
         } catch (err) {
           if (attempt <= 3) {
-            setTimeout(attemptStart, 120);
+            setTimeout(attemptStart, 150);
           } else {
             console.warn("[Translator] rec.start failed:", err);
             stopCurrentRecognition();
+            if (autoDialogEnabled) {
+              autoDialogTimer = setTimeout(() => {
+                if (autoDialogEnabled) startSpeechRecognition(fromLang, toLang, isUserSpeaker, btnEl);
+              }, 600);
+            }
           }
         }
       }
-      // Small 60ms delay ensures iOS audio session completely resets to Record
-      setTimeout(attemptStart, 60);
+      setTimeout(attemptStart, 80);
     } else {
       const text = prompt("Введіть текст для перекладу:");
       if (text) translateAndDisplay(text, fromLang, toLang, isUserSpeaker);
