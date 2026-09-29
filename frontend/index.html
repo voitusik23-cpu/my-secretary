@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.5.8">
+  <link rel="stylesheet" href="/static/styles.css?v=3.6.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -162,6 +162,10 @@
       <button class="tab-btn" data-tab="movies" role="tab" aria-selected="false">
         <span class="tab-icon">🎬</span>
         <span class="tab-label">Фільми</span>
+      </button>
+      <button class="tab-btn" data-tab="music" role="tab" aria-selected="false">
+        <span class="tab-icon">🎵</span>
+        <span class="tab-label">Музика</span>
       </button>
       <button class="tab-btn" data-tab="inventory" role="tab" aria-selected="false">
         <span class="tab-icon">📦</span>
@@ -320,6 +324,73 @@
             </div>
           </div>
           <div id="movies-watchlist-list" class="items-list"><!-- Populated by JS --></div>
+        </div>
+      </section>
+
+      <!-- 6b. MUSIC & PLAYER TAB -->
+      <section id="tab-music" class="tab-panel">
+        <div class="panel-header">
+          <h2>🎵 Музика & Плеєр</h2>
+          <div class="panel-actions">
+            <button id="shazam-import-btn" class="action-btn-sm" style="background: linear-gradient(135deg, #0088ff, #00d2ff); color: white; border: none; font-weight: 700; box-shadow: 0 2px 10px rgba(0, 136, 255, 0.35);">
+              ⚡ Shazam
+            </button>
+            <button id="add-music-track-btn" class="action-btn-sm">+ Додати</button>
+          </div>
+        </div>
+
+        <!-- Quick Search & Stream bar -->
+        <div class="quick-input-form" style="margin-top:0;margin-bottom:12px;">
+          <input type="text" id="music-search-input" placeholder="🔍 Назва треку, артист або посилання Shazam..." />
+          <button id="music-search-btn" class="send-btn" title="Знайти">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </button>
+        </div>
+
+        <!-- Search Results Dropdown/Container (When searching online) -->
+        <div id="music-search-results" class="hidden" style="margin-bottom:14px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong style="font-size:0.85rem;color:var(--text-muted);">Результати пошуку:</strong>
+            <button id="music-search-close-btn" class="text-btn" style="font-size:0.75rem;">✕ Закрити</button>
+          </div>
+          <div id="music-search-results-list" class="items-list" style="max-height:280px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- Continuous Play & Car Play Banner -->
+        <div class="stat-card" style="margin-bottom:12px;background:linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.15));border-color:rgba(124,58,237,0.35);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-weight:700;font-size:0.95rem;display:flex;align-items:center;gap:6px;">
+                <span>🚗 Режим Авто / Сплошняком</span>
+              </div>
+              <small style="color:var(--text-muted);font-size:0.76rem;">Автоперехід на наступний трек, фонове відтворення на екрані авто та блокування</small>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button id="music-play-all-btn" class="action-btn-sm" style="background:var(--primary);color:#fff;border:none;font-weight:700;">
+                ▶ Слухати все
+              </button>
+              <button id="music-shuffle-all-btn" class="action-btn-sm" style="background:rgba(255,255,255,0.12);color:var(--text-main);border:1px solid var(--border-color);" title="Перемішати чергу">
+                🔀
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Playlists Tabs / Filter Pills -->
+        <div class="music-playlists-bar" id="music-playlists-bar" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none;">
+          <button class="music-pl-pill active" data-playlist="Всі треки">🎵 Всі треки</button>
+          <button class="music-pl-pill" data-playlist="Shazam">⚡ Shazam</button>
+          <button class="music-pl-pill" data-playlist="Улюблені">❤️ Улюблені</button>
+          <button class="music-pl-pill" data-playlist="В авто 🚗">🚗 В авто</button>
+          <button class="music-pl-pill" data-playlist="Релакс 🌙">🌙 Релакс</button>
+        </div>
+
+        <!-- Tracks List -->
+        <div id="music-tracks-list" class="items-list">
+          <div class="empty-state">
+            <span class="empty-icon">🎵</span>
+            <p>У медіатеці ще немає треків. Вставте посилання з Shazam або знайдіть через пошук!</p>
+          </div>
         </div>
       </section>
 
@@ -842,7 +913,7 @@
 
           <hr style="border:none;border-top:1px solid var(--border-color);margin:16px 0;" />
           <button id="clear-cache-reload-btn" class="btn-secondary" style="width:100%;padding:10px;font-size:0.85rem;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;">
-            <span>🔄 Очистити кеш та оновити вигляд (v3.5.1)</span>
+            <span>🔄 Очистити кеш та оновити вигляд (v3.6.0)</span>
           </button>
         </div>
       </div>
@@ -863,6 +934,113 @@
             <button type="submit" class="btn-primary">Сохранить</button>
           </div>
         </form>
+      </div>
+    </div>
+  <!-- Persistent Floating Music Mini-Player -->
+  <div id="music-floating-player" class="music-floating-player hidden">
+    <div class="mini-player-progress-bar" id="mini-player-progress-bar">
+      <div class="mini-player-progress-fill" id="mini-player-progress-fill"></div>
+    </div>
+    <div class="mini-player-inner">
+      <div class="mini-player-cover" id="mini-player-cover-btn">
+        <img id="mini-player-img" src="/static/icons/icon.svg" alt="Cover" />
+        <div class="mini-player-play-badge" id="mini-player-play-badge">▶</div>
+      </div>
+      <div class="mini-player-info" id="mini-player-info-area">
+        <div class="mini-player-title" id="mini-player-title">Назва треку</div>
+        <div class="mini-player-artist" id="mini-player-artist">Виконавець</div>
+      </div>
+      <div class="mini-player-controls">
+        <button id="mini-player-prev-btn" class="mini-ctrl-btn" title="Попередній">⏮</button>
+        <button id="mini-player-toggle-btn" class="mini-ctrl-btn mini-play-btn" title="Відтворення / Пауза">▶</button>
+        <button id="mini-player-next-btn" class="mini-ctrl-btn" title="Наступний">⏭</button>
+        <button id="mini-player-fav-btn" class="mini-ctrl-btn mini-fav-btn" title="Улюблене">🤍</button>
+        <button id="mini-player-expand-btn" class="mini-ctrl-btn mini-expand-btn" title="Розгорнути плеєр">⛶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fullscreen / Car Mode Player Overlay -->
+  <div id="music-fullscreen-modal" class="music-fullscreen-modal hidden">
+    <div class="fs-player-header">
+      <button id="fs-player-collapse-btn" class="fs-icon-btn">✕</button>
+      <div class="fs-player-subtitle" id="fs-player-playlist-name">🎵 Плейліст: Всі треки</div>
+      <button id="fs-player-queue-btn" class="fs-icon-btn" title="Черга відтворення">≡</button>
+    </div>
+
+    <div class="fs-player-body">
+      <div class="fs-album-art-wrap" id="fs-album-art-wrap">
+        <img id="fs-album-art" src="/static/icons/icon.svg" alt="Album Art" class="fs-album-art" />
+        <div class="fs-vinyl-center"></div>
+      </div>
+
+      <div class="fs-track-details">
+        <div class="fs-track-title" id="fs-track-title">Трек</div>
+        <div class="fs-track-artist" id="fs-track-artist">Артист</div>
+      </div>
+
+      <!-- Scrubbing Time Slider -->
+      <div class="fs-scrubber-wrap">
+        <input type="range" id="fs-time-slider" min="0" max="100" value="0" step="0.5" class="fs-time-slider" />
+        <div class="fs-time-labels">
+          <span id="fs-time-current">0:00</span>
+          <span id="fs-time-duration">0:00</span>
+        </div>
+      </div>
+
+      <!-- Big Touch-Friendly Car Controls -->
+      <div class="fs-controls-main">
+        <button id="fs-shuffle-btn" class="fs-ctrl-sub" title="Випадковий порядок">🔀</button>
+        <button id="fs-prev-btn" class="fs-ctrl-action" title="Попередній трек">⏮</button>
+        <button id="fs-play-btn" class="fs-ctrl-bigplay" title="Грати / Пауза">▶</button>
+        <button id="fs-next-btn" class="fs-ctrl-action" title="Наступний трек">⏭</button>
+        <button id="fs-repeat-btn" class="fs-ctrl-sub" title="Повтор">🔁</button>
+      </div>
+
+      <div class="fs-controls-secondary">
+        <button id="fs-fav-btn" class="fs-pill-btn">🤍 В улюблені</button>
+        <button id="fs-car-btn" class="fs-pill-btn">🚗 Додати в Авто</button>
+      </div>
+    </div>
+
+    <!-- Queue Overlay Drawer -->
+    <div id="fs-queue-drawer" class="fs-queue-drawer hidden">
+      <div class="fs-queue-header">
+        <strong>Черга відтворення (<span id="fs-queue-count">0</span>)</strong>
+        <button id="fs-queue-close-btn" class="fs-icon-btn">✕</button>
+      </div>
+      <div id="fs-queue-list" class="items-list" style="flex:1;overflow-y:auto;max-height:60vh;"></div>
+    </div>
+  </div>
+
+  <!-- Hidden Native Audio Engine for Background and Continuous Playback -->
+  <audio id="global-music-audio" preload="auto"></audio>
+
+  <!-- Shazam Import Modal -->
+  <div id="shazam-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>⚡ Імпорт із Shazam</h3>
+        <button id="shazam-modal-close-btn" class="icon-btn-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">
+          Вставте посилання на трек із Shazam (напр. <code>https://www.shazam.com/track/...</code>) або текст «Поділитися» із додатку Shazam:
+        </p>
+        <textarea id="shazam-input-text" rows="3" placeholder="Вставте посилання або скопійований текст із Shazam..." style="width:100%;margin-bottom:12px;box-sizing:border-box;border-radius:10px;padding:10px;background:var(--bg-input);color:var(--text-main);border:1px solid var(--border-color);"></textarea>
+        
+        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">Додати у плейліст:</label>
+        <select id="shazam-target-playlist" style="width:100%;margin-bottom:14px;box-sizing:border-box;border-radius:8px;padding:8px;background:var(--bg-input);color:var(--text-main);border:1px solid var(--border-color);">
+          <option value="Shazam" selected>⚡ Shazam</option>
+          <option value="В авто 🚗">🚗 В авто</option>
+          <option value="Улюблені">❤️ Улюблені</option>
+          <option value="Релакс 🌙">🌙 Релакс</option>
+        </select>
+
+        <button id="shazam-submit-btn" class="btn-primary" style="width:100%;background:linear-gradient(135deg, #0088ff, #00d2ff);color:#fff;border:none;font-weight:700;padding:12px;border-radius:10px;cursor:pointer;">
+          ⚡ Імпортувати та додати
+        </button>
+        <div id="shazam-status-feedback" class="test-result-text" style="margin-top:8px;"></div>
       </div>
     </div>
   </div>
@@ -903,6 +1081,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.5.8"></script>
+  <script src="/static/app.js?v=3.6.0"></script>
 </body>
 </html>

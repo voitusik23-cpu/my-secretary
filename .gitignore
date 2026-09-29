@@ -13,6 +13,7 @@ backups/
 logs/
 *.log
 test_audio.wav
+music_cache/
 
 # Python artifacts
 __pycache__/

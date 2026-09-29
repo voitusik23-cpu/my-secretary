@@ -29,6 +29,7 @@ from app.modules.movies import movies_router
 from app.modules.users import users_router, User, UserSettings
 from app.modules.plants import plants_router, Plant
 from app.modules.recipes import recipes_router, Recipe
+from app.modules.music import music_router, MusicTrack, MusicPlaylist
 from app.core import web_agent_router, gemini_router, system_router, start_nightly_backup_task
 from app.core.undo_service import router as undo_router
 from app.database import Base, engine
@@ -95,6 +96,7 @@ api_v1.include_router(movies_router)
 api_v1.include_router(users_router)
 api_v1.include_router(plants_router)
 api_v1.include_router(recipes_router)
+api_v1.include_router(music_router)
 
 # Dormant Hospitality Module (Feature-flagged)
 if settings.ENABLE_HOSPITALITY:
@@ -133,6 +135,7 @@ def get_system_health():
         "users",
         "plants",
         "recipes",
+        "music",
     ]
     if settings.ENABLE_HOSPITALITY:
         active_modules.append("hospitality")

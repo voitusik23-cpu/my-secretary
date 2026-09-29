@@ -22,7 +22,7 @@ class ProcessTextRequest(BaseModel):
 
 async def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str, List[Any]]:
     """Зберігає вилучені AI дії у відповідні таблиці БД."""
-    created_items: Dict[str, List[Any]] = {k: [] for k in ["finance", "shopping", "tasks", "media_notes", "auto", "health_vitals", "movies"]}
+    created_items: Dict[str, List[Any]] = {k: [] for k in ["finance", "shopping", "tasks", "media_notes", "auto", "health_vitals", "movies", "music"]}
 
     for action in actions:
         domain = action.get("domain")
@@ -92,13 +92,24 @@ async def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Di
                 if m_res:
                     created_items["movies"].append(m_res)
 
+            elif domain == "music":
+                from app.modules.music.service import parse_and_import_shazam
+                q_text = data.get("title") or data.get("query") or data.get("url") or data.get("text") or ""
+                if q_text:
+                    if data.get("artist") and data.get("title"):
+                        q_text = f"{data['artist']} - {data['title']}"
+                    pl = data.get("playlist") or "Shazam"
+                    m_track = await parse_and_import_shazam(q_text, playlist=pl, db=db)
+                    if m_track and isinstance(m_track, dict) and m_track.get("id"):
+                        created_items["music"].append(m_track)
+
         except Exception as e:
             continue
 
     db.commit()
     try:
         from app.core.undo_service import record_action
-        for dom in ["shopping", "finance", "tasks", "media_notes", "auto", "health_vitals", "movies"]:
+        for dom in ["shopping", "finance", "tasks", "media_notes", "auto", "health_vitals", "movies", "music"]:
             its = created_items.get(dom, [])
             if its:
                 ids = [it["id"] for it in its if "id" in it]
