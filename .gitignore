@@ -14,6 +14,7 @@ service_account.json
 secretary.db
 data/
 secretary_data/
+*.tar.gz
 
 # Python & Virtual Environments
 venv/
