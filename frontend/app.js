@@ -23,7 +23,7 @@ const state = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js?v=3.5.6")
+      .register("/sw.js?v=3.5.7")
       .then((reg) => {
         reg.update();
         reg.addEventListener("updatefound", () => {
@@ -221,12 +221,13 @@ function initVoice() {
       }, 500);
     } catch (err) {
       console.error("Microphone access or recorder error:", err);
+      const isHttps = window.isSecureContext && window.location.protocol === "https:";
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
         statusText.textContent = "Доступ к микрофону заблокирован";
-        showToast("❌ Разрешите микрофон: кнопка «аА» в Safari → Настройки веб-сайта → Микрофон: Разрешить");
-      } else if (!window.isSecureContext) {
-        statusText.textContent = "Требуется защищенное соединение (HTTPS)";
-        showToast("⚠️ Для работы микрофона открывайте сайт только по HTTPS ссылке из Cloudflare/Tailscale!");
+        showToast("❌ Разрешите микрофон: в Safari кнопка «аА» слева вверху → Настройки веб-сайта → Микрофон: Разрешить");
+      } else if (!isHttps) {
+        statusText.textContent = `Требуется HTTPS (сейчас: ${window.location.protocol}//${window.location.host})`;
+        showToast(`⚠️ Вы открыли сайт по ${window.location.protocol}//! Удалите старый ярлык и откройте ссылку с https://`);
       } else {
         statusText.textContent = `Ошибка микрофона: ${err.message || err.name}`;
         showToast(`❌ Ошибка: ${err.message || err.name}`);

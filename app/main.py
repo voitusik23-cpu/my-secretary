@@ -2,10 +2,10 @@ import os
 import time
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import text
 from app.config import settings
 from app.database import init_db
@@ -172,7 +172,20 @@ if os.path.exists(frontend_dir):
     app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
     @app.api_route("/", methods=["GET", "HEAD"])
-    async def serve_index():
+    async def serve_index(request: Request):
+        proto = request.headers.get("x-forwarded-proto", request.url.scheme).lower()
+        host = request.headers.get("host", "").split(":")[0]
+        if proto == "http" and host not in ["localhost", "127.0.0.1"]:
+            tunnel_file = r"C:\Users\Administrator\logs\current_tunnel_url.txt"
+            if os.path.exists(tunnel_file):
+                try:
+                    with open(tunnel_file, "r", encoding="utf-8") as tf:
+                        tunnel_url = tf.read().strip()
+                        if tunnel_url.startswith("https://"):
+                            return RedirectResponse(f"{tunnel_url}/?key={settings.SECRET_KEY}", status_code=307)
+                except Exception:
+                    pass
+
         return FileResponse(
             os.path.join(frontend_dir, "index.html"),
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
