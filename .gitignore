@@ -1,54 +1,60 @@
-# Environments & Secrets
+# Sensitive credentials & environment
 .env
-.env.local
-*.env
-service_account.json
-*.pem
-*.key
-*.crt
+.env.*
+!.env.example
 
-# SQLite Database & Persistent Data
+# Local SQLite databases & backups
 *.db
 *.db-journal
-*.sqlite3
 secretary.db
-data/
-secretary_data/
-*.tar.gz
+backups/
 
-# Python & Virtual Environments
-venv/
-env/
-.venv/
+# Logs & temporary runtime files
+logs/
+*.log
+test_audio.wav
+
+# Python artifacts
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+venv/
+.venv/
+env/
 
-# IDE & OS
+# OS & User profile system folders
+AppData/
+Desktop/
+Documents/
+Downloads/
+"3D Objects/"
+Contacts/
+Favorites/
+Links/
+Music/
+Pictures/
+"Saved Games/"
+Searches/
+Videos/
+NTUSER*
+ntuser*
+.antigravity*
+.gemini*
+.cache*
+
+# Windows Junction Points & Shortcuts
+"Application Data/"
+Cookies/
+"Local Settings/"
+"My Documents/"
+NetHood/
+PrintHood/
+Recent/
+SendTo/
+"Start Menu/"
+Templates/
+
 .DS_Store
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Backups
-backups/
-*.bak
-*.backup
+Thumbs.db
+desktop.ini
+._*

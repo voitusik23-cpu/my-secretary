@@ -28,17 +28,17 @@ TRANSLATE_SYSTEM_INSTRUCTION = """Ти — професійний синхрон
 
 
 async def perform_translation(text: str, source_lang: str = "auto", target_lang: str = "en") -> Dict[str, str]:
-    """Виконує швидкий переклад (<0.3с) через нейромережу Google з автоматичним failover на Gemini."""
+    """Виконує швидкий переклад (<0.3с) через перевірені високошвидкісні шлюзи з failover на Gemini 3.1."""
     sl = (source_lang or "auto").lower()
     tl = (target_lang or "en").lower().split("-")[0]
 
-    # Tier 1: Ultra-fast neural translation (~0.25s)
+    # Tier 1: Ultra-fast Google client=dict-chrome-ex (~0.25-0.4s)
     try:
         import httpx
         q = urllib.parse.quote(text)
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={sl}&tl={tl}&dt=t&q={q}"
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        url = f"https://translate.googleapis.com/translate_a/single?client=dict-chrome-ex&sl={sl}&tl={tl}&dt=t&q={q}"
+        async with httpx.AsyncClient(timeout=1.8) as client:
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
             if resp.status_code == 200:
                 data = resp.json()
                 translated = "".join([part[0] for part in data[0] if part and part[0]]).strip()
@@ -49,9 +49,28 @@ async def perform_translation(text: str, source_lang: str = "auto", target_lang:
                         "detected_source_lang": detected
                     }
     except Exception as e:
-        logger.info(f"Fast translate tier fallback to Gemini: {e}")
+        logger.info(f"Fast Google translate tier failed: {e}")
 
-    # Tier 2: Gemini failover
+    # Tier 2: MyMemory fast API fallback (~0.4s)
+    try:
+        import httpx
+        pair = f"{sl}|{tl}" if sl != "auto" else f"autodetect|{tl}"
+        q = urllib.parse.quote(text)
+        url = f"https://api.mymemory.translated.net/get?q={q}&langpair={pair}"
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            if resp.status_code == 200:
+                mm_data = resp.json()
+                res_text = mm_data.get("responseData", {}).get("translatedText")
+                if res_text and not res_text.startswith("MYMEMORY WARNING"):
+                    return {
+                        "translated_text": res_text.strip(),
+                        "detected_source_lang": sl
+                    }
+    except Exception as e:
+        logger.info(f"MyMemory tier failed: {e}")
+
+    # Tier 3: Gemini 3.1 Flash Lite fast AI translation
     api_key = settings.GEMINI_API_KEY.strip() if settings.GEMINI_API_KEY else ""
     if not api_key:
         return {
@@ -59,49 +78,38 @@ async def perform_translation(text: str, source_lang: str = "auto", target_lang:
             "detected_source_lang": source_lang if source_lang != "auto" else "unknown"
         }
 
-    prompt = TRANSLATE_SYSTEM_INSTRUCTION.format(source_lang=source_lang, target_lang=target_lang)
-    candidate_models = [settings.AI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"]
-    models_to_try = []
-    for m in candidate_models:
-        if m and m not in models_to_try:
-            models_to_try.append(m)
-
     try:
         from google import genai
         from google.genai import types
 
         client = genai.Client(api_key=api_key)
-        for model_name in models_to_try:
-            try:
-                res = client.models.generate_content(
-                    model=model_name,
-                    contents=text,
-                    config=types.GenerateContentConfig(
-                        system_instruction=prompt,
-                        response_mime_type="application/json",
-                        temperature=0.2,
-                    )
-                )
-                raw_text = res.text or ""
-                clean_json = raw_text.strip()
-                if "```" in clean_json:
-                    m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", clean_json)
-                    if m:
-                        clean_json = m.group(1).strip()
+        prompt = TRANSLATE_SYSTEM_INSTRUCTION.format(source_lang=source_lang, target_lang=target_lang)
+        res = client.models.generate_content(
+            model="gemini-3.1-flash-lite",
+            contents=text,
+            config=types.GenerateContentConfig(
+                system_instruction=prompt,
+                response_mime_type="application/json",
+                temperature=0.1,
+            )
+        )
+        raw_text = res.text or ""
+        clean_json = raw_text.strip()
+        if "```" in clean_json:
+            m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", clean_json)
+            if m:
+                clean_json = m.group(1).strip()
 
-                parsed = json.loads(clean_json)
-                return {
-                    "translated_text": parsed.get("translated_text", text),
-                    "detected_source_lang": parsed.get("detected_source_lang", source_lang)
-                }
-            except Exception as e:
-                logger.warning(f"Translation model {model_name} failed: {e}. Trying fallback...")
-                continue
+        parsed = json.loads(clean_json)
+        return {
+            "translated_text": parsed.get("translated_text", text),
+            "detected_source_lang": parsed.get("detected_source_lang", source_lang)
+        }
     except Exception as e:
-        logger.error(f"Translation error: {e}")
+        logger.error(f"Gemini translation error: {e}")
 
     return {
-        "translated_text": f"[{text}]",
+        "translated_text": text,
         "detected_source_lang": source_lang if source_lang != "auto" else "unknown"
     }
 

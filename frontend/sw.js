@@ -1,4 +1,4 @@
-const CACHE_NAME = "my-secretary-v3.5.3";
+const CACHE_NAME = "my-secretary-v3.5.6";
 const STATIC_ASSETS = [
   "/",
   "/static/index.html",

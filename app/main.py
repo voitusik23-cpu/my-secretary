@@ -173,15 +173,25 @@ if os.path.exists(frontend_dir):
 
     @app.api_route("/", methods=["GET", "HEAD"])
     async def serve_index():
-        return FileResponse(os.path.join(frontend_dir, "index.html"))
+        return FileResponse(
+            os.path.join(frontend_dir, "index.html"),
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+        )
 
     @app.api_route("/manifest.json", methods=["GET", "HEAD"])
     async def serve_manifest():
-        return FileResponse(os.path.join(frontend_dir, "manifest.json"))
+        return FileResponse(
+            os.path.join(frontend_dir, "manifest.json"),
+            headers={"Cache-Control": "no-cache, must-revalidate"}
+        )
 
     @app.api_route("/sw.js", methods=["GET", "HEAD"])
     async def serve_sw():
-        return FileResponse(os.path.join(frontend_dir, "sw.js"), media_type="application/javascript")
+        return FileResponse(
+            os.path.join(frontend_dir, "sw.js"),
+            media_type="application/javascript",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+        )
 
     @app.api_route("/apple-touch-icon.png", methods=["GET", "HEAD"])
     @app.api_route("/apple-touch-icon-120x120.png", methods=["GET", "HEAD"])
