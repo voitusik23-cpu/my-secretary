@@ -57,10 +57,12 @@ def build_watch_links(title: str, original_title: Optional[str] = None, year: Op
         {"category": "official", "platform": "📺 Megogo", "url": f"https://megogo.net/ua/search?q={encoded_title}"},
 
         # Онлайн кінотеатри (безкоштовно)
-        {"category": "online", "platform": "🎬 Kinogo", "url": f"https://www.google.com/search?q={encoded_query}+смотреть+онлайн+kinogo"},
         {"category": "online", "platform": "🍿 HDRezka", "url": f"https://rezka.ag/search/?q={encoded_title}"},
-        {"category": "online", "platform": "🇺🇦 UAKino (укр)", "url": f"https://uakino.me/index.php?do=search&subaction=search&story={encoded_title}"},
-        {"category": "online", "platform": "🎥 Baskino", "url": f"https://baskino.org/index.php?do=search&subaction=search&story={encoded_title}"},
+        {"category": "online", "platform": "🎬 Filmix", "url": f"https://filmix.gg/search/{encoded_title}"},
+        {"category": "online", "platform": "🇺🇦 Енеїда (укр)", "url": f"https://eneyida.tv/index.php?do=search&subaction=search&story={encoded_title}"},
+        {"category": "online", "platform": "🇺🇦 UASerials (укр)", "url": f"https://uaserials.my/index.php?do=search&subaction=search&story={encoded_title}"},
+        {"category": "online", "platform": "🇺🇦 UAKino (онлайн)", "url": f"https://www.google.com/search?q={encoded_query}+дивитися+онлайн+uakino"},
+        {"category": "online", "platform": "🎬 Kinogo", "url": f"https://www.google.com/search?q={encoded_query}+смотреть+онлайн+kinogo"},
         
         # Торренти (завантажити)
         {"category": "torrent", "platform": "🧲 Toloka (Гуртом, укр)", "url": f"https://toloka.to/tracker.php?nm={encoded_title}"},
