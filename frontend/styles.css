@@ -2529,6 +2529,125 @@ body {
   opacity: 1;
 }
 
+/* Dual Mic Container for Business (Expense vs Income) */
+.biz-voice-dual-container {
+  margin-bottom: 16px;
+}
+
+.biz-voice-dual-header {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 0.6px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.biz-voice-dual-row {
+  display: flex;
+  gap: 10px;
+}
+
+@media (max-width: 480px) {
+  .biz-voice-dual-row {
+    flex-direction: column;
+  }
+}
+
+.biz-dual-mic-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.biz-dual-mic-btn.expense {
+  border: 1px solid rgba(255, 69, 58, 0.4);
+  background: linear-gradient(135deg, rgba(255, 69, 58, 0.16), rgba(255, 69, 58, 0.05));
+  color: var(--text-main);
+}
+
+.biz-dual-mic-btn.expense:hover {
+  border-color: rgba(255, 69, 58, 0.8);
+  box-shadow: 0 4px 14px rgba(255, 69, 58, 0.25);
+  transform: translateY(-1px);
+}
+
+.biz-dual-mic-btn.expense.listening {
+  border-color: #ff453a;
+  background: linear-gradient(135deg, rgba(255, 69, 58, 0.4), rgba(255, 69, 58, 0.2));
+  animation: bizPulseListening 1.5s infinite ease-in-out;
+}
+
+.biz-dual-mic-btn.income {
+  border: 1px solid rgba(48, 209, 88, 0.4);
+  background: linear-gradient(135deg, rgba(48, 209, 88, 0.16), rgba(48, 209, 88, 0.05));
+  color: var(--text-main);
+}
+
+.biz-dual-mic-btn.income:hover {
+  border-color: rgba(48, 209, 88, 0.8);
+  box-shadow: 0 4px 14px rgba(48, 209, 88, 0.25);
+  transform: translateY(-1px);
+}
+
+.biz-dual-mic-btn.income.listening {
+  border-color: #30d158;
+  background: linear-gradient(135deg, rgba(48, 209, 88, 0.4), rgba(48, 209, 88, 0.2));
+  animation: bizPulseListeningGreen 1.5s infinite ease-in-out;
+}
+
+@keyframes bizPulseListeningGreen {
+  0% { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0.5); }
+  70% { box-shadow: 0 0 0 14px rgba(48, 209, 88, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0); }
+}
+
+.biz-dual-mic-badge {
+  font-size: 1.35rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.biz-dual-mic-text {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.biz-dual-mic-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.biz-dual-mic-btn.expense .biz-dual-mic-title {
+  color: #ff6961;
+}
+
+.biz-dual-mic-btn.income .biz-dual-mic-title {
+  color: #30d158;
+}
+
+.biz-dual-mic-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
 /* Voice Dictation Card for busy hands */
 .biz-voice-card {
   margin-bottom: 16px;

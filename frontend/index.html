@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.6.6">
+  <link rel="stylesheet" href="/static/styles.css?v=3.6.7">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -272,17 +272,27 @@
           </div>
         </div>
 
-        <!-- Hands-Free Voice Dictation Card (Bazaar, driving, busy hands) -->
-        <div class="biz-voice-card">
-          <button type="button" id="biz-voice-dictate-btn" class="biz-voice-btn" title="Натисніть і надиктуйте витрату чи дохід">
-            <span class="biz-voice-icon-wrap">
-              <span class="biz-voice-icon">🎙️</span>
-            </span>
-            <div class="biz-voice-text-wrap">
-              <div class="biz-voice-title">Надиктувати голосом (руки зайняті)</div>
-              <div class="biz-voice-subtitle">Натисніть і скажіть: «шайбочки на базарі 250 гривень»</div>
-            </div>
-          </button>
+        <!-- Dedicated Quick Voice Mic Buttons (Expense & Income) -->
+        <div class="biz-voice-dual-container">
+          <div class="biz-voice-dual-header">🎙️ ШВИДКА НАДИКТОВКА ГОЛОСОМ (РУКИ ЗАЙНЯТІ):</div>
+          <div class="biz-voice-dual-row">
+            <button type="button" id="biz-voice-expense-btn" class="biz-dual-mic-btn expense" title="Натисніть і скажіть витрату: наприклад «шайбочки на базарі 250»">
+              <span class="biz-dual-mic-badge">🔴 🎙️</span>
+              <div class="biz-dual-mic-text">
+                <span class="biz-dual-mic-title">Надиктувати витрату (-)</span>
+                <span class="biz-dual-mic-hint">«шайбочки 250», «провода 1200»</span>
+              </div>
+            </button>
+
+            <button type="button" id="biz-voice-income-btn" class="biz-dual-mic-btn income" title="Натисніть і скажіть дохід: наприклад «оренда офіс 100 тисяч»">
+              <span class="biz-dual-mic-badge">🟢 🎙️</span>
+              <div class="biz-dual-mic-text">
+                <span class="biz-dual-mic-title">Надиктувати дохід (+)</span>
+                <span class="biz-dual-mic-hint">«оренда 100 тис», «аванс 20000»</span>
+              </div>
+            </button>
+          </div>
+
           <div id="biz-voice-status" class="biz-voice-status" style="display:none;">
             <div class="biz-voice-wave">
               <span></span><span></span><span></span><span></span>
@@ -1294,12 +1304,12 @@
     </div>
   </div>
 
-  <script src="/static/modules/auth_phone.js?v=3.6.6"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.6.6"></script>
-  <script src="/static/modules/business.js?v=3.6.6"></script>
-  <script src="/static/modules/movies.js?v=3.6.6"></script>
-  <script src="/static/modules/music.js?v=3.6.6"></script>
-  <script src="/static/app.js?v=3.6.6"></script>
+  <script src="/static/modules/auth_phone.js?v=3.6.7"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.6.7"></script>
+  <script src="/static/modules/business.js?v=3.6.7"></script>
+  <script src="/static/modules/movies.js?v=3.6.7"></script>
+  <script src="/static/modules/music.js?v=3.6.7"></script>
+  <script src="/static/app.js?v=3.6.7"></script>
 </body>
 </html>
 

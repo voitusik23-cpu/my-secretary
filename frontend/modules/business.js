@@ -217,17 +217,32 @@ const BusinessModule = {
   // Voice dictation state
   recognition: null,
   isVoiceActive: false,
+  currentVoiceType: null, // "expense" | "income" | null
   mediaRecorder: null,
   audioChunks: [],
 
-  updateVoiceUI(isListening, statusText) {
-    const btn = document.getElementById("biz-voice-dictate-btn");
+  updateVoiceUI(isListening, statusText, voiceType = null) {
+    const expenseBtn = document.getElementById("biz-voice-expense-btn");
+    const incomeBtn = document.getElementById("biz-voice-income-btn");
+    const legacyBtn = document.getElementById("biz-voice-dictate-btn");
     const statusBox = document.getElementById("biz-voice-status");
     const statusLabel = document.getElementById("biz-voice-status-text");
 
-    if (btn) {
-      if (isListening) btn.classList.add("listening");
-      else btn.classList.remove("listening");
+    const activeType = voiceType || this.currentVoiceType;
+
+    if (expenseBtn) {
+      if (isListening && activeType === "expense") expenseBtn.classList.add("listening");
+      else expenseBtn.classList.remove("listening");
+    }
+
+    if (incomeBtn) {
+      if (isListening && activeType === "income") incomeBtn.classList.add("listening");
+      else incomeBtn.classList.remove("listening");
+    }
+
+    if (legacyBtn) {
+      if (isListening) legacyBtn.classList.add("listening");
+      else legacyBtn.classList.remove("listening");
     }
 
     if (statusBox && statusLabel) {
@@ -240,12 +255,16 @@ const BusinessModule = {
     }
   },
 
-  async submitVoiceText(text) {
+  async submitVoiceText(text, forceType = null) {
     if (!text || !text.trim()) return;
+    const typeToUse = forceType || this.currentVoiceType;
     try {
       const res = await apiFetch("/api/v1/business/quick-parse", {
         method: "POST",
-        body: JSON.stringify({ text: text.trim() })
+        body: JSON.stringify({ 
+          text: text.trim(),
+          force_type: typeToUse
+        })
       });
 
       const sign = res.type === "income" ? "+" : "-";
@@ -270,16 +289,26 @@ const BusinessModule = {
     }
   },
 
-  toggleVoiceDictation() {
+  toggleVoiceDictation(forceType = null) {
     if (this.isVoiceActive) {
+      if (this.currentVoiceType === forceType) {
+        this.stopVoice();
+        return;
+      }
       this.stopVoice();
-    } else {
-      this.startVoice();
     }
+    this.startVoice(forceType);
   },
 
-  startVoice() {
+  startVoice(forceType = null) {
+    this.currentVoiceType = forceType;
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    const hintText = forceType === "expense"
+      ? "🔴 Слухаю витрату... Наприклад: «шайбочки на базарі 250»"
+      : (forceType === "income"
+          ? "🟢 Слухаю прихід... Наприклад: «оренда офіс 100 тисяч»"
+          : "🎙️ Слухаю... Наприклад: «шайбочки 250» або «оренда 100 тисяч»");
 
     if (SpeechRec) {
       try {
@@ -295,7 +324,7 @@ const BusinessModule = {
 
         rec.onstart = () => {
           this.isVoiceActive = true;
-          this.updateVoiceUI(true, "🎙️ Слухаю... Скажіть витрату чи дохід (напр. «шайбочки на базарі 250 гривень»)");
+          this.updateVoiceUI(true, hintText, forceType);
         };
 
         rec.onresult = async (event) => {
@@ -303,7 +332,7 @@ const BusinessModule = {
           if (event.results && event.results[0] && event.results[0][0]) {
             const transcript = event.results[0][0].transcript;
             this.updateVoiceUI(false, `⚡ Почуто: «${transcript}». Записую в касу...`);
-            await this.submitVoiceText(transcript);
+            await this.submitVoiceText(transcript, forceType);
           }
         };
 
@@ -313,7 +342,7 @@ const BusinessModule = {
           if (e.error === "not-allowed" || e.error === "service-not-allowed") {
             this.updateVoiceUI(false, "⚠️ Мікрофон заблоковано в налаштуваннях браузера");
           } else if (e.error === "no-speech") {
-            this.updateVoiceUI(false, "Голос не почуто. Натисніть ще раз щоб повторити");
+            this.updateVoiceUI(false, "Голос не почуто. Натисніть кнопку та спробуйте ще раз");
           } else {
             this.updateVoiceUI(false, `Помилка: ${e.error}`);
           }
@@ -321,8 +350,7 @@ const BusinessModule = {
 
         rec.onend = () => {
           this.isVoiceActive = false;
-          const btn = document.getElementById("biz-voice-dictate-btn");
-          if (btn) btn.classList.remove("listening");
+          this.updateVoiceUI(false, null);
         };
 
         this.recognition = rec;
@@ -334,7 +362,7 @@ const BusinessModule = {
     }
 
     // Fallback: Audio recording via MediaRecorder
-    this.startAudioRecordingFallback();
+    this.startAudioRecordingFallback(forceType);
   },
 
   stopVoice() {
@@ -345,10 +373,11 @@ const BusinessModule = {
       try { this.mediaRecorder.stop(); } catch (e) {}
     }
     this.isVoiceActive = false;
+    this.currentVoiceType = null;
     this.updateVoiceUI(false, null);
   },
 
-  async startAudioRecordingFallback() {
+  async startAudioRecordingFallback(forceType = null) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       if (typeof showToast === "function") showToast("⚠️ Браузер не підтримує запис голосу");
       return;
@@ -371,7 +400,8 @@ const BusinessModule = {
         try {
           const formData = new FormData();
           formData.append("audio", audioBlob, "business_voice.webm");
-          formData.append("text", "бізнес операція");
+          const hint = forceType === "expense" ? "бізнес витрата" : (forceType === "income" ? "бізнес дохід" : "бізнес операція");
+          formData.append("text", hint);
 
           const token = localStorage.getItem("SECRET_KEY") || "";
           const resp = await fetch("/api/v1/process/audio", {
@@ -399,7 +429,10 @@ const BusinessModule = {
       mr.start();
       this.mediaRecorder = mr;
       this.isVoiceActive = true;
-      this.updateVoiceUI(true, "🎙️ Запис аудіо... Натисніть кнопку ще раз для збереження");
+      const recMsg = forceType === "expense"
+        ? "🔴 Запис витрати... Натисніть кнопку ще раз для збереження"
+        : "🟢 Запис доходу... Натисніть кнопку ще раз для збереження";
+      this.updateVoiceUI(true, recMsg, forceType);
     } catch (micErr) {
       console.error("Microphone error:", micErr);
       this.isVoiceActive = false;
@@ -408,8 +441,10 @@ const BusinessModule = {
   },
 
   init() {
-    // Voice dictation button
-    document.getElementById("biz-voice-dictate-btn")?.addEventListener("click", () => this.toggleVoiceDictation());
+    // Dual voice dictation buttons
+    document.getElementById("biz-voice-expense-btn")?.addEventListener("click", () => this.toggleVoiceDictation("expense"));
+    document.getElementById("biz-voice-income-btn")?.addEventListener("click", () => this.toggleVoiceDictation("income"));
+    document.getElementById("biz-voice-dictate-btn")?.addEventListener("click", () => this.toggleVoiceDictation(null));
 
     // Quick buttons
     document.getElementById("biz-add-income-btn")?.addEventListener("click", () => this.addTransaction("income"));

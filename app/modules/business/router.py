@@ -123,37 +123,87 @@ def get_summary(db: Session = Depends(get_db)):
     )
 
 
+def parse_spoken_amount(text: str) -> tuple:
+    """
+    Визначає суму з тексту або мовних виразів («40 тисяч», «2.5к», «двісті п'ятдесят» тощо).
+    Повертає (сума, очищений текст).
+    """
+    clean_text = text
+
+    clean_text = re.sub(r"\b(півтори|полторы)\s+(тисячі|тысячи|тис|тыс)\b", "1500", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(дві|две)\s+(тисячі|тысячи|тис|тыс)\b", "2000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(три|три)\s+(тисячі|тысячи|тис|тыс)\b", "3000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(чотири|четыре)\s+(тисячі|тысячи|тис|тыс)\b", "4000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(п'ять|пять)\s+(тисяч|тысяч|тис|тыс)\b", "5000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(десять)\s+(тисяч|тысяч|тис|тыс)\b", "10000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(двадцять|двадцать)\s+(тисяч|тысяч|тис|тыс)\b", "20000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(тридцять|тридцать)\s+(тисяч|тысяч|тис|тыс)\b", "30000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(сорок)\s+(тисяч|тысяч|тис|тыс)\b", "40000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(п'ятдесят|пятьдесят)\s+(тисяч|тысяч|тис|тыс)\b", "50000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(сто)\s+(тисяч|тысяч|тис|тыс)\b", "100000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(двісті|двести)\s+(тисяч|тысяч|тис|тыс)\b", "200000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(півмільйона|полмиллиона)\b", "500000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(мільйон|миллион)\b", "1000000", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b(тисяча|тысяча)\b", "1000", clean_text, flags=re.IGNORECASE)
+
+    def mult_repl(m):
+        base = float(m.group(1).replace(" ", "").replace(",", "."))
+        unit = m.group(2).lower()
+        if unit.startswith("млн") or "мил" in unit or "міл" in unit:
+            return str(int(base * 1_000_000))
+        return str(int(base * 1_000))
+
+    clean_text = re.sub(
+        r"(\d+[\d\s.,]*\d*|\d+)\s*(тыс[ячи]*|тис[ячі]*|млн[а-я]*|к|k)\b",
+        mult_repl,
+        clean_text,
+        flags=re.IGNORECASE,
+    )
+
+    amount_match = re.search(r"(\d+[\d\s.,]*\d*|\d+)", clean_text)
+    if not amount_match:
+        return None, clean_text
+
+    raw_num = amount_match.group(1).replace(" ", "").replace(",", ".")
+    try:
+        amount = float(raw_num)
+        return amount, clean_text
+    except ValueError:
+        return None, clean_text
+
+
 @business_router.post("/quick-parse", response_model=BusinessTransactionResponse)
 def quick_parse_text(payload: dict, db: Session = Depends(get_db)):
     """
-    Швидкий запис текстом: наприклад
-    «получил аренду офис плюс 100000 грн» або «выдал зарплату толику 40000»
+    Швидкий запис текстом або голосом.
+    Підтримує:
+    - payload['text']: фраза користувача
+    - payload['force_type']: 'expense' або 'income' (якщо натиснуто відповідну кнопку мікрофона)
     """
     text = payload.get("text", "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Текст не може бути порожнім")
 
-    # Extract digits / amount
-    amount_match = re.search(r"(\d+[\d\s.,]*\d*|\d+)", text)
-    if not amount_match:
-        raise HTTPException(status_code=400, detail="Не вдалося розпізнати суму у тексті")
+    amount, processed_text = parse_spoken_amount(text)
+    if amount is None or amount <= 0:
+        raise HTTPException(status_code=400, detail="Не вдалося розпізнати суму у висловлюванні")
 
-    raw_num = amount_match.group(1).replace(" ", "").replace(",", ".")
-    try:
-        amount = float(raw_num)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Некоректна сума")
+    lower = processed_text.lower()
 
-    # Determine type: income vs expense
-    lower = text.lower()
-    is_income = any(w in lower for w in [
-        "плюс", "+", "получил", "отримав", "доход", "дохід", "зашло", "приход", "прибуток", "оренда", "аренда"
-    ]) and not any(w in lower for w in ["видав", "выдал", "заплатил", "заплатив", "мінус", "-"])
-
-    tx_type = "income" if is_income else "expense"
+    # Determine type: forced or smart detected
+    force_type = payload.get("type") or payload.get("force_type")
+    if force_type in ("expense", "витрата", "расход", "минус", "-"):
+        tx_type = "expense"
+    elif force_type in ("income", "дохід", "доход", "плюс", "+"):
+        tx_type = "income"
+    else:
+        is_income = any(w in lower for w in [
+            "плюс", "+", "получил", "отримав", "доход", "дохід", "зашло", "приход", "прибуток", "оренда", "аренда"
+        ]) and not any(w in lower for w in ["видав", "выдал", "заплатил", "заплатив", "мінус", "-"])
+        tx_type = "income" if is_income else "expense"
 
     # Clean description
-    desc = re.sub(r"(\d+[\d\s.,]*\d*|\d+)", "", text)
+    desc = re.sub(r"(\d+[\d\s.,]*\d*|\d+)", "", processed_text)
     desc = desc.replace("+", " ").replace("-", " ")
     for w in [
         "грн", "uah", "гривен", "гривень", "плюс", "мінус", "получил", "отримав", "выдал", "видав",
