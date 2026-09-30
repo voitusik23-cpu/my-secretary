@@ -1086,9 +1086,47 @@
           </div>
 
           <hr style="border:none;border-top:1px solid var(--border-color);margin:16px 0;" />
-          <button id="clear-cache-reload-btn" class="btn-secondary" style="width:100%;padding:10px;font-size:0.85rem;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;">
-            <span>🔄 Очистити кеш та оновити вигляд (v3.6.1)</span>
-          </button>
+
+          <!-- Bot & System Version Section -->
+          <div class="system-version-card" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:10px;background:rgba(14,165,233,0.15);display:flex;align-items:center;justify-content:center;font-size:1.25rem;">
+                  🤖
+                </div>
+                <div>
+                  <div style="font-size:0.72rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Версія системи та бота</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                    <span id="bot-version-badge" style="font-size:1.05rem;font-weight:800;color:var(--text-main);">v3.7.3</span>
+                    <span id="bot-status-tag" style="font-size:0.72rem;font-weight:600;background:rgba(34,197,94,0.18);color:#22c55e;padding:2px 7px;border-radius:20px;border:1px solid rgba(34,197,94,0.3);">● Актуальна</span>
+                  </div>
+                </div>
+              </div>
+              <button type="button" id="check-version-btn" title="Перевірити версію на сервері" style="background:rgba(255,255,255,0.06);border:1px solid var(--border-color);border-radius:8px;padding:6px 10px;font-size:0.78rem;cursor:pointer;color:var(--text-main);display:flex;align-items:center;gap:4px;">
+                <span>🔄 Перевірити</span>
+              </button>
+            </div>
+
+            <div style="font-size:0.8rem;color:var(--text-muted);background:rgba(0,0,0,0.18);padding:10px 12px;border-radius:8px;display:flex;flex-direction:column;gap:6px;border:1px solid rgba(255,255,255,0.05);">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>📅 <strong>Дата та час збірки:</strong></span>
+                <span id="bot-build-time" style="color:var(--text-main);font-weight:600;">30.09.2026 16:25</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>📱 <strong>Клієнт (PWA додаток):</strong></span>
+                <span id="pwa-version-label" style="color:var(--text-main);font-weight:600;">v3.7.3</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>⚡ <strong>Статус сервера:</strong></span>
+                <span id="bot-connection-status" style="color:#22c55e;font-weight:600;">● Підключено</span>
+              </div>
+            </div>
+
+            <button type="button" id="clear-cache-reload-btn" class="btn-primary" style="width:100%;margin-top:12px;padding:11px;font-size:0.85rem;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg, #0ea5e9, #2563eb);color:#fff;border:none;font-weight:700;cursor:pointer;">
+              <span>🔄 Оновити додаток та скинути кеш</span>
+            </button>
+            <div id="version-action-feedback" style="font-size:0.75rem;text-align:center;margin-top:6px;min-height:16px;color:var(--text-muted);"></div>
+          </div>
         </div>
       </div>
     </div>

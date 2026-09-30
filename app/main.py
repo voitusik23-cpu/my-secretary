@@ -179,9 +179,37 @@ def get_system_health():
     }
 
 
-# Register healthcheck on API v1 and root app
+def get_version_info():
+    """Повертає точну версію бота, системні дані та дату/час останньої збірки."""
+    build_time = "30.09.2026 16:25"
+    git_hash = "latest"
+    try:
+        import subprocess
+        out = subprocess.check_output(
+            ["git", "log", "-1", "--format=%cd|%h", "--date=format:%d.%m.%Y %H:%M"],
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ).decode("utf-8").strip()
+        if "|" in out:
+            build_time, git_hash = out.split("|", 1)
+    except Exception:
+        pass
+
+    return {
+        "status": "online",
+        "app_name": "Мой Секретарь",
+        "bot_version": app.version,
+        "client_version": app.version,
+        "build_date_time": build_time,
+        "build_hash": git_hash,
+        "uptime_seconds": round(time.time() - START_TIME, 1),
+    }
+
+
+# Register healthcheck and version on API v1 and root app
 api_v1.add_api_route("/health", get_system_health, methods=["GET"], tags=["System & Health"])
 app.add_api_route("/health", get_system_health, methods=["GET"], tags=["System & Health"])
+api_v1.add_api_route("/system/version", get_version_info, methods=["GET"], tags=["System & Health"])
+app.add_api_route("/system/version", get_version_info, methods=["GET"], tags=["System & Health"])
 
 app.mount("/api/v1", api_v1)
 app.mount("/api", api_v1)

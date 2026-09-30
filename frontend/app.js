@@ -1121,6 +1121,48 @@ document.getElementById("clear-shopping-btn")?.addEventListener("click", async (
   }
 });
 
+async function loadVersionInfo() {
+  const versionBadge = document.getElementById("bot-version-badge");
+  const buildTimeLabel = document.getElementById("bot-build-time");
+  const pwaLabel = document.getElementById("pwa-version-label");
+  const statusTag = document.getElementById("bot-status-tag");
+  const connStatus = document.getElementById("bot-connection-status");
+
+  if (pwaLabel) pwaLabel.textContent = `v${APP_VERSION}`;
+
+  try {
+    const res = await apiFetch("/api/v1/system/version");
+    if (res && res.bot_version) {
+      if (versionBadge) versionBadge.textContent = `v${res.bot_version}`;
+      if (buildTimeLabel) buildTimeLabel.textContent = res.build_date_time || "30.09.2026";
+      if (connStatus) {
+        connStatus.textContent = "● Підключено";
+        connStatus.style.color = "#22c55e";
+      }
+
+      if (statusTag) {
+        if (res.bot_version === APP_VERSION) {
+          statusTag.textContent = "● Актуальна";
+          statusTag.style.color = "#22c55e";
+          statusTag.style.background = "rgba(34,197,94,0.18)";
+          statusTag.style.borderColor = "rgba(34,197,94,0.3)";
+        } else {
+          statusTag.textContent = "⚠️ Оновіть додаток";
+          statusTag.style.color = "#f59e0b";
+          statusTag.style.background = "rgba(245,158,11,0.18)";
+          statusTag.style.borderColor = "rgba(245,158,11,0.3)";
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("loadVersionInfo error:", err);
+    if (connStatus) {
+      connStatus.textContent = "⚠️ Помилка зв'язку";
+      connStatus.style.color = "#ef4444";
+    }
+  }
+}
+
 // --- Settings Modal ---
 function initSettingsModal() {
   const modal = document.getElementById("settings-modal");
@@ -1141,17 +1183,26 @@ function initSettingsModal() {
       resultText.textContent = "";
       try {
         loadBackupStatus();
+        loadVersionInfo();
       } catch (err) {
-        console.warn("loadBackupStatus error:", err);
+        console.warn("Settings init error:", err);
       }
     });
   }
 
+  document.getElementById("check-version-btn")?.addEventListener("click", async () => {
+    await loadVersionInfo();
+    showToast("✅ Дані версії бота оновлено!");
+  });
+
   document.getElementById("trigger-cloud-backup-btn")?.addEventListener("click", triggerCloudBackup);
 
   document.getElementById("clear-cache-reload-btn")?.addEventListener("click", async () => {
-    showToast("Очищення кешу та оновлення...");
+    const feedback = document.getElementById("version-action-feedback");
+    if (feedback) feedback.textContent = "⏳ Очищення кешу Safari/PWA та оновлення...";
+    showToast("🔄 Очищення кешу та примусове оновлення...");
     try {
+      localStorage.removeItem("secretary_sw_version");
       if ("caches" in window) {
         const keys = await caches.keys();
         await Promise.all(keys.map((k) => caches.delete(k)));
@@ -1164,8 +1215,11 @@ function initSettingsModal() {
       console.warn("Cache clear error:", e);
     }
     setTimeout(() => {
-      window.location.reload(true);
-    }, 400);
+      const keyParam = state.secretKey ? `key=${encodeURIComponent(state.secretKey)}` : "";
+      const tParam = `_force=${Date.now()}`;
+      const queryStr = [keyParam, tParam].filter(Boolean).join("&");
+      window.location.href = `${window.location.origin}/?${queryStr}`;
+    }, 450);
   });
 
   closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
