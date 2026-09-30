@@ -17,6 +17,8 @@ const state = {
   secretKey: initialKey,
   currentUser: initialUser,
   serverUrl: localStorage.getItem("server_url") || window.location.origin,
+  preferredCurrency: localStorage.getItem("preferred_currency") || "₴",
+  preferredLanguage: localStorage.getItem("preferred_language") || "uk",
   isRecording: false,
   mediaRecorder: null,
   audioChunks: [],
@@ -26,7 +28,7 @@ const state = {
 
 
 // --- Service Worker Registration with Safe Auto-Update & Hard-Cache Flush ---
-const APP_VERSION = "3.7.5";
+const APP_VERSION = "3.7.6";
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // If version changed, purge old caches to prevent stale script/audio issues on iPhone
@@ -1180,6 +1182,10 @@ function initSettingsModal() {
       modal.classList.remove("hidden");
       serverInput.value = state.serverUrl;
       secretInput.value = state.secretKey;
+      const currencySelect = document.getElementById("currency-select");
+      if (currencySelect) currencySelect.value = state.preferredCurrency || "₴";
+      const languageSelect = document.getElementById("language-select");
+      if (languageSelect) languageSelect.value = state.preferredLanguage || "uk";
       resultText.textContent = "";
       try {
         loadBackupStatus();
@@ -1233,8 +1239,20 @@ function initSettingsModal() {
     state.secretKey = secretInput.value.trim();
     localStorage.setItem("server_url", state.serverUrl);
     localStorage.setItem("secret_key", state.secretKey);
+
+    const currencySelect = document.getElementById("currency-select");
+    if (currencySelect) {
+      state.preferredCurrency = currencySelect.value;
+      localStorage.setItem("preferred_currency", state.preferredCurrency);
+    }
+    const languageSelect = document.getElementById("language-select");
+    if (languageSelect) {
+      state.preferredLanguage = languageSelect.value;
+      localStorage.setItem("preferred_language", state.preferredLanguage);
+    }
+
     modal.classList.add("hidden");
-    showToast("⚙️ Настройки сохранены");
+    showToast("⚙️ Настройки збережено");
     checkHealth();
     reloadCurrentTab();
   });
@@ -1262,6 +1280,206 @@ function initSettingsModal() {
     } finally {
       state.serverUrl = prevUrl;
       state.secretKey = prevKey;
+    }
+  });
+}
+
+// --- Help, FAQ & Feedback Modal ---
+function initHelpModal() {
+  const modal = document.getElementById("help-modal");
+  const openBtn = document.getElementById("help-open-btn");
+  const closeBtn = document.getElementById("help-close-btn");
+  const tabFaqBtn = document.getElementById("help-tab-faq-btn");
+  const tabFeedbackBtn = document.getElementById("help-tab-feedback-btn");
+  const faqContent = document.getElementById("help-faq-content");
+  const feedbackContent = document.getElementById("help-feedback-content");
+  const textInput = document.getElementById("feedback-text-input");
+  const micBtn = document.getElementById("feedback-mic-btn");
+  const sendBtn = document.getElementById("send-feedback-btn");
+  const statusMsg = document.getElementById("feedback-status-msg");
+  const typeChips = document.querySelectorAll(".fb-type-chip");
+
+  let selectedType = "idea";
+  let feedbackRecognition = null;
+  let isDictating = false;
+
+  if (openBtn && modal) {
+    openBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      modal.classList.remove("hidden");
+      if (statusMsg) statusMsg.textContent = "";
+    });
+  }
+
+  closeBtn?.addEventListener("click", () => modal?.classList.add("hidden"));
+
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
+  });
+
+  function switchTab(target) {
+    if (target === "faq") {
+      tabFaqBtn.style.background = "linear-gradient(135deg, #0ea5e9, #2563eb)";
+      tabFaqBtn.style.color = "#fff";
+      tabFaqBtn.style.fontWeight = "700";
+      tabFeedbackBtn.style.background = "transparent";
+      tabFeedbackBtn.style.color = "var(--text-muted)";
+      tabFeedbackBtn.style.fontWeight = "600";
+      faqContent?.classList.remove("hidden");
+      feedbackContent?.classList.add("hidden");
+    } else {
+      tabFeedbackBtn.style.background = "linear-gradient(135deg, #0ea5e9, #2563eb)";
+      tabFeedbackBtn.style.color = "#fff";
+      tabFeedbackBtn.style.fontWeight = "700";
+      tabFaqBtn.style.background = "transparent";
+      tabFaqBtn.style.color = "var(--text-muted)";
+      tabFaqBtn.style.fontWeight = "600";
+      feedbackContent?.classList.remove("hidden");
+      faqContent?.classList.add("hidden");
+    }
+  }
+
+  tabFaqBtn?.addEventListener("click", () => switchTab("faq"));
+  tabFeedbackBtn?.addEventListener("click", () => switchTab("feedback"));
+
+  typeChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      typeChips.forEach((c) => {
+        c.classList.remove("active");
+        c.style.borderColor = "var(--border-color)";
+        c.style.background = "var(--bg-input)";
+        c.style.color = "var(--text-muted)";
+        c.style.fontWeight = "600";
+      });
+      chip.classList.add("active");
+      chip.style.borderColor = "#0ea5e9";
+      chip.style.background = "rgba(14,165,233,0.18)";
+      chip.style.color = "#0ea5e9";
+      chip.style.fontWeight = "700";
+      selectedType = chip.dataset.type || "idea";
+    });
+  });
+
+  // Voice dictation for feedback
+  if (micBtn && textInput) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      micBtn.addEventListener("click", () => {
+        if (isDictating && feedbackRecognition) {
+          try {
+            feedbackRecognition.stop();
+          } catch (e) {}
+          return;
+        }
+
+        try {
+          feedbackRecognition = new SpeechRecognition();
+          feedbackRecognition.continuous = false;
+          feedbackRecognition.interimResults = false;
+          feedbackRecognition.lang = state.preferredLanguage === "en" ? "en-US" : (state.preferredLanguage === "ru" ? "ru-RU" : "uk-UA");
+
+          feedbackRecognition.onstart = () => {
+            isDictating = true;
+            micBtn.style.background = "rgba(244,63,94,0.4)";
+            micBtn.style.transform = "scale(1.1)";
+            micBtn.title = "Слухаю... Натисніть для зупинки";
+            if (statusMsg) {
+              statusMsg.textContent = "🎙️ Говоріть, слухаю...";
+              statusMsg.style.color = "#f43f5e";
+            }
+          };
+
+          feedbackRecognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            if (transcript) {
+              const current = textInput.value.trim();
+              textInput.value = current ? `${current} ${transcript}` : transcript;
+            }
+          };
+
+          feedbackRecognition.onerror = (e) => {
+            console.warn("Feedback speech recognition error:", e);
+            if (statusMsg) {
+              statusMsg.textContent = "Помилка мікрофона або доступ заборонено";
+              statusMsg.style.color = "var(--danger)";
+            }
+          };
+
+          feedbackRecognition.onend = () => {
+            isDictating = false;
+            micBtn.style.background = "rgba(244,63,94,0.18)";
+            micBtn.style.transform = "scale(1)";
+            micBtn.title = "Диктувати голосом";
+            if (statusMsg && statusMsg.textContent.includes("Говоріть")) {
+              statusMsg.textContent = "";
+            }
+          };
+
+          feedbackRecognition.start();
+        } catch (err) {
+          console.warn("Speech recognition init fail:", err);
+          showToast("🎙️ Голосове введення недоступне, введіть текст клавіатурою");
+        }
+      });
+    } else {
+      micBtn.addEventListener("click", () => {
+        showToast("🎙️ Для голосового введення використовуйте Safari або Chrome");
+      });
+    }
+  }
+
+  // Submit feedback to server
+  sendBtn?.addEventListener("click", async () => {
+    const message = textInput?.value.trim();
+    if (!message) {
+      if (statusMsg) {
+        statusMsg.textContent = "⚠️ Будь ласка, напишіть хоча б кілька слів";
+        statusMsg.style.color = "#f59e0b";
+      }
+      textInput?.focus();
+      return;
+    }
+
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = `<span>⏳ Відправка...</span>`;
+    if (statusMsg) {
+      statusMsg.textContent = "Відправка розробнику...";
+      statusMsg.style.color = "var(--text-muted)";
+    }
+
+    try {
+      const res = await apiFetch("/system/feedback", {
+        method: "POST",
+        body: JSON.stringify({
+          feedback_type: selectedType,
+          message: message,
+          client_info: `PWA v${APP_VERSION} (${navigator.userAgent})`,
+        }),
+      });
+
+      if (res && res.status === "ok") {
+        if (statusMsg) {
+          statusMsg.textContent = "✅ Дякуємо! Ваш відгук успішно передано.";
+          statusMsg.style.color = "var(--success)";
+        }
+        showToast("🚀 Відгук надіслано розробнику! Дякуємо!");
+        if (textInput) textInput.value = "";
+        setTimeout(() => {
+          modal.classList.add("hidden");
+          if (statusMsg) statusMsg.textContent = "";
+        }, 1800);
+      } else {
+        throw new Error(res?.message || "Помилка відправки");
+      }
+    } catch (err) {
+      if (statusMsg) {
+        statusMsg.textContent = `❌ ${err.message || "Не вдалося надіслати"}`;
+        statusMsg.style.color = "var(--danger)";
+      }
+      showToast(`❌ Помилка: ${err.message}`);
+    } finally {
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = `<span>🚀 Надіслати розробнику</span>`;
     }
   });
 }
@@ -2851,6 +3069,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   initSettingsModal();
+  initHelpModal();
   initManualAddModal();
   initStep2Handlers();
   initStep3Handlers();

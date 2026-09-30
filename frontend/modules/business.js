@@ -16,8 +16,9 @@ const BusinessModule = {
   },
 
   formatMoney(num) {
-    if (isNaN(num)) return "0 ₴";
-    return `${Number(num).toLocaleString("uk-UA")} ₴`;
+    const cur = (window.state && window.state.preferredCurrency) || localStorage.getItem("preferred_currency") || "₴";
+    if (isNaN(num)) return `0 ${cur}`;
+    return `${Number(num).toLocaleString("uk-UA")} ${cur}`;
   },
 
   async loadTab() {

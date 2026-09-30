@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.7.5">
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.6">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -74,6 +74,9 @@
           <svg class="moon-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
           </svg>
+        </button>
+        <button id="help-open-btn" class="icon-btn" title="Довідка, FAQ та Відгук" aria-label="Довідка">
+          <span style="font-size: 1.15rem; line-height: 1;">💡</span>
         </button>
         <button id="settings-open-btn" class="icon-btn" title="Настройки" aria-label="Настройки">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
@@ -1056,6 +1059,33 @@
             </button>
           </div>
 
+          <!-- Regional Settings (Currency & Language) -->
+          <div style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:12px;margin-bottom:12px;">
+            <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">🌍 Регіональні налаштування</div>
+            <div style="display:flex;gap:10px;">
+              <div style="flex:1;">
+                <label for="currency-select" style="display:block;font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;">Основна валюта:</label>
+                <select id="currency-select" style="width:100%;box-sizing:border-box;padding:9px 10px;border-radius:8px;background:var(--bg-card);color:var(--text-main);border:1px solid var(--border-color);font-size:0.85rem;outline:none;">
+                  <option value="₴">₴ Гривня (UAH)</option>
+                  <option value="$">$ Долар (USD)</option>
+                  <option value="€">€ Євро (EUR)</option>
+                  <option value="د.إ">د.إ Дирхам (AED)</option>
+                  <option value="₸">₸ Тенге (KZT)</option>
+                  <option value="₺">₺ Ліра (TRY)</option>
+                </select>
+              </div>
+              <div style="flex:1;">
+                <label for="language-select" style="display:block;font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;">Мова інтерфейсу:</label>
+                <select id="language-select" style="width:100%;box-sizing:border-box;padding:9px 10px;border-radius:8px;background:var(--bg-card);color:var(--text-main);border:1px solid var(--border-color);font-size:0.85rem;outline:none;">
+                  <option value="uk">🇺🇦 Українська</option>
+                  <option value="en">🇬🇧 English</option>
+                  <option value="ru">🇷🇺 Русский</option>
+                  <option value="ar">🇦🇪 العربية</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <label for="server-url-input">Адрес сервера:</label>
           <input type="url" id="server-url-input" placeholder="http://localhost:8000" />
 
@@ -1137,7 +1167,107 @@
       </div>
     </div>
 
-    <!-- Manual Add Item Modal -->
+    <!-- Help, FAQ & Feedback Modal -->
+    <div id="help-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:1.25rem;">💡</span>
+            <h3 style="margin:0;font-size:1.05rem;">Довідка та Підтримка</h3>
+          </div>
+          <button id="help-close-btn" class="icon-btn-close">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:14px 16px;">
+          <!-- Segmented Tab switcher -->
+          <div style="display:flex;background:var(--bg-input);padding:3px;border-radius:10px;border:1px solid var(--border-color);margin-bottom:14px;">
+            <button type="button" id="help-tab-faq-btn" style="flex:1;padding:8px;border-radius:8px;border:none;font-size:0.82rem;font-weight:700;cursor:pointer;background:linear-gradient(135deg, #0ea5e9, #2563eb);color:#fff;transition:all 0.2s;">
+              📖 Інструкція & FAQ
+            </button>
+            <button type="button" id="help-tab-feedback-btn" style="flex:1;padding:8px;border-radius:8px;border:none;font-size:0.82rem;font-weight:600;cursor:pointer;background:transparent;color:var(--text-muted);transition:all 0.2s;">
+              💬 Написати відгук
+            </button>
+          </div>
+
+          <!-- Tab 1: FAQ & Instruction -->
+          <div id="help-faq-content">
+            <details style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:10px 12px;margin-bottom:8px;" open>
+              <summary style="cursor:pointer;font-weight:700;font-size:0.88rem;color:var(--text-main);user-select:none;">
+                🎤 Як диктувати витрати та доходи голосом?
+              </summary>
+              <div style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;line-height:1.5;">
+                Натисніть мікрофон і скажіть природною мовою:<br>
+                • <code>«Купив провода 300»</code> або <code>«Витрата шайби 150»</code> → автоматично запише у витрати.<br>
+                • <code>«Здав офіс 100000»</code> або <code>«Прихід оренда 50000»</code> → запише в дохід бізнесу.<br>
+                • <code>«Купити молоко, хліб і каву»</code> → додасть у список покупок.<br>
+                • <code>«Зустріч з Іваном завтра о 12»</code> → створить завдання у списку справ.
+              </div>
+            </details>
+
+            <details style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+              <summary style="cursor:pointer;font-weight:700;font-size:0.88rem;color:var(--text-main);user-select:none;">
+                💼 Як працює розділ «Бізнес» та швидкий звіт?
+              </summary>
+              <div style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;line-height:1.5;">
+                Розділ створений для моментального обліку грошей. Внизу завжди відображається ваш чистий залишок у кишені.<br>
+                Кнопка <strong>«📋 Скопіювати звіт»</strong> миттєво формує текстовий баланс, який можна в 1 клік надіслати партнерам у Telegram, WhatsApp чи по email.
+              </div>
+            </details>
+
+            <details style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+              <summary style="cursor:pointer;font-weight:700;font-size:0.88rem;color:var(--text-main);user-select:none;">
+                🚗 Як слухати музику в авто та імпортувати із Shazam?
+              </summary>
+              <div style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;line-height:1.5;">
+                1. Скопіюйте посилання на пісню або повідомлення «I used Shazam...» із додатка Shazam.<br>
+                2. Відкрийте вкладку «Музика» та натисніть <strong>«⚡ Додати з буфера»</strong> — трек збережеться на сервері та додасться у плейліст «В авто 🚗».<br>
+                3. Музика грає без реклами і з миттєвим кешем!
+              </div>
+            </details>
+
+            <details style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+              <summary style="cursor:pointer;font-weight:700;font-size:0.88rem;color:var(--text-main);user-select:none;">
+                📬 Як очистити 20 поштових ящиків від спаму?
+              </summary>
+              <div style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;line-height:1.5;">
+                У розділі «Пошта» натисніть <strong>«+ Додати скриньку»</strong>. Введіть email та пароль додатку (для Gmail/Ukr.net генерується в безпеці акаунта за 1 хвилину). Секретар перевіряє пошту, виявляє розсилки та за вашою командою очищає непотрібні листи.
+              </div>
+            </details>
+
+            <details style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+              <summary style="cursor:pointer;font-weight:700;font-size:0.88rem;color:var(--text-main);user-select:none;">
+                🔒 Безпека та захист ваших даних
+              </summary>
+              <div style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;line-height:1.5;">
+                Усі фінансові записи, пошта та діалоги захищені <strong>256-бітним шифруванням AES/Fernet</strong>. Дані кожного акаунта суворо ізольовані та фізично недоступні іншим користувачам.
+              </div>
+            </details>
+          </div>
+
+          <!-- Tab 2: Feedback Form -->
+          <div id="help-feedback-content" class="hidden">
+            <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;line-height:1.4;">
+              Знайшли помилку, маєте ідею чи хочете подякувати розробнику? Напишіть або надиктуйте голосом:
+            </div>
+
+            <div style="display:flex;gap:6px;margin-bottom:12px;">
+              <button type="button" class="fb-type-chip active" data-type="idea" style="flex:1;padding:8px;border-radius:8px;border:1px solid #0ea5e9;background:rgba(14,165,233,0.18);color:#0ea5e9;font-size:0.78rem;font-weight:700;cursor:pointer;">💡 Ідея</button>
+              <button type="button" class="fb-type-chip" data-type="bug" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.78rem;font-weight:600;cursor:pointer;">⚠️ Баг</button>
+              <button type="button" class="fb-type-chip" data-type="thanks" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.78rem;font-weight:600;cursor:pointer;">❤️ Подяка</button>
+            </div>
+
+            <div style="position:relative;margin-bottom:12px;">
+              <textarea id="feedback-text-input" rows="4" placeholder="Опишіть вашу ідею, проблему або враження..." style="width:100%;box-sizing:border-box;padding:12px;padding-right:44px;border-radius:10px;background:var(--bg-input);color:var(--text-main);border:1.5px solid var(--border-color);font-size:0.9rem;outline:none;resize:none;font-family:inherit;"></textarea>
+              <button type="button" id="feedback-mic-btn" title="Диктувати голосом" style="position:absolute;right:8px;bottom:12px;width:34px;height:34px;border-radius:50%;background:rgba(244,63,94,0.18);border:1px solid rgba(244,63,94,0.4);color:#f43f5e;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.1rem;">🎙️</button>
+            </div>
+
+            <button type="button" id="send-feedback-btn" class="btn-primary" style="width:100%;padding:12px;border-radius:10px;font-size:0.9rem;font-weight:700;background:linear-gradient(135deg, #0ea5e9, #2563eb);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+              <span>🚀 Надіслати розробнику</span>
+            </button>
+            <div id="feedback-status-msg" style="font-size:0.8rem;text-align:center;margin-top:8px;min-height:18px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="manual-add-modal" class="modal-overlay hidden">
       <div class="modal-card">
         <div class="modal-header">
@@ -1497,14 +1627,14 @@
     </div>
   </div>
 
-  <script src="/static/modules/ai_chat.js?v=3.7.5"></script>
-  <script src="/static/modules/auth_phone.js?v=3.7.5"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.7.5"></script>
-  <script src="/static/modules/business.js?v=3.7.5"></script>
-  <script src="/static/modules/mailbox.js?v=3.7.5"></script>
-  <script src="/static/modules/movies.js?v=3.7.5"></script>
-  <script src="/static/modules/music.js?v=3.7.5"></script>
-  <script src="/static/app.js?v=3.7.5"></script>
+  <script src="/static/modules/ai_chat.js?v=3.7.6"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.6"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.6"></script>
+  <script src="/static/modules/business.js?v=3.7.6"></script>
+  <script src="/static/modules/mailbox.js?v=3.7.6"></script>
+  <script src="/static/modules/movies.js?v=3.7.6"></script>
+  <script src="/static/modules/music.js?v=3.7.6"></script>
+  <script src="/static/app.js?v=3.7.6"></script>
 </body>
 </html>
 

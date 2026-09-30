@@ -69,7 +69,7 @@ START_TIME = time.time()
 app = FastAPI(
     title="Мой Секретарь (My Secretary)",
     description="Автономный персональный AI-секретарь на FastAPI и Google Gemini",
-    version="3.7.5",
+    version="3.7.6",
     lifespan=lifespan,
 )
 
@@ -205,11 +205,56 @@ def get_version_info():
     }
 
 
-# Register healthcheck and version on API v1 and root app
+from typing import Optional
+from pydantic import BaseModel
+
+
+class FeedbackCreate(BaseModel):
+    feedback_type: str = "idea"
+    message: str
+    client_info: Optional[str] = None
+
+
+async def submit_feedback(payload: FeedbackCreate, request: Request):
+    """Приймає відгук, баг-репорт або подяку від користувача."""
+    user = request.headers.get("x-secretary-user") or request.query_params.get("user") or "anonymous"
+    clean_msg = payload.message.strip()
+    if not clean_msg:
+        return {"status": "error", "message": "Повідомлення не може бути порожнім"}
+
+    from app.database import SessionLocal
+    from app.models.feedback import SystemFeedback
+    with SessionLocal() as db:
+        fb = SystemFeedback(
+            user_phone=user,
+            feedback_type=payload.feedback_type,
+            message=clean_msg,
+            client_info=payload.client_info or request.headers.get("user-agent", "unknown")[:200],
+        )
+        db.add(fb)
+        db.commit()
+
+    # Optional Telegram notification if configured
+    try:
+        from app.core.telegram_bot import send_telegram_message
+        icon = "💡 Ідея" if payload.feedback_type == "idea" else ("⚠️ Баг" if payload.feedback_type == "bug" else "❤️ Подяка")
+        text = f"<b>{icon} від {user}</b>\n\n{clean_msg}"
+        admin_chat_id = getattr(settings, "TELEGRAM_ADMIN_CHAT_ID", None)
+        if admin_chat_id:
+            await send_telegram_message(str(admin_chat_id), text)
+    except Exception as e:
+        pass
+
+    return {"status": "ok", "message": "Дякуємо! Ваш відгук успішно передано розробнику."}
+
+
+# Register healthcheck, version and feedback on API v1 and root app
 api_v1.add_api_route("/health", get_system_health, methods=["GET"], tags=["System & Health"])
 app.add_api_route("/health", get_system_health, methods=["GET"], tags=["System & Health"])
 api_v1.add_api_route("/system/version", get_version_info, methods=["GET"], tags=["System & Health"])
 app.add_api_route("/system/version", get_version_info, methods=["GET"], tags=["System & Health"])
+api_v1.add_api_route("/system/feedback", submit_feedback, methods=["POST"], tags=["System & Health"])
+app.add_api_route("/system/feedback", submit_feedback, methods=["POST"], tags=["System & Health"])
 
 app.mount("/api/v1", api_v1)
 app.mount("/api", api_v1)
