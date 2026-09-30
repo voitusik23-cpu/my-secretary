@@ -37,7 +37,7 @@ if ("serviceWorker" in navigator) {
     });
 
     navigator.serviceWorker
-      .register("/sw.js?v=3.6.2")
+      .register("/sw.js?v=3.6.3")
       .then((reg) => {
         reg.update().catch(() => {});
       })
@@ -3806,6 +3806,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initVoice();
   initTextInput();
   initTabs();
+  if (window.AuthPhone && typeof window.AuthPhone.init === "function") {
+    window.AuthPhone.init();
+  }
   if (window.BlocksManager && typeof window.BlocksManager.initBlocksManager === "function") {
     window.BlocksManager.initBlocksManager();
   }

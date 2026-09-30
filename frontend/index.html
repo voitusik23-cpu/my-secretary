@@ -884,8 +884,19 @@
           <button id="settings-close-btn" class="icon-btn-close">&times;</button>
         </div>
         <div class="modal-body">
+          <div style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">ПОТОЧНИЙ АКАУНТ</div>
+              <div id="account-info-badge" style="font-size:0.95rem;font-weight:700;margin-top:2px;">📱 Завантаження...</div>
+            </div>
+            <button type="button" id="switch-account-btn" style="background:transparent;border:1px solid var(--border-color);color:var(--text-muted);border-radius:6px;padding:4px 8px;font-size:0.78rem;cursor:pointer;">
+              Змінити номер
+            </button>
+          </div>
+
           <label for="server-url-input">Адрес сервера:</label>
           <input type="url" id="server-url-input" placeholder="http://localhost:8000" />
+
 
           <label for="secret-key-input">Секретный ключ (SECRET_KEY):</label>
           <input type="password" id="secret-key-input" placeholder="Введите ваш SECRET_KEY из .env" />
@@ -1137,10 +1148,46 @@
     </div>
   </div>
 
-  <script src="/static/modules/blocks_manager.js?v=3.6.2"></script>
-  <script src="/static/modules/movies.js?v=3.6.2"></script>
-  <script src="/static/modules/music.js?v=3.6.2"></script>
-  <script src="/static/app.js?v=3.6.2"></script>
+  <!-- Step 8: Phone Quick Login Modal (Окремий модуль швидкої реєстрації) -->
+  <div id="phone-auth-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 400px; text-align: center; padding: 24px;">
+      <div style="font-size: 2.8rem; margin-bottom: 8px;">👋</div>
+      <h3 style="font-size: 1.25rem; font-weight: 800; margin: 0 0 6px 0;">Мой Секретарь</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.45; margin: 0 0 18px 0;">
+        Введіть номер телефону для входу. Секретар створить ваш особистий чистий кабінет:
+      </p>
+
+      <div style="margin-bottom: 16px; text-align: left;">
+        <label for="phone-login-input" style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Номер телефону:</label>
+        <div style="position: relative; display: flex; align-items: center;">
+          <span style="position: absolute; left: 14px; font-size: 1.1rem; pointer-events: none;">📱</span>
+          <input 
+            type="tel" 
+            id="phone-login-input" 
+            placeholder="+380 (__) ___-__-__" 
+            autocomplete="tel"
+            style="width: 100%; box-sizing: border-box; padding: 13px 14px 13px 44px; font-size: 1.05rem; font-weight: 600; letter-spacing: 0.5px; border-radius: 12px; background: var(--bg-input); color: var(--text-main); border: 2px solid var(--border-color); outline: none; transition: border-color 0.2s;"
+          />
+        </div>
+        <div id="phone-login-error" style="color: var(--danger); font-size: 0.8rem; margin-top: 6px; display: none;"></div>
+      </div>
+
+      <button id="phone-login-submit-btn" class="btn-primary" style="width: 100%; padding: 14px; font-size: 1rem; font-weight: 700; border-radius: 12px; border: none; cursor: pointer; background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; box-shadow: 0 4px 15px rgba(14, 165, 233, 0.35);">
+        🚀 Увійти / Почати
+      </button>
+
+      <div style="margin-top: 14px; font-size: 0.76rem; color: var(--text-muted);">
+        🔒 Без паролів та смс. Ваші дані повністю ізольовані
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/modules/auth_phone.js?v=3.6.3"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.6.3"></script>
+  <script src="/static/modules/movies.js?v=3.6.3"></script>
+  <script src="/static/modules/music.js?v=3.6.3"></script>
+  <script src="/static/app.js?v=3.6.3"></script>
 </body>
 </html>
+
 
