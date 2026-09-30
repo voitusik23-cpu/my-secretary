@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.7.7">
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.8">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -167,8 +167,8 @@
         <span class="tab-icon">❤️</span>
         <span class="tab-label">Давление</span>
       </button>
-      <button class="tab-btn" data-tab="media" role="tab" aria-selected="false">
-        <span class="tab-icon">🧠</span>
+      <button class="tab-btn" data-tab="vault" role="tab" aria-selected="false">
+        <span class="tab-icon">🔒</span>
         <span class="tab-label">Склерозник</span>
       </button>
       <button class="tab-btn" data-tab="movies" role="tab" aria-selected="false">
@@ -396,20 +396,78 @@
         </div>
       </section>
 
-      <!-- 5. СКЛЕРОЗНИК (Quick Notes & Brain Dumps) -->
-      <section id="tab-media" class="tab-panel">
-        <div class="panel-header">
-          <h2>🧠 Склерозник (Швидкі замітки)</h2>
-          <button id="add-media-btn" class="action-btn-sm">+ Запис</button>
-        </div>
-        <div style="background:var(--bg-card);border:1px dashed var(--border-color);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:12px;font-size:0.84rem;color:var(--text-sub);display:flex;align-items:center;gap:10px;">
-          <span style="font-size:1.3rem;">🎙️</span>
-          <div>
-            <strong>Голосові команди:</strong> Скажіть <em>«Склерозник: пароль від роутера 12345»</em> або <em>«Запиши в склерозник код шлагбаума 7788»</em> з головного екрана.
+      <!-- 5. СКЛЕРОЗНИК (Encrypted Password Vault & AI Subscriptions) -->
+      <section id="tab-vault" class="tab-panel">
+        <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:1.35rem;">🔒</span>
+            <h2 style="margin:0;font-size:1.12rem;">Склерозник</h2>
+            <span style="font-size:0.72rem;background:rgba(14,165,233,0.15);color:#38bdf8;padding:2px 8px;border-radius:12px;font-weight:700;">AES-256</span>
+          </div>
+
+          <div style="display:flex;gap:5px;flex-wrap:wrap;">
+            <button type="button" id="vault-voice-btn" class="action-btn-sm" style="display:flex;align-items:center;gap:4px;font-weight:700;" title="Диктувати голосом">
+              <span>🎙️ Голос</span>
+            </button>
+            <button type="button" id="vault-photo-btn" class="action-btn-sm" style="display:flex;align-items:center;gap:4px;font-weight:700;color:#38bdf8;" title="Сфоткати лист з паролями">
+              <span>📸 Фото</span>
+            </button>
+            <button type="button" id="vault-bulk-btn" class="action-btn-sm" style="display:flex;align-items:center;gap:4px;" title="Вставити пачкою">
+              <span>📋 Пачкою</span>
+            </button>
+            <button type="button" id="vault-export-btn" class="action-btn-sm" style="display:flex;align-items:center;gap:4px;" title="Експорт списку">
+              <span>📤 Експорт</span>
+            </button>
+            <button type="button" id="vault-add-btn" class="btn-primary" style="padding:6px 14px;font-size:0.82rem;font-weight:700;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;border-radius:8px;border:none;cursor:pointer;">
+              + Додати
+            </button>
           </div>
         </div>
-        <div id="media-list" class="items-list">
-          <!-- Populated by JS -->
+
+        <!-- Hidden file input for Photo OCR -->
+        <input type="file" id="vault-file-input" accept="image/*" capture="environment" style="display:none;" />
+
+        <!-- Search Bar -->
+        <div style="position:relative;margin-bottom:12px;">
+          <input 
+            type="search" 
+            id="vault-search-input" 
+            placeholder="🔍 Пошук паролів, бірж, ШІ, Wi-Fi..." 
+            style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;background:var(--bg-input);color:var(--text-main);border:1px solid var(--border-color);font-size:0.88rem;outline:none;" 
+          />
+        </div>
+
+        <!-- Category Filter Pills (Horizontal Scroll) -->
+        <div class="music-playlists-bar" style="margin-bottom:12px;display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;">
+          <button type="button" class="vault-cat-pill active" data-cat="all">
+            <span>🌐 Всі (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="ai">
+            <span>🤖 ШІ / AI (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="social">
+            <span>💬 Соцмережі (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="email">
+            <span>📬 Пошти (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="crypto">
+            <span>📈 Крипта (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="wifi">
+            <span>📶 Wi-Fi (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="devices">
+            <span>📱 Пристрої (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="other">
+            <span>📝 Інше (<span class="vault-pill-count">0</span>)</span>
+          </button>
+        </div>
+
+        <!-- Cards List -->
+        <div id="vault-cards-list" class="items-list">
+          <!-- Populated by VaultModule -->
         </div>
       </section>
 
@@ -1133,7 +1191,7 @@
                 <div>
                   <div style="font-size:0.72rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Версія системи та бота</div>
                   <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
-                    <span id="bot-version-badge" style="font-size:1.05rem;font-weight:800;color:var(--text-main);">v3.7.3</span>
+                    <span id="bot-version-badge" style="font-size:1.05rem;font-weight:800;color:var(--text-main);">v3.7.8</span>
                     <span id="bot-status-tag" style="font-size:0.72rem;font-weight:600;background:rgba(34,197,94,0.18);color:#22c55e;padding:2px 7px;border-radius:20px;border:1px solid rgba(34,197,94,0.3);">● Актуальна</span>
                   </div>
                 </div>
@@ -1146,11 +1204,11 @@
             <div style="font-size:0.8rem;color:var(--text-muted);background:rgba(0,0,0,0.18);padding:10px 12px;border-radius:8px;display:flex;flex-direction:column;gap:6px;border:1px solid rgba(255,255,255,0.05);">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>📅 <strong>Дата та час збірки:</strong></span>
-                <span id="bot-build-time" style="color:var(--text-main);font-weight:600;">30.09.2026 16:25</span>
+                <span id="bot-build-time" style="color:var(--text-main);font-weight:600;">30.09.2026 18:20</span>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>📱 <strong>Клієнт (PWA додаток):</strong></span>
-                <span id="pwa-version-label" style="color:var(--text-main);font-weight:600;">v3.7.3</span>
+                <span id="pwa-version-label" style="color:var(--text-main);font-weight:600;">v3.7.8</span>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>⚡ <strong>Статус сервера:</strong></span>
@@ -1235,10 +1293,24 @@
 
             <details style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
               <summary style="cursor:pointer;font-weight:700;font-size:0.88rem;color:var(--text-main);user-select:none;">
+                🔒 Як працює «Склерозник» (паролі, ШІ, Wi-Fi, фото OCR)?
+              </summary>
+              <div style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;line-height:1.5;">
+                «Склерозник» — це захищений 256-бітним AES-шифруванням сейф для всіх ваших акаунтів:<br>
+                • <strong>📸 Сфоткати лист:</strong> сфотографуйте аркуш паперу або блокнот — нейромережа Gemini розпізнає почерк, розкладе по полях і покаже на перевірку перед збереженням.<br>
+                • <strong>📋 Пачкою з тексту:</strong> вставте неструктурований текст або таблицю із заміток — бот сам розіб'є все на акаунти.<br>
+                • <strong>🎙️ Голос:</strong> надиктуйте пароль на ходу за кермом.<br>
+                • <strong>📶 Wi-Fi QR для гостей:</strong> відкриває QR-код мережі, щоб гості підключалися камерою iPhone без диктування пароля.<br>
+                • <strong>📤 Експорт:</strong> скопіюйте або роздрукуйте резервний список у 1 клік.
+              </div>
+            </details>
+
+            <details style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+              <summary style="cursor:pointer;font-weight:700;font-size:0.88rem;color:var(--text-main);user-select:none;">
                 🔒 Безпека та захист ваших даних
               </summary>
               <div style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;line-height:1.5;">
-                Усі фінансові записи, пошта та діалоги захищені <strong>256-бітним шифруванням AES/Fernet</strong>. Дані кожного акаунта суворо ізольовані та фізично недоступні іншим користувачам.
+                Усі фінансові записи, пошта, паролі та діалоги захищені <strong>256-бітним шифруванням AES/Fernet</strong>. Дані кожного акаунта суворо ізольовані та фізично недоступні іншим користувачам.
               </div>
             </details>
           </div>
@@ -1688,14 +1760,186 @@
     </div>
   </div>
 
-  <script src="/static/modules/ai_chat.js?v=3.7.7"></script>
-  <script src="/static/modules/auth_phone.js?v=3.7.7"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.7.7"></script>
-  <script src="/static/modules/business.js?v=3.7.7"></script>
-  <script src="/static/modules/mailbox.js?v=3.7.7"></script>
-  <script src="/static/modules/movies.js?v=3.7.7"></script>
-  <script src="/static/modules/music.js?v=3.7.7"></script>
-  <script src="/static/app.js?v=3.7.7"></script>
+  <!-- Modal: Vault Item Add / Edit -->
+  <div id="vault-edit-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 480px; padding: 22px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid var(--border-color);padding-bottom:10px;">
+        <h3 id="vault-modal-title" style="margin:0;font-size:1.15rem;font-weight:800;">➕ Додати в Склерозник</h3>
+        <button type="button" id="vault-modal-close-btn" class="icon-btn-close">&times;</button>
+      </div>
+
+      <form id="vault-form">
+        <div style="margin-bottom: 12px; text-align: left;">
+          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Назва сервісу або речі *:</label>
+          <input type="text" id="v-input-title" placeholder="ChatGPT, Binance, Wi-Fi Дім, Apple ID" required style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
+        </div>
+
+        <div style="display:flex;gap:10px;margin-bottom:12px;">
+          <div style="flex:1;">
+            <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Категорія:</label>
+            <select id="v-input-cat" style="width: 100%; box-sizing: border-box; padding: 11px 10px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none; font-size: 0.85rem;">
+              <option value="ai">🤖 ШІ / AI</option>
+              <option value="social">💬 Соцмережі</option>
+              <option value="email">📬 Пошти</option>
+              <option value="crypto">📈 Крипта</option>
+              <option value="wifi">📶 Wi-Fi</option>
+              <option value="devices">📱 Apple & Гаджети</option>
+              <option value="other">📝 Інше</option>
+            </select>
+          </div>
+          <div style="flex:1;">
+            <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Тариф / План:</label>
+            <select id="v-input-plan" style="width: 100%; box-sizing: border-box; padding: 11px 10px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none; font-size: 0.85rem;">
+              <option value="">— Без тарифу —</option>
+              <option value="pro">💎 PRO / Plus (Платний)</option>
+              <option value="free">🆓 Free (Безкоштовний)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 12px; text-align: left;">
+          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Логін / Email / Назва Wi-Fi мережі (SSID):</label>
+          <input type="text" id="v-input-login" placeholder="myemail@gmail.com, nick_telegram, Home_5G" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
+        </div>
+
+        <div style="margin-bottom: 12px; text-align: left;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted);">Пароль / Пін-код:</label>
+            <button type="button" id="vault-gen-pwd-btn" style="background:transparent;border:none;color:#38bdf8;font-size:0.76rem;font-weight:700;cursor:pointer;padding:2px 4px;">
+              🎲 Згенерувати 16 знаків
+            </button>
+          </div>
+          <input type="text" id="v-input-pwd" placeholder="Пароль або код" autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none; font-family: monospace; font-size: 0.95rem;" />
+        </div>
+
+        <div style="margin-bottom: 12px; text-align: left;">
+          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Посилання на сайт або сервіс (URL):</label>
+          <input type="url" id="v-input-url" placeholder="https://chatgpt.com" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
+        </div>
+
+        <div style="margin-bottom: 12px; text-align: left;">
+          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">2FA / Google Authenticator / Резервні коди:</label>
+          <input type="text" id="v-input-2fa" placeholder="Коди бекапу, секретний ключ або нотатка" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
+        </div>
+
+        <div style="margin-bottom: 16px; text-align: left;">
+          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Нотатки / Деталі активації:</label>
+          <textarea id="v-input-notes" rows="2" placeholder="Для активації айфона, чек у коробці, пароль для гостей..." style="width: 100%; box-sizing: border-box; padding: 10px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none; resize: none; font-family: inherit; font-size: 0.85rem;"></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="vault-modal-cancel-btn" class="action-btn-sm" style="flex:1;padding:12px;">Скасувати</button>
+          <button type="submit" class="btn-primary" style="flex:2;padding:12px;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
+            💾 Зберегти в сейф
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Bulk Text Paste -->
+  <div id="vault-bulk-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 480px; padding: 22px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;font-size:1.15rem;font-weight:800;">📋 Вставити список пачкою</h3>
+        <button type="button" id="vault-bulk-close-btn" class="icon-btn-close">&times;</button>
+      </div>
+
+      <p style="font-size:0.83rem;color:var(--text-muted);margin:0 0 12px 0;line-height:1.45;">
+        Вставте неструктурований текст із блокнота, пошти чи таблиці. ШІ Gemini розпізнає назви, логіни, паролі та розкладе по категоріях:
+      </p>
+
+      <textarea id="vault-bulk-textarea" rows="7" placeholder="Наприклад:
+вайфай роутер в залі Home_5G пароль SuperPass123
+chatgpt login me@gmail.com pass secret789 pro акаунт
+binance mylogin@crypto.com 2fa увімкнено
+дискорд gamer#123 pass discord2026" style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none; font-family: monospace; font-size: 0.85rem; line-height: 1.4; resize: vertical; margin-bottom: 14px;"></textarea>
+
+      <div style="display:flex;gap:8px;">
+        <button type="button" id="vault-bulk-cancel-btn" class="action-btn-sm" style="flex:1;padding:12px;">Скасувати</button>
+        <button type="button" id="vault-bulk-submit-btn" class="btn-primary" style="flex:2;padding:12px;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
+          🤖 Розпізнати через AI
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Review and Confirm (AI Safety Check) -->
+  <div id="vault-review-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 520px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;border-bottom:1px solid var(--border-color);padding-bottom:10px;">
+        <div>
+          <h3 style="margin:0;font-size:1.1rem;font-weight:800;">🔍 Перевірка розпізнаних даних</h3>
+          <small style="color:var(--text-muted);font-size:0.75rem;">Знайдено записів: <strong id="vault-review-count" style="color:#38bdf8;">0</strong>. Перевірте або виправте перед збереженням:</small>
+        </div>
+        <button type="button" id="vault-review-close-btn" class="icon-btn-close">&times;</button>
+      </div>
+
+      <div id="vault-review-list" style="flex:1;overflow-y:auto;padding-right:4px;display:flex;flex-direction:column;gap:8px;margin-bottom:12px;min-height:180px;">
+        <!-- Populated dynamically by JS -->
+      </div>
+
+      <div style="display:flex;gap:8px;border-top:1px solid var(--border-color);padding-top:12px;">
+        <button type="button" id="vault-review-cancel-btn" class="action-btn-sm" style="flex:1;padding:12px;">Скасувати</button>
+        <button type="button" id="vault-review-save-btn" class="btn-primary" style="flex:2;padding:12px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
+          ✅ Зберегти всі в Склерозник
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Export Vault Credentials -->
+  <div id="vault-export-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 500px; padding: 22px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;font-size:1.15rem;font-weight:800;">📤 Резервний список для друку</h3>
+        <button type="button" id="vault-export-close-btn" class="icon-btn-close">&times;</button>
+      </div>
+
+      <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 10px 0;">
+        Чистий текстовий звіт для копіювання, збереження в надійне місце або друку:
+      </p>
+
+      <textarea id="vault-export-text" rows="10" readonly style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none; font-family: monospace; font-size: 0.82rem; line-height: 1.45; resize: vertical; margin-bottom: 12px; user-select: all;"></textarea>
+
+      <button type="button" id="vault-export-copy-btn" class="btn-primary" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; font-weight: 700; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <span>📋</span> Скопіювати текст всього списку
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal: Wi-Fi Guest QR Code -->
+  <div id="vault-qr-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 380px; text-align: center; padding: 22px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 id="vault-qr-title" style="margin:0;font-size:1.15rem;font-weight:800;">📶 Wi-Fi мережа</h3>
+        <button type="button" id="vault-qr-close-btn" class="icon-btn-close">&times;</button>
+      </div>
+
+      <p style="font-size:0.83rem;color:var(--text-muted);margin:0 0 14px 0;">
+        Наведіть камеру iPhone або Android на цей QR-код для миттєвого підключення гостей без ручного введення:
+      </p>
+
+      <div style="background:#ffffff;padding:16px;border-radius:16px;display:inline-block;margin-bottom:14px;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+        <img id="vault-qr-img" src="" alt="Wi-Fi QR Code" style="width:200px;height:200px;display:block;" />
+      </div>
+
+      <div style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:10px 14px;font-size:0.85rem;text-align:left;display:flex;flex-direction:column;gap:4px;">
+        <div><strong>Мережа:</strong> <span id="vault-qr-ssid" style="color:var(--text-main);font-family:monospace;"></span></div>
+        <div><strong>Пароль:</strong> <span id="vault-qr-pwd" style="color:var(--text-main);font-family:monospace;font-weight:700;"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/modules/ai_chat.js?v=3.7.8"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.8"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.8"></script>
+  <script src="/static/modules/business.js?v=3.7.8"></script>
+  <script src="/static/modules/mailbox.js?v=3.7.8"></script>
+  <script src="/static/modules/movies.js?v=3.7.8"></script>
+  <script src="/static/modules/music.js?v=3.7.8"></script>
+  <script src="/static/modules/vault.js?v=3.7.8"></script>
+  <script src="/static/app.js?v=3.7.8"></script>
 </body>
 </html>
 

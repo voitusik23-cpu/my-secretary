@@ -28,7 +28,7 @@ const state = {
 
 
 // --- Service Worker Registration with Safe Auto-Update & Hard-Cache Flush ---
-const APP_VERSION = "3.7.7";
+const APP_VERSION = "3.7.8";
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // If version changed, purge old caches to prevent stale script/audio issues on iPhone
@@ -473,6 +473,9 @@ function loadTabData(tab) {
       break;
     case "mailbox":
       if (typeof window.loadMailboxTab === "function") window.loadMailboxTab();
+      break;
+    case "vault":
+      if (typeof window.loadVaultTab === "function") window.loadVaultTab();
       break;
   }
 }
@@ -1360,72 +1363,100 @@ function initHelpModal() {
     });
   });
 
-  // Voice dictation for feedback
+  // Voice dictation for feedback (Universal MediaRecorder + Gemini Transcription)
   if (micBtn && textInput) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      micBtn.addEventListener("click", () => {
-        if (isDictating && feedbackRecognition) {
-          try {
-            feedbackRecognition.stop();
-          } catch (e) {}
-          return;
+    let feedbackRecorder = null;
+    let feedbackChunks = [];
+    let isFeedbackRecording = false;
+
+    micBtn.addEventListener("click", async () => {
+      if (isFeedbackRecording) {
+        if (feedbackRecorder && feedbackRecorder.state !== "inactive") {
+          feedbackRecorder.stop();
         }
+        isFeedbackRecording = false;
+        micBtn.style.background = "rgba(244,63,94,0.18)";
+        micBtn.style.transform = "scale(1)";
+        micBtn.title = "Диктувати голосом";
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        feedbackChunks = [];
+        const mimeType = (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported("audio/mp4"))
+          ? "audio/mp4"
+          : "audio/webm";
 
         try {
-          feedbackRecognition = new SpeechRecognition();
-          feedbackRecognition.continuous = false;
-          feedbackRecognition.interimResults = false;
-          feedbackRecognition.lang = state.preferredLanguage === "en" ? "en-US" : (state.preferredLanguage === "ru" ? "ru-RU" : "uk-UA");
+          feedbackRecorder = new MediaRecorder(stream, { mimeType });
+        } catch (e) {
+          feedbackRecorder = new MediaRecorder(stream);
+        }
 
-          feedbackRecognition.onstart = () => {
-            isDictating = true;
-            micBtn.style.background = "rgba(244,63,94,0.4)";
-            micBtn.style.transform = "scale(1.1)";
-            micBtn.title = "Слухаю... Натисніть для зупинки";
-            if (statusMsg) {
-              statusMsg.textContent = "🎙️ Говоріть, слухаю...";
-              statusMsg.style.color = "#f43f5e";
+        feedbackRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) feedbackChunks.push(e.data);
+        };
+
+        feedbackRecorder.onstop = async () => {
+          stream.getTracks().forEach((track) => track.stop());
+          const actualMime = feedbackRecorder.mimeType || mimeType;
+          const audioBlob = new Blob(feedbackChunks, { type: actualMime });
+
+          if (statusMsg) {
+            statusMsg.textContent = "⏳ Розпізнаю голос через Gemini...";
+            statusMsg.style.color = "#38bdf8";
+          }
+
+          const formData = new FormData();
+          formData.append("audio", audioBlob, "feedback_voice.webm");
+
+          try {
+            const res = await apiFetch("/api/v1/system/transcribe-audio", {
+              method: "POST",
+              body: formData,
+            });
+
+            if (res && res.text) {
+              const prev = textInput.value.trim();
+              textInput.value = prev ? `${prev} ${res.text}` : res.text;
+              if (statusMsg) {
+                statusMsg.textContent = "✅ Голос розпізнано!";
+                statusMsg.style.color = "var(--success)";
+                setTimeout(() => { if (statusMsg && statusMsg.textContent.includes("розпізнано")) statusMsg.textContent = ""; }, 2500);
+              }
+            } else {
+              if (statusMsg) {
+                statusMsg.textContent = "⚠️ Не вдалося розібрати слова";
+                statusMsg.style.color = "var(--warning)";
+              }
             }
-          };
-
-          feedbackRecognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            if (transcript) {
-              const current = textInput.value.trim();
-              textInput.value = current ? `${current} ${transcript}` : transcript;
-            }
-          };
-
-          feedbackRecognition.onerror = (e) => {
-            console.warn("Feedback speech recognition error:", e);
+          } catch (err) {
             if (statusMsg) {
-              statusMsg.textContent = "Помилка мікрофона або доступ заборонено";
+              statusMsg.textContent = `❌ Помилка розпізнавання: ${err.message}`;
               statusMsg.style.color = "var(--danger)";
             }
-          };
+          }
+        };
 
-          feedbackRecognition.onend = () => {
-            isDictating = false;
-            micBtn.style.background = "rgba(244,63,94,0.18)";
-            micBtn.style.transform = "scale(1)";
-            micBtn.title = "Диктувати голосом";
-            if (statusMsg && statusMsg.textContent.includes("Говоріть")) {
-              statusMsg.textContent = "";
-            }
-          };
-
-          feedbackRecognition.start();
-        } catch (err) {
-          console.warn("Speech recognition init fail:", err);
-          showToast("🎙️ Голосове введення недоступне, введіть текст клавіатурою");
+        feedbackRecorder.start();
+        isFeedbackRecording = true;
+        micBtn.style.background = "#ef4444";
+        micBtn.style.transform = "scale(1.15)";
+        micBtn.title = "Слухаю... Натисніть для завершення";
+        if (statusMsg) {
+          statusMsg.textContent = "🎙️ Слухаю... Говоріть, потім натисніть мікрофон ще раз";
+          statusMsg.style.color = "#f43f5e";
         }
-      });
-    } else {
-      micBtn.addEventListener("click", () => {
-        showToast("🎙️ Для голосового введення використовуйте Safari або Chrome");
-      });
-    }
+      } catch (err) {
+        console.warn("Feedback voice record error:", err);
+        showToast("❌ Дозвольте доступ до мікрофона для диктування");
+        if (statusMsg) {
+          statusMsg.textContent = "Доступ до мікрофона заблоковано";
+          statusMsg.style.color = "var(--danger)";
+        }
+      }
+    });
   }
 
   // Submit feedback to server
@@ -3066,6 +3097,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   if (window.MailboxModule && typeof window.MailboxModule.init === "function") {
     window.MailboxModule.init();
+  }
+  if (window.VaultModule && typeof window.VaultModule.init === "function") {
+    window.VaultModule.init();
   }
 
   initSettingsModal();

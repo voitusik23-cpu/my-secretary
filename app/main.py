@@ -33,6 +33,7 @@ from app.modules.music import music_router, MusicTrack, MusicPlaylist
 from app.modules.business import business_router, BusinessTransaction
 from app.modules.ai_chat import ai_chat_router
 from app.modules.mailbox import mailbox_router
+from app.modules.vault import vault_router, VaultItem
 from app.core import web_agent_router, gemini_router, system_router, start_nightly_backup_task
 from app.core.undo_service import router as undo_router
 from app.database import Base, engine
@@ -69,7 +70,7 @@ START_TIME = time.time()
 app = FastAPI(
     title="Мой Секретарь (My Secretary)",
     description="Автономный персональный AI-секретарь на FastAPI и Google Gemini",
-    version="3.7.7",
+    version="3.7.8",
     lifespan=lifespan,
 )
 
@@ -114,6 +115,7 @@ api_v1.include_router(music_router)
 api_v1.include_router(business_router)
 api_v1.include_router(ai_chat_router)
 api_v1.include_router(mailbox_router)
+api_v1.include_router(vault_router)
 
 
 # Dormant Hospitality Module (Feature-flagged)
@@ -248,13 +250,42 @@ async def submit_feedback(payload: FeedbackCreate, request: Request):
     return {"status": "ok", "message": "Дякуємо! Ваш відгук успішно передано розробнику."}
 
 
-# Register healthcheck, version and feedback on API v1 and root app
+from fastapi import UploadFile, File
+
+async def transcribe_audio(audio: UploadFile = File(...)):
+    """Розпізнає голос у текст за допомогою Gemini AI для миттєвої вставки в текст/форми."""
+    audio_bytes = await audio.read()
+    if not audio_bytes:
+        return {"status": "error", "text": "Порожній аудіофайл"}
+    try:
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        actual_mime = audio.content_type or "audio/webm"
+        fname = (audio.filename or "").lower()
+        if "mp4" in fname or "m4a" in fname:
+            actual_mime = "audio/mp4"
+
+        part = types.Part.from_bytes(data=audio_bytes, mime_type=actual_mime)
+        res = client.models.generate_content(
+            model=settings.AI_MODEL,
+            contents=[part, "Розпізнай цей голос та виведи ТІЛЬКИ чистий розпізнаний текст користувача без лапок, пояснень та форматування."]
+        )
+        return {"status": "ok", "text": (res.text or "").strip()}
+    except Exception as e:
+        return {"status": "error", "text": "", "detail": str(e)}
+
+
+# Register healthcheck, version, feedback and audio transcription
 api_v1.add_api_route("/health", get_system_health, methods=["GET"], tags=["System & Health"])
 app.add_api_route("/health", get_system_health, methods=["GET"], tags=["System & Health"])
 api_v1.add_api_route("/system/version", get_version_info, methods=["GET"], tags=["System & Health"])
 app.add_api_route("/system/version", get_version_info, methods=["GET"], tags=["System & Health"])
 api_v1.add_api_route("/system/feedback", submit_feedback, methods=["POST"], tags=["System & Health"])
 app.add_api_route("/system/feedback", submit_feedback, methods=["POST"], tags=["System & Health"])
+api_v1.add_api_route("/system/transcribe-audio", transcribe_audio, methods=["POST"], tags=["System & Health"])
+app.add_api_route("/system/transcribe-audio", transcribe_audio, methods=["POST"], tags=["System & Health"])
 
 app.mount("/api/v1", api_v1)
 app.mount("/api", api_v1)
