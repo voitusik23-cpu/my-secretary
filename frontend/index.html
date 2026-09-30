@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.7.6">
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.7">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -1603,8 +1603,28 @@
           <input type="password" id="mail-acc-password" placeholder="Пароль додатку або IMAP" required autocomplete="current-password" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
         </div>
 
-        <div id="mail-acc-provider-hint" style="font-size:0.77rem;color:var(--text-muted);background:rgba(255,255,255,0.05);padding:8px 10px;border-radius:8px;margin-bottom:14px;line-height:1.4;">
-          💡 Для Gmail та Ukr.net створіть «Пароль додатків» у налаштуваннях безпеки акаунта.
+        <div id="mail-acc-provider-hint" style="font-size:0.8rem;color:var(--text-muted);background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.25);padding:10px 12px;border-radius:10px;margin-bottom:14px;line-height:1.45;">
+          <div style="font-weight:700;color:#38bdf8;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+            <span>🔑</span> Пароль додатків (16 літер):
+          </div>
+          <div id="mail-hint-text">
+            Для захисту Google вимагає окремий 16-значний пароль для зовнішніх програм.
+          </div>
+          <div style="margin-top:6px;">
+            <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;color:#38bdf8;font-weight:700;text-decoration:none;background:rgba(14,165,233,0.15);padding:5px 9px;border-radius:6px;font-size:0.78rem;">
+              <span>🔗 Отримати пароль у Google (16 літер) ↗</span>
+            </a>
+          </div>
+          <details style="margin-top:6px;font-size:0.76rem;color:var(--text-muted);" open>
+            <summary style="cursor:pointer;color:#38bdf8;font-weight:600;">📖 Покрокова інструкція: де взяти 16 букв</summary>
+            <ol style="margin:6px 0 0 0;padding-left:16px;line-height:1.5;">
+              <li>Натисніть посилання вище (або відкрийте <em>myaccount.google.com/apppasswords</em>).</li>
+              <li>Увійдіть у свій Google-акаунт, якщо запитає.</li>
+              <li>У полі введіть назву, наприклад <strong>«Секретар»</strong>, та натисніть «Створити».</li>
+              <li>Google видасть жовте віконце з <strong>16 буквами</strong> (наприклад: <code>abcd efgh ijkl mnop</code>).</li>
+              <li>Скопіюйте ці 16 букв і вставте в поле пароля (пробіли видаляти не обов'язково — бот прибере їх автоматично).</li>
+            </ol>
+          </details>
         </div>
 
         <details style="margin-bottom:14px;font-size:0.8rem;color:var(--text-muted);">
@@ -1627,14 +1647,55 @@
     </div>
   </div>
 
-  <script src="/static/modules/ai_chat.js?v=3.7.6"></script>
-  <script src="/static/modules/auth_phone.js?v=3.7.6"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.7.6"></script>
-  <script src="/static/modules/business.js?v=3.7.6"></script>
-  <script src="/static/modules/mailbox.js?v=3.7.6"></script>
-  <script src="/static/modules/movies.js?v=3.7.6"></script>
-  <script src="/static/modules/music.js?v=3.7.6"></script>
-  <script src="/static/app.js?v=3.7.6"></script>
+  <!-- Modal: Email Message Preview / Читання листа -->
+  <div id="mail-preview-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 520px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;border-bottom:1px solid var(--border-color);padding-bottom:12px;">
+        <div style="min-width:0;flex:1;">
+          <div id="mail-preview-badge" style="margin-bottom:6px;"></div>
+          <h3 id="mail-preview-subject" style="margin:0;font-size:1.05rem;font-weight:800;color:var(--text-main);line-height:1.35;word-break:break-word;">
+            Тема листа
+          </h3>
+        </div>
+        <button type="button" id="mail-preview-close-btn" class="icon-btn-close">&times;</button>
+      </div>
+
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;display:flex;flex-direction:column;gap:4px;background:var(--bg-input);padding:8px 12px;border-radius:8px;">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span><strong>Від:</strong> <span id="mail-preview-sender" style="color:var(--text-main);"></span></span>
+          <span id="mail-preview-date"></span>
+        </div>
+        <div id="mail-preview-account-line" style="font-size:0.75rem;opacity:0.85;"></div>
+      </div>
+
+      <div id="mail-preview-body" style="flex:1;overflow-y:auto;font-size:0.88rem;line-height:1.55;color:var(--text-main);background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:14px;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text;min-height:160px;">
+        Завантаження вмісту...
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:14px;border-top:1px solid var(--border-color);padding-top:12px;flex-wrap:wrap;">
+        <a id="mail-preview-webmail-btn" href="#" target="_blank" rel="noopener noreferrer" class="btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:9px 14px;font-size:0.84rem;font-weight:700;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;border-radius:8px;">
+          <span>🌐 Відкрити в пошті ↗</span>
+        </a>
+        <div style="display:flex;gap:6px;">
+          <button type="button" id="mail-preview-delete-btn" class="action-btn-sm" style="color:var(--danger,#ff453a);padding:9px 12px;font-size:0.84rem;font-weight:600;">
+            🗑️ Видалити
+          </button>
+          <button type="button" id="mail-preview-cancel-btn" class="action-btn-sm" style="padding:9px 14px;font-size:0.84rem;">
+            Закрити
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/modules/ai_chat.js?v=3.7.7"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.7"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.7"></script>
+  <script src="/static/modules/business.js?v=3.7.7"></script>
+  <script src="/static/modules/mailbox.js?v=3.7.7"></script>
+  <script src="/static/modules/movies.js?v=3.7.7"></script>
+  <script src="/static/modules/music.js?v=3.7.7"></script>
+  <script src="/static/app.js?v=3.7.7"></script>
 </body>
 </html>
 

@@ -195,10 +195,10 @@ const MailboxModule = {
         ? `<span class="item-badge" style="background:rgba(239,68,68,0.18);color:#ef4444;border:1px solid rgba(239,68,68,0.3);">🗑️ ${escapeHtml(m.spam_reason || 'Спам')}</span>`
         : (m.category === "important" 
             ? `<span class="item-badge" style="background:rgba(34,197,94,0.18);color:#22c55e;border:1px solid rgba(34,197,94,0.3);">⭐ Важливе</span>`
-            : "");
+            : `<span class="item-badge" style="background:rgba(14,165,233,0.18);color:#0ea5e9;border:1px solid rgba(14,165,233,0.3);">📩 Звичайний</span>`);
 
       return `
-        <div class="stat-card" style="margin-bottom:8px;padding:12px;display:flex;gap:12px;align-items:flex-start;position:relative;">
+        <div class="stat-card" style="margin-bottom:8px;padding:12px;display:flex;gap:12px;align-items:flex-start;position:relative;cursor:pointer;transition:transform 0.15s, background 0.15s;" onclick="MailboxModule.openMessagePreview(${m.id})">
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
               <div style="display:flex;align-items:center;gap:6px;min-width:0;">
@@ -217,11 +217,16 @@ const MailboxModule = {
 
             ${m.snippet ? `<div style="font-size:0.8rem;color:var(--text-muted);line-height:1.4;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(m.snippet)}</div>` : ''}
 
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;" onclick="event.stopPropagation();">
               <div>${badge}</div>
-              <button type="button" class="action-btn-sm" style="font-size:0.76rem;color:var(--danger,#ff453a);padding:3px 8px;" onclick="MailboxModule.deleteSingleMessage(${m.id})" title="Видалити лист із сервера">
-                🗑️ Видалити
-              </button>
+              <div style="display:flex;gap:6px;">
+                <button type="button" class="action-btn-sm" style="font-size:0.76rem;padding:3px 9px;" onclick="MailboxModule.openMessagePreview(${m.id})" title="Читати повний лист">
+                  👁️ Читати
+                </button>
+                <button type="button" class="action-btn-sm" style="font-size:0.76rem;color:var(--danger,#ff453a);padding:3px 8px;" onclick="MailboxModule.deleteSingleMessage(${m.id})" title="Видалити лист із сервера">
+                  🗑️ Видалити
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -377,6 +382,95 @@ const MailboxModule = {
     }
   },
 
+  async openMessagePreview(msgId) {
+    const modal = document.getElementById("mail-preview-modal");
+    if (!modal) return;
+
+    modal.classList.remove("hidden");
+
+    const subjectEl = document.getElementById("mail-preview-subject");
+    const senderEl = document.getElementById("mail-preview-sender");
+    const dateEl = document.getElementById("mail-preview-date");
+    const accLineEl = document.getElementById("mail-preview-account-line");
+    const badgeEl = document.getElementById("mail-preview-badge");
+    const bodyEl = document.getElementById("mail-preview-body");
+    const webmailBtn = document.getElementById("mail-preview-webmail-btn");
+    const deleteBtn = document.getElementById("mail-preview-delete-btn");
+
+    // Quick populate from cached state
+    const cached = (this.state.messages || []).find(m => m.id === msgId);
+    if (cached) {
+      if (subjectEl) subjectEl.textContent = cached.subject || "(Без теми)";
+      if (senderEl) senderEl.textContent = cached.sender || cached.sender_email || "Невідомий";
+      const d = cached.date ? new Date(cached.date) : new Date();
+      if (dateEl) dateEl.textContent = d.toLocaleString("uk-UA", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+      if (accLineEl) accLineEl.textContent = `Скринька: ${cached.account_name || cached.account_email || ''}`;
+      if (badgeEl) {
+        badgeEl.innerHTML = cached.is_spam 
+          ? `<span class="item-badge" style="background:rgba(239,68,68,0.18);color:#ef4444;border:1px solid rgba(239,68,68,0.3);">🗑️ ${escapeHtml(cached.spam_reason || 'Спам')}</span>`
+          : (cached.category === "important" 
+              ? `<span class="item-badge" style="background:rgba(34,197,94,0.18);color:#22c55e;border:1px solid rgba(34,197,94,0.3);">⭐ Важливе</span>`
+              : `<span class="item-badge" style="background:rgba(14,165,233,0.18);color:#0ea5e9;border:1px solid rgba(14,165,233,0.3);">📩 Звичайний</span>`);
+      }
+      if (bodyEl) {
+        bodyEl.textContent = cached.snippet || "Завантажую текст листа з сервера...";
+      }
+    } else {
+      if (bodyEl) bodyEl.textContent = "Завантаження листа...";
+    }
+
+    // Configure delete button inside preview modal
+    if (deleteBtn) {
+      deleteBtn.onclick = async () => {
+        this.closeMessagePreview();
+        await this.deleteSingleMessage(msgId);
+      };
+    }
+
+    try {
+      const data = await apiFetch(`/api/v1/mailbox/messages/${msgId}`);
+      if (data) {
+        if (subjectEl) subjectEl.textContent = data.subject || "(Без теми)";
+        if (senderEl) senderEl.textContent = `${data.sender || ''} ${data.sender_email ? '<' + data.sender_email + '>' : ''}`;
+        const d = data.date ? new Date(data.date) : new Date();
+        if (dateEl) dateEl.textContent = d.toLocaleString("uk-UA", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+        if (accLineEl) accLineEl.textContent = `Скринька: ${data.account_name || data.account_email || ''} • Кому: ${data.recipient || ''}`;
+        
+        if (badgeEl) {
+          badgeEl.innerHTML = data.is_spam 
+            ? `<span class="item-badge" style="background:rgba(239,68,68,0.18);color:#ef4444;border:1px solid rgba(239,68,68,0.3);">🗑️ ${escapeHtml(data.spam_reason || 'Спам')}</span>`
+            : (data.category === "important" 
+                ? `<span class="item-badge" style="background:rgba(34,197,94,0.18);color:#22c55e;border:1px solid rgba(34,197,94,0.3);">⭐ Важливе</span>`
+                : `<span class="item-badge" style="background:rgba(14,165,233,0.18);color:#0ea5e9;border:1px solid rgba(14,165,233,0.3);">📩 Звичайний</span>`);
+        }
+
+        if (bodyEl) {
+          bodyEl.textContent = data.body || data.snippet || "(Текст листа порожній або містить тільки медіавкладення)";
+        }
+
+        if (webmailBtn) {
+          if (data.webmail_url) {
+            webmailBtn.href = data.webmail_url;
+            webmailBtn.style.display = "inline-flex";
+            const label = data.webmail_url.includes("gmail") ? "🌐 Відкрити в Gmail ↗" : (data.webmail_url.includes("ukr.net") ? "🌐 Відкрити в Ukr.net ↗" : "🌐 Відкрити в пошті ↗");
+            const spanEl = webmailBtn.querySelector("span");
+            if (spanEl) spanEl.textContent = label;
+          } else {
+            webmailBtn.style.display = "none";
+          }
+        }
+      }
+    } catch (err) {
+      if (bodyEl && (!bodyEl.textContent || bodyEl.textContent.includes("Завантаж"))) {
+        bodyEl.textContent = `Помилка завантаження листа: ${err.message}`;
+      }
+    }
+  },
+
+  closeMessagePreview() {
+    document.getElementById("mail-preview-modal")?.classList.add("hidden");
+  },
+
   async deleteAccount(accId) {
     const acc = this.state.accounts.find(a => a.id === accId);
     const name = acc ? acc.name || acc.email : "цю скриньку";
@@ -439,6 +533,11 @@ const MailboxModule = {
       return;
     }
 
+    let cleanPwd = pwdVal;
+    if (emailVal.toLowerCase().includes("@gmail.com") && cleanPwd.replace(/\s+/g, "").length === 16) {
+      cleanPwd = cleanPwd.replace(/\s+/g, "");
+    }
+
     try {
       if (submitBtn) {
         submitBtn.disabled = true;
@@ -449,7 +548,7 @@ const MailboxModule = {
       const payload = {
         email: emailVal,
         name: nameEl?.value?.trim() || null,
-        password: pwdVal,
+        password: cleanPwd,
         imap_server: serverEl?.value?.trim() || null,
         imap_port: portEl?.value ? parseInt(portEl.value) : 993,
         use_ssl: true
@@ -491,6 +590,19 @@ const MailboxModule = {
     document.getElementById("mail-acc-cancel-btn")?.addEventListener("click", () => this.closeAddAccountModal());
     document.getElementById("mail-add-account-form")?.addEventListener("submit", (e) => this.submitAddAccount(e));
 
+    // Mail preview modal close listeners
+    document.getElementById("mail-preview-close-btn")?.addEventListener("click", () => this.closeMessagePreview());
+    document.getElementById("mail-preview-cancel-btn")?.addEventListener("click", () => this.closeMessagePreview());
+    const previewModal = document.getElementById("mail-preview-modal");
+    previewModal?.addEventListener("click", (e) => {
+      if (e.target === previewModal) this.closeMessagePreview();
+    });
+
+    const addAccModal = document.getElementById("mail-add-account-modal");
+    addAccModal?.addEventListener("click", (e) => {
+      if (e.target === addAccModal) this.closeAddAccountModal();
+    });
+
     // Category pills filter
     document.querySelectorAll(".mail-cat-pill").forEach(p => {
       p.addEventListener("click", () => {
@@ -502,24 +614,27 @@ const MailboxModule = {
     // Auto-detect server helper when email is typed
     const emailInput = document.getElementById("mail-acc-email");
     const serverInput = document.getElementById("mail-acc-server");
-    const helpHint = document.getElementById("mail-acc-provider-hint");
+    const helpHint = document.getElementById("mail-hint-text");
 
-    emailInput?.addEventListener("blur", () => {
+    const updateProviderHint = () => {
       const val = emailInput.value.toLowerCase().trim();
-      if (val.includes("@gmail.com")) {
+      if (val.includes("@gmail.com") || val.includes("@googlemail.com")) {
         if (serverInput && !serverInput.value) serverInput.value = "imap.gmail.com";
-        if (helpHint) helpHint.innerHTML = "💡 <strong>Gmail:</strong> Потрібен <em>'Пароль додатків'</em> (16 літер з Google-акаунта). Пароль від входу Google не підійде через захист.";
+        if (helpHint) helpHint.innerHTML = "Для захисту Google вимагає окремий <strong>16-значний пароль додатку</strong>. Основний пароль Google не спрацює.";
       } else if (val.includes("@ukr.net")) {
         if (serverInput && !serverInput.value) serverInput.value = "imap.ukr.net";
-        if (helpHint) helpHint.innerHTML = "💡 <strong>Ukr.net:</strong> Увімкніть доступ за IMAP в налаштуваннях Ukr.net та створіть 'Пароль для програм'.";
+        if (helpHint) helpHint.innerHTML = "Для <strong>Ukr.net</strong> увімкніть IMAP у налаштуваннях та створіть 'Пароль для програм'.";
       } else if (val.includes("@yahoo.com")) {
         if (serverInput && !serverInput.value) serverInput.value = "imap.mail.yahoo.com";
-        if (helpHint) helpHint.innerHTML = "💡 <strong>Yahoo:</strong> Згенеруйте App Password в налаштуваннях безпеки Yahoo.";
+        if (helpHint) helpHint.innerHTML = "Для <strong>Yahoo</strong> згенеруйте App Password у безпеці акаунта Yahoo.";
       } else if (val.includes("@outlook.com") || val.includes("@hotmail.com")) {
         if (serverInput && !serverInput.value) serverInput.value = "outlook.office365.com";
-        if (helpHint) helpHint.innerHTML = "💡 <strong>Outlook:</strong> Використовуйте стандартний пароль або App Password.";
+        if (helpHint) helpHint.innerHTML = "Для <strong>Outlook</strong> використовуйте звичайний пароль або App Password.";
       }
-    });
+    };
+
+    emailInput?.addEventListener("blur", updateProviderHint);
+    emailInput?.addEventListener("input", updateProviderHint);
   }
 };
 

@@ -69,22 +69,23 @@ def decode_mime(raw_header: Optional[str]) -> str:
 
 
 def clean_html_to_text(html_content: str) -> str:
-    """Очищає HTML-розмітку та повертає чистий текст без зовнішніх бібліотек."""
+    """Очищає HTML-розмітку та повертає чистий текст із збереженням розривів рядків."""
     if not html_content:
         return ""
     # Remove script and style elements
     text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html_content, flags=re.DOTALL | re.IGNORECASE)
-    # Replace breaks and paragraphs with spaces
-    text = re.sub(r"<(br|p|div|tr)[^>]*>", " ", text, flags=re.IGNORECASE)
+    # Replace breaks and paragraphs with newlines
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</?(p|div|tr|h\d|li)[^>]*>", "\n", text, flags=re.IGNORECASE)
     # Strip all remaining tags
     text = re.sub(r"<[^>]+>", " ", text)
     # Decode HTML entities like &nbsp;, &quot;
     text = html.unescape(text)
-    return re.sub(r"\s+", " ", text).strip()
+    return text
 
 
-def extract_body_snippet(msg: email.message.Message, max_len: int = 300) -> str:
-    """Витягує короткий текстовий зміст листа, очищаючи HTML-теги."""
+def extract_body_snippet(msg: email.message.Message, max_len: int = 1500) -> str:
+    """Витягує текстовий зміст листа, очищаючи HTML-теги та зберігаючи абзаци."""
     body_text = ""
     try:
         if msg.is_multipart():
@@ -117,27 +118,33 @@ def extract_body_snippet(msg: email.message.Message, max_len: int = 300) -> str:
     except Exception as e:
         logger.debug(f"Error extracting body snippet: {e}")
 
-    # Clean whitespace and strip
-    cleaned = re.sub(r"\s+", " ", body_text).strip()
-    return cleaned[:max_len]
+    # Normalize double linebreaks and spaces
+    body_text = re.sub(r"\r\n|\r", "\n", body_text)
+    body_text = re.sub(r"[ \t]+", " ", body_text)
+    body_text = re.sub(r"\n\s*\n+", "\n\n", body_text).strip()
+    return body_text[:max_len]
 
 
 def test_imap_connection(email_addr: str, password: str, server: str, port: int, use_ssl: bool = True) -> Dict[str, Any]:
     """Перевіряє коректність логіну та пароля до поштового сервера."""
     try:
+        clean_pwd = password.strip()
+        if "gmail" in server.lower() and len(clean_pwd.replace(" ", "")) == 16:
+            clean_pwd = clean_pwd.replace(" ", "")
+
         if use_ssl:
             client = imaplib.IMAP4_SSL(server, port, timeout=10)
         else:
             client = imaplib.IMAP4(server, port, timeout=10)
 
-        typ, res = client.login(email_addr.strip(), password.strip())
+        typ, res = client.login(email_addr.strip(), clean_pwd)
         client.logout()
         return {"success": True, "message": "Підключення до пошти успішне!"}
     except imaplib.IMAP4.error as e:
         err_msg = str(e)
         if "Application-specific password" in err_msg or "password" in err_msg.lower() or "authenticationfailed" in err_msg.lower():
             if "gmail" in server.lower():
-                err_msg = "Gmail вимагає 'Пароль додатка' (App Password). Створіть його в налаштуваннях Google: Безпека ➔ Двоетапна перевірка ➔ Паролі додатків."
+                err_msg = "Gmail вимагає 'Пароль додатка' (16 літер). Створіть його: myaccount.google.com/apppasswords."
             elif "ukr.net" in server.lower():
                 err_msg = "Ukr.net вимагає увімкнення IMAP та створення 'Пароля для зовнішніх програм' в налаштуваннях пошти Ukr.net."
         return {"success": False, "message": f"Помилка авторизації: {err_msg}"}
@@ -225,7 +232,11 @@ def fetch_account_emails(account: MailAccount, limit: int = 30) -> List[Dict[str
         else:
             client = imaplib.IMAP4(account.imap_server, account.imap_port, timeout=12)
 
-        client.login(account.email, account.password)
+        clean_pwd = account.password.strip()
+        if "gmail" in account.imap_server.lower() and len(clean_pwd.replace(" ", "")) == 16:
+            clean_pwd = clean_pwd.replace(" ", "")
+
+        client.login(account.email, clean_pwd)
         typ, data = client.select("INBOX", readonly=True)
         if typ != "OK":
             logger.warning(f"Could not select INBOX for {account.email}: {data}")
@@ -242,12 +253,12 @@ def fetch_account_emails(account: MailAccount, limit: int = 30) -> List[Dict[str
 
         for uid_bytes in latest_uids:
             uid_str = uid_bytes.decode()
-            typ, msg_data = client.uid("fetch", uid_bytes, "(RFC822.HEADER BODY.PEEK[TEXT])")
+            typ, msg_data = client.uid("fetch", uid_bytes, "(BODY.PEEK[])")
             if typ != "OK" or not msg_data or not msg_data[0]:
                 continue
 
-            raw_header = msg_data[0][1] if isinstance(msg_data[0], tuple) else b""
-            parsed_msg = email.message_from_bytes(raw_header)
+            raw_bytes = msg_data[0][1] if isinstance(msg_data[0], tuple) else b""
+            parsed_msg = email.message_from_bytes(raw_bytes)
 
             subject = decode_mime(parsed_msg.get("Subject", "(Без теми)"))
             sender = decode_mime(parsed_msg.get("From", ""))
@@ -270,7 +281,7 @@ def fetch_account_emails(account: MailAccount, limit: int = 30) -> List[Dict[str
             clean_sender_email = sender_email_match.group(1).lower() if sender_email_match else sender.strip().lower()
 
             raw_headers_dict = {k.lower(): v for k, v in parsed_msg.items()}
-            snippet = extract_body_snippet(parsed_msg, max_len=250)
+            snippet = extract_body_snippet(parsed_msg, max_len=1000)
 
             category, is_spam, spam_reason = classify_email(subject, sender, snippet, raw_headers_dict)
 
@@ -300,6 +311,40 @@ def fetch_account_emails(account: MailAccount, limit: int = 30) -> List[Dict[str
     return results
 
 
+def fetch_single_email_body(account: MailAccount, message_uid: str) -> Optional[str]:
+    """Зчитує повний текст конкретного листа з IMAP сервера без позначки прочитаного."""
+    client = None
+    try:
+        if account.use_ssl:
+            client = imaplib.IMAP4_SSL(account.imap_server, account.imap_port, timeout=12)
+        else:
+            client = imaplib.IMAP4(account.imap_server, account.imap_port, timeout=12)
+
+        clean_pwd = account.password.strip()
+        if "gmail" in account.imap_server.lower() and len(clean_pwd.replace(" ", "")) == 16:
+            clean_pwd = clean_pwd.replace(" ", "")
+
+        client.login(account.email, clean_pwd)
+        typ, _ = client.select("INBOX", readonly=True)
+        if typ != "OK":
+            return None
+
+        typ, msg_data = client.uid("fetch", message_uid.encode(), "(BODY.PEEK[])")
+        if typ == "OK" and msg_data and msg_data[0] and isinstance(msg_data[0], tuple):
+            parsed_msg = email.message_from_bytes(msg_data[0][1])
+            return extract_body_snippet(parsed_msg, max_len=4000)
+    except Exception as e:
+        logger.warning(f"Error fetching email body for UID {message_uid}: {e}")
+    finally:
+        if client:
+            try:
+                client.close()
+                client.logout()
+            except Exception:
+                pass
+    return None
+
+
 def delete_emails_imap(account: MailAccount, uids: List[str]) -> int:
     """Видаляє листи за IMAP UID (переміщує в Кошик або маркує \\Deleted + EXPUNGE)."""
     if not uids:
@@ -313,7 +358,11 @@ def delete_emails_imap(account: MailAccount, uids: List[str]) -> int:
         else:
             client = imaplib.IMAP4(account.imap_server, account.imap_port, timeout=15)
 
-        client.login(account.email, account.password)
+        clean_pwd = account.password.strip()
+        if "gmail" in account.imap_server.lower() and len(clean_pwd.replace(" ", "")) == 16:
+            clean_pwd = clean_pwd.replace(" ", "")
+
+        client.login(account.email, clean_pwd)
         typ, _ = client.select("INBOX", readonly=False)
         if typ != "OK":
             return 0

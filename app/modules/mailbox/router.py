@@ -20,6 +20,7 @@ from app.modules.mailbox.service import (
     resolve_imap_settings,
     test_imap_connection,
     fetch_account_emails,
+    fetch_single_email_body,
     delete_emails_imap,
     generate_mail_digest,
 )
@@ -79,8 +80,12 @@ def add_mail_account(payload: MailAccountCreate, db: Session = Depends(get_db)):
     """Підключає нову поштову скриньку."""
     server, port, use_ssl = resolve_imap_settings(payload.email, payload.imap_server, payload.imap_port)
 
+    clean_pwd = payload.password.strip()
+    if "gmail" in server.lower() and len(clean_pwd.replace(" ", "")) == 16:
+        clean_pwd = clean_pwd.replace(" ", "")
+
     # Test login first to give immediate clear feedback
-    test_res = test_imap_connection(payload.email, payload.password, server, port, use_ssl=use_ssl)
+    test_res = test_imap_connection(payload.email, clean_pwd, server, port, use_ssl=use_ssl)
     if not test_res.get("success"):
         raise HTTPException(status_code=400, detail=test_res.get("message"))
 
@@ -95,7 +100,7 @@ def add_mail_account(payload: MailAccountCreate, db: Session = Depends(get_db)):
         imap_server=server,
         imap_port=port,
         use_ssl=use_ssl,
-        password=payload.password.strip(),
+        password=clean_pwd,
         is_active=True,
     )
     db.add(acc)
@@ -301,6 +306,62 @@ def clean_spam_messages(payload: CleanSpamRequest, db: Session = Depends(get_db)
         deleted_count=len(spam_msgs),
         message=f"🧹 Успішно видалено {len(spam_msgs)} рекламних листів і спаму із сервера!",
     )
+
+
+@router.get("/messages/{message_id}")
+def get_single_message(message_id: int, db: Session = Depends(get_db)):
+    """Повертає деталі та повний текст попереднього перегляду листа."""
+    msg = db.query(MailMessage).filter(MailMessage.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Лист не знайдено")
+
+    acc = db.query(MailAccount).filter(MailAccount.id == msg.account_id).first()
+
+    # If snippet is empty or short, fetch full text live from IMAP and cache
+    body_text = msg.snippet or ""
+    if len(body_text.strip()) < 50 and acc:
+        try:
+            live_body = fetch_single_email_body(acc, msg.message_uid)
+            if live_body:
+                body_text = live_body
+                msg.snippet = live_body[:1000]
+                db.commit()
+        except Exception:
+            pass
+
+    # Build webmail direct link
+    webmail_url = None
+    if acc:
+        server_lower = acc.imap_server.lower()
+        if "gmail" in server_lower:
+            import urllib.parse
+            q = urllib.parse.quote(msg.subject or "")
+            webmail_url = f"https://mail.google.com/mail/u/0/#search/{q}"
+        elif "ukr.net" in server_lower:
+            webmail_url = "https://mail.ukr.net/"
+        elif "outlook" in server_lower or "office365" in server_lower:
+            webmail_url = "https://outlook.live.com/mail/"
+        elif "yahoo" in server_lower:
+            webmail_url = "https://mail.yahoo.com/"
+
+    return {
+        "id": msg.id,
+        "account_id": msg.account_id,
+        "account_name": acc.name if acc else None,
+        "account_email": acc.email if acc else None,
+        "message_uid": msg.message_uid,
+        "subject": msg.subject or "(Без теми)",
+        "sender": msg.sender or "(Невідомо)",
+        "sender_email": msg.sender_email,
+        "recipient": msg.recipient,
+        "date": msg.date,
+        "category": msg.category or "other",
+        "is_spam": msg.is_spam,
+        "spam_reason": msg.spam_reason,
+        "is_read": msg.is_read,
+        "body": body_text,
+        "webmail_url": webmail_url,
+    }
 
 
 @router.delete("/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
