@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.7.0">
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.1">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -1113,6 +1113,18 @@
       <div class="fs-controls-secondary">
         <button id="fs-fav-btn" class="fs-pill-btn">🤍 В улюблені</button>
         <button id="fs-car-btn" class="fs-pill-btn">🚗 Додати в Авто</button>
+        <button id="fs-delete-btn" class="fs-pill-btn" style="color:var(--danger,#ff453a);border-color:rgba(255,69,58,0.35);" title="Видалити поточний трек">🗑️ Видалити</button>
+      </div>
+
+      <!-- Volume & Speed Controls for Car / Fullscreen -->
+      <div class="fs-extra-controls">
+        <div class="fs-volume-wrap">
+          <button id="fs-mute-btn" class="fs-icon-btn-sm" title="Вимкнути / Увімкнути звук">🔊</button>
+          <input type="range" id="fs-volume-slider" min="0" max="1" step="0.05" value="1" class="fs-volume-slider" title="Гучність" />
+        </div>
+        <div class="fs-speed-wrap">
+          <button id="fs-speed-btn" class="fs-pill-btn-sm" title="Швидкість відтворення">1.0x</button>
+        </div>
       </div>
     </div>
 
@@ -1328,13 +1340,13 @@
     </div>
   </div>
 
-  <script src="/static/modules/ai_chat.js?v=3.7.0"></script>
-  <script src="/static/modules/auth_phone.js?v=3.7.0"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.7.0"></script>
-  <script src="/static/modules/business.js?v=3.7.0"></script>
-  <script src="/static/modules/movies.js?v=3.7.0"></script>
-  <script src="/static/modules/music.js?v=3.7.0"></script>
-  <script src="/static/app.js?v=3.7.0"></script>
+  <script src="/static/modules/ai_chat.js?v=3.7.1"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.1"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.1"></script>
+  <script src="/static/modules/business.js?v=3.7.1"></script>
+  <script src="/static/modules/movies.js?v=3.7.1"></script>
+  <script src="/static/modules/music.js?v=3.7.1"></script>
+  <script src="/static/app.js?v=3.7.1"></script>
 </body>
 </html>
 

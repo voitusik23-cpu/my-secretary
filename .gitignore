@@ -23,20 +23,21 @@ venv/
 .venv/
 env/
 
-# OS & User profile system folders
-AppData/
-Desktop/
-Documents/
-Downloads/
-"3D Objects/"
-Contacts/
-Favorites/
-Links/
-Music/
-Pictures/
-"Saved Games/"
-Searches/
-Videos/
+# OS & User profile system folders (anchored to root)
+/AppData/
+/Desktop/
+/Documents/
+/Downloads/
+"/3D Objects/"
+/Contacts/
+/Favorites/
+/Links/
+/Music/
+/Pictures/
+"/Saved Games/"
+/Searches/
+/Videos/
+!app/modules/music/**
 NTUSER*
 ntuser*
 .antigravity*

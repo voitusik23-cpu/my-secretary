@@ -1,18 +1,25 @@
-﻿// ===================================================
-// Мой Секретарь — Модуль Музики та Плеєра
-// frontend/modules/music.js
 // ===================================================
+// Мой Секретарь — Оновлений Модуль Музики та Плеєра
+// frontend/modules/music.js (v3.7.1)
+// ===================================================
+
 const musicState = {
   tracks: [],
   allTracks: [],
   queue: [],
+  deletedTrackIds: new Set(),
   currentIndex: -1,
   currentTrack: null,
   isPlaying: false,
   isShuffle: false,
   isRepeat: false,
+  volume: 1.0,
+  isMuted: false,
+  playbackRate: 1.0,
   activePlaylist: "Всі треки",
+  searchQuery: "",
   audio: null,
+  consecutiveErrors: 0,
 };
 
 function formatTrackTime(seconds) {
@@ -27,13 +34,19 @@ function updatePlayState(playing) {
   const miniToggle = document.getElementById("mini-player-toggle-btn");
   const fsPlayBtn = document.getElementById("fs-play-btn");
   const miniBadge = document.getElementById("mini-player-play-badge");
+  const fsArt = document.getElementById("fs-album-art");
 
   const icon = playing ? "⏸" : "▶";
   if (miniToggle) miniToggle.textContent = icon;
   if (fsPlayBtn) fsPlayBtn.textContent = icon;
   if (miniBadge) miniBadge.textContent = icon;
 
-  // Highlight currently playing card in list
+  if (fsArt) {
+    if (playing) fsArt.classList.add("spinning");
+    else fsArt.classList.remove("spinning");
+  }
+
+  // Highlight currently playing card in track list with live equalizer
   document.querySelectorAll(".music-track-card").forEach(c => {
     if (musicState.currentTrack && String(c.dataset.id) === String(musicState.currentTrack.id)) {
       if (playing) {
@@ -47,54 +60,87 @@ function updatePlayState(playing) {
   });
 
   if ("mediaSession" in navigator) {
-    navigator.mediaSession.playbackState = playing ? "playing" : "paused";
+    try {
+      navigator.mediaSession.playbackState = playing ? "playing" : "paused";
+    } catch (e) {}
   }
 }
 
 function updateMediaSession(track) {
   if (!("mediaSession" in navigator) || !track) return;
   try {
+    const artwork = [
+      { src: track.cover_url || "/static/icons/icon.svg", sizes: "96x96", type: "image/jpeg" },
+      { src: track.cover_url || "/static/icons/icon.svg", sizes: "128x128", type: "image/jpeg" },
+      { src: track.cover_url || "/static/icons/icon.svg", sizes: "256x256", type: "image/jpeg" },
+      { src: track.cover_url || "/static/icons/icon.svg", sizes: "512x512", type: "image/jpeg" },
+    ];
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.title,
-      artist: track.artist || "Невідомий виконавець",
-      album: track.album || track.playlist || "Мой Секретарь",
-      artwork: [
-        { src: track.cover_url || "/static/icons/icon.svg", sizes: "96x96", type: "image/jpeg" },
-        { src: track.cover_url || "/static/icons/icon.svg", sizes: "128x128", type: "image/jpeg" },
-        { src: track.cover_url || "/static/icons/icon.svg", sizes: "192x192", type: "image/jpeg" },
-        { src: track.cover_url || "/static/icons/icon.svg", sizes: "256x256", type: "image/jpeg" },
-        { src: track.cover_url || "/static/icons/icon.svg", sizes: "512x512", type: "image/jpeg" },
-      ],
+      artist: track.artist || "Мой Секретарь",
+      album: track.album || track.playlist || "В авто 🚗",
+      artwork: artwork,
     });
   } catch (err) {
     console.warn("MediaSession metadata error:", err);
   }
 }
 
+function stopPlayback() {
+  const audio = musicState.audio || document.getElementById("global-music-audio");
+  if (audio) {
+    try {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    } catch (e) {}
+  }
+  musicState.isPlaying = false;
+  musicState.currentTrack = null;
+  musicState.currentIndex = -1;
+  updatePlayState(false);
+  const fsArt = document.getElementById("fs-album-art");
+  if (fsArt) fsArt.classList.remove("spinning");
+}
+
+function resetPlayerUI() {
+  stopPlayback();
+  document.getElementById("music-floating-player")?.classList.add("hidden");
+  document.getElementById("music-fullscreen-modal")?.classList.add("hidden");
+  if ("mediaSession" in navigator) {
+    try { navigator.mediaSession.playbackState = "none"; } catch (e) {}
+  }
+}
+
 function playTrack(track, queue = null) {
   if (!track) return;
+  const strId = String(track.id);
+
+  // If track was deleted, never play it!
+  if (musicState.deletedTrackIds.has(strId)) {
+    console.warn(`[Music] Refusing to play deleted track ${strId}`);
+    playNextTrack();
+    return;
+  }
+
   if (!musicState.audio) {
     musicState.audio = document.getElementById("global-music-audio");
   }
   const audio = musicState.audio;
   if (!audio) return;
 
-  if (queue && queue.length > 0) {
-    musicState.queue = queue;
-  } else if (musicState.allTracks && musicState.allTracks.length > 0) {
-    musicState.queue = musicState.allTracks;
-  } else {
-    musicState.queue = musicState.tracks;
-  }
+  // Filter queue against deleted tracks
+  let baseQueue = queue && queue.length > 0 ? queue : (musicState.queue.length > 0 ? musicState.queue : musicState.allTracks);
+  musicState.queue = (baseQueue || []).filter(t => !musicState.deletedTrackIds.has(String(t.id)));
 
   musicState.currentTrack = track;
-  musicState.currentIndex = musicState.queue.findIndex(t => String(t.id) === String(track.id));
+  musicState.currentIndex = musicState.queue.findIndex(t => String(t.id) === strId);
   if (musicState.currentIndex === -1) {
     musicState.queue.push(track);
     musicState.currentIndex = musicState.queue.length - 1;
   }
 
-  // Construct authenticated stream url with ?key=
+  // Construct authenticated stream url with ?key= and cache buster
   const keyParam = state.secretKey ? `?key=${encodeURIComponent(state.secretKey)}` : "";
   const streamUrl = `${state.serverUrl}/api/v1/music/stream/${track.id}${keyParam}`;
 
@@ -103,14 +149,18 @@ function playTrack(track, queue = null) {
   } catch (e) {}
 
   audio.src = streamUrl;
+  audio.volume = musicState.volume;
+  audio.muted = musicState.isMuted;
+  audio.playbackRate = musicState.playbackRate;
   audio.load();
 
   const playPromise = audio.play();
   if (playPromise !== undefined) {
     playPromise.then(() => {
+      musicState.consecutiveErrors = 0;
       updatePlayState(true);
     }).catch(err => {
-      console.warn("Audio autoplay blocked or failed:", err);
+      console.warn("Audio play promise catch:", err);
       updatePlayState(false);
     });
   }
@@ -136,7 +186,10 @@ function playTrack(track, queue = null) {
   const fsFav = document.getElementById("fs-fav-btn");
   const fsPl = document.getElementById("fs-player-playlist-name");
 
-  if (fsImg) fsImg.src = track.cover_url || "/static/icons/icon.svg";
+  if (fsImg) {
+    fsImg.src = track.cover_url || "/static/icons/icon.svg";
+    fsImg.classList.add("spinning");
+  }
   if (fsTitle) fsTitle.textContent = track.title;
   if (fsArtist) fsArtist.textContent = track.artist || "";
   if (fsFav) {
@@ -147,11 +200,15 @@ function playTrack(track, queue = null) {
 
   updateMediaSession(track);
   renderQueueDrawer();
+  updatePlayState(true);
 }
 
 function playTrackById(trackId) {
-  const t = (musicState.tracks.find(x => String(x.id) === String(trackId))) ||
-            (musicState.allTracks.find(x => String(x.id) === String(trackId)));
+  const strId = String(trackId);
+  if (musicState.deletedTrackIds.has(strId)) return;
+
+  const t = (musicState.tracks.find(x => String(x.id) === strId)) ||
+            (musicState.allTracks.find(x => String(x.id) === strId));
   if (t) {
     const q = (musicState.tracks && musicState.tracks.length > 1) ? musicState.tracks : musicState.allTracks;
     playTrack(t, q);
@@ -159,17 +216,20 @@ function playTrackById(trackId) {
 }
 
 function playNextTrack() {
-  // If current queue has only 1 track, expand to allTracks so we NEVER get stuck on 1 song!
-  if (!musicState.queue || musicState.queue.length <= 1) {
-    if (musicState.allTracks && musicState.allTracks.length > 1) {
-      musicState.queue = [...musicState.allTracks];
-      if (musicState.currentTrack) {
-        musicState.currentIndex = musicState.queue.findIndex(t => String(t.id) === String(musicState.currentTrack.id));
-      }
+  // Purge any deleted tracks from queue
+  musicState.queue = (musicState.queue || []).filter(t => !musicState.deletedTrackIds.has(String(t.id)));
+
+  if (musicState.queue.length <= 1) {
+    const freshAll = (musicState.allTracks || []).filter(t => !musicState.deletedTrackIds.has(String(t.id)));
+    if (freshAll.length > 1) {
+      musicState.queue = [...freshAll];
     }
   }
 
-  if (!musicState.queue || musicState.queue.length === 0) return;
+  if (!musicState.queue || musicState.queue.length === 0) {
+    resetPlayerUI();
+    return;
+  }
 
   if (musicState.isRepeat && musicState.currentTrack) {
     if (musicState.audio) {
@@ -183,29 +243,32 @@ function playNextTrack() {
   if (musicState.isShuffle && musicState.queue.length > 1) {
     do {
       nextIdx = Math.floor(Math.random() * musicState.queue.length);
-    } while (nextIdx === musicState.currentIndex);
+    } while (nextIdx === musicState.currentIndex && musicState.queue.length > 1);
   } else {
     nextIdx = (musicState.currentIndex + 1) % musicState.queue.length;
   }
 
   const nextTrack = musicState.queue[nextIdx];
   if (nextTrack) {
-    showToast(`▶ Грає: «${nextTrack.title}» - ${nextTrack.artist}`);
+    showToast(`▶ «${nextTrack.title}» - ${nextTrack.artist}`);
     playTrack(nextTrack, musicState.queue);
   }
 }
 
 function playPrevTrack() {
-  if (!musicState.queue || musicState.queue.length <= 1) {
-    if (musicState.allTracks && musicState.allTracks.length > 1) {
-      musicState.queue = [...musicState.allTracks];
-      if (musicState.currentTrack) {
-        musicState.currentIndex = musicState.queue.findIndex(t => String(t.id) === String(musicState.currentTrack.id));
-      }
+  musicState.queue = (musicState.queue || []).filter(t => !musicState.deletedTrackIds.has(String(t.id)));
+
+  if (musicState.queue.length <= 1) {
+    const freshAll = (musicState.allTracks || []).filter(t => !musicState.deletedTrackIds.has(String(t.id)));
+    if (freshAll.length > 1) {
+      musicState.queue = [...freshAll];
     }
   }
 
-  if (!musicState.queue || musicState.queue.length === 0) return;
+  if (!musicState.queue || musicState.queue.length === 0) {
+    resetPlayerUI();
+    return;
+  }
 
   if (musicState.audio && musicState.audio.currentTime > 4) {
     musicState.audio.currentTime = 0;
@@ -220,16 +283,14 @@ function playPrevTrack() {
 }
 
 function togglePlayPause() {
-  const audio = musicState.audio;
+  const audio = musicState.audio || document.getElementById("global-music-audio");
   if (!audio) return;
 
-  if (!audio.src || audio.src === window.location.href) {
-    if (musicState.queue.length > 0) {
-      playTrack(musicState.queue[0]);
-    } else if (musicState.allTracks.length > 0) {
-      playTrack(musicState.allTracks[0]);
-    } else if (musicState.tracks.length > 0) {
-      playTrack(musicState.tracks[0]);
+  if (!audio.src || audio.src === window.location.href || !audio.getAttribute("src")) {
+    const q = (musicState.queue.length > 0) ? musicState.queue : ((musicState.tracks.length > 0) ? musicState.tracks : musicState.allTracks);
+    const valid = q.filter(t => !musicState.deletedTrackIds.has(String(t.id)));
+    if (valid.length > 0) {
+      playTrack(valid[0], valid);
     }
     return;
   }
@@ -276,11 +337,10 @@ async function loadMusicTab(playlist = null) {
     listEl.innerHTML = `
       <div class="empty-state">
         <span class="empty-icon" style="animation:pulse-mic 1s infinite;">🎵</span>
-        <p>Завантажую треки...</p>
+        <p>Завантажую медіатеку...</p>
       </div>
     `;
 
-    // 1. Fetch filtered tracks and all tracks concurrently
     const allPromise = apiFetch("/api/v1/music/tracks");
     let url = "/api/v1/music/tracks";
     const params = new URLSearchParams();
@@ -298,15 +358,28 @@ async function loadMusicTab(playlist = null) {
       allPromise
     ]);
 
-    musicState.allTracks = allTracks || [];
-    musicState.tracks = filteredTracks || [];
+    // Filter out any locally deleted IDs
+    const cleanAll = (allTracks || []).filter(t => !musicState.deletedTrackIds.has(String(t.id)));
+    const cleanFiltered = (filteredTracks || []).filter(t => !musicState.deletedTrackIds.has(String(t.id)));
 
-    // Continuous queue: if filtered has few tracks, keep allTracks in queue
-    if (!musicState.queue || musicState.queue.length <= 1) {
-      musicState.queue = [...musicState.allTracks];
+    musicState.allTracks = cleanAll;
+    musicState.tracks = cleanFiltered;
+
+    // Synchronize queue with actual tracks from DB
+    const validIds = new Set(cleanAll.map(t => String(t.id)));
+    musicState.queue = (musicState.queue || []).filter(t => validIds.has(String(t.id)));
+    if (musicState.queue.length === 0 && cleanAll.length > 0) {
+      musicState.queue = [...cleanAll];
+    }
+
+    // If current track is no longer in valid tracks, stop audio immediately
+    if (musicState.currentTrack && !validIds.has(String(musicState.currentTrack.id))) {
+      console.warn("[Music] Current track is no longer valid, stopping playback");
+      stopPlayback();
     }
 
     renderMusicTracks(musicState.tracks);
+    renderQueueDrawer();
     updatePlaylistCounts();
   } catch (err) {
     listEl.innerHTML = `
@@ -322,24 +395,34 @@ function renderMusicTracks(tracks) {
   const listEl = document.getElementById("music-tracks-list");
   if (!listEl) return;
 
-  if (!tracks || tracks.length === 0) {
+  const validTracks = (tracks || []).filter(t => !musicState.deletedTrackIds.has(String(t.id)));
+
+  if (validTracks.length === 0) {
     listEl.innerHTML = `
       <div class="empty-state">
         <span class="empty-icon">🎵</span>
-        <p>У цій категорії ще немає треків.</p>
+        <p>У цій категорії немає треків.</p>
         <p style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">
-          Скористайтесь кнопкою <strong>«📋 Вставити трек»</strong> або рядком пошуку вище!
+          Скористайтесь кнопкою <strong>«📋 Вставити трек»</strong> або пошуком вище!
         </p>
       </div>
     `;
     return;
   }
 
-  listEl.innerHTML = tracks.map(t => {
+  listEl.innerHTML = validTracks.map(t => {
     const isCurrent = musicState.currentTrack && String(musicState.currentTrack.id) === String(t.id);
     const isPlaying = isCurrent && musicState.isPlaying;
     const durStr = t.duration ? formatTrackTime(t.duration) : "3:00";
     const coverUrl = t.cover_url || "/static/icons/icon.svg";
+
+    const eqHtml = isPlaying ? `
+      <span class="music-live-equalizer">
+        <span></span><span></span><span></span>
+      </span>
+    ` : "";
+
+    const cachedBadge = t.is_cached ? `<span class="music-pill-tag tag-cached" title="Збережено на сервері">💾 Офлайн</span>` : "";
 
     return `
       <div class="music-track-card ${isPlaying ? 'is-playing' : ''}" data-id="${t.id}">
@@ -349,11 +432,15 @@ function renderMusicTracks(tracks) {
             <div class="music-thumb-play-overlay">${isPlaying ? '⏸' : '▶'}</div>
           </div>
           <div class="music-track-meta">
-            <span class="music-track-title">${escapeHtml(t.title)}</span>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+              <span class="music-track-title">${escapeHtml(t.title)}</span>
+              ${eqHtml}
+            </div>
             <span class="music-track-artist">${escapeHtml(t.artist || "Невідомий виконавець")}</span>
             <div class="music-track-badges">
               <span class="music-pill-tag">⏱ ${durStr}</span>
               <span class="music-pill-tag">📂 ${escapeHtml(t.playlist || "Всі треки")}</span>
+              ${cachedBadge}
             </div>
           </div>
         </div>
@@ -364,7 +451,7 @@ function renderMusicTracks(tracks) {
           <button class="music-icon-action ${t.is_favorite ? 'fav-active' : ''}" onclick="toggleFavTrack(${t.id}, event)" title="${t.is_favorite ? 'Видалити з улюблених' : 'В улюблені'}">
             ${t.is_favorite ? '❤️' : '🤍'}
           </button>
-          <button class="music-icon-action" onclick="deleteTrackItem(${t.id}, event)" title="Видалити трек">
+          <button class="music-icon-action" onclick="deleteTrackItem(${t.id}, event)" title="Видалити трек із медіатеки">
             🗑️
           </button>
         </div>
@@ -378,7 +465,7 @@ function renderQueueDrawer() {
   const listEl = document.getElementById("fs-queue-list");
   if (!listEl) return;
 
-  const q = musicState.queue || [];
+  const q = (musicState.queue || []).filter(t => !musicState.deletedTrackIds.has(String(t.id)));
   if (countEl) countEl.textContent = q.length;
 
   if (q.length === 0) {
@@ -389,7 +476,7 @@ function renderQueueDrawer() {
   listEl.innerHTML = q.map((t, idx) => {
     const isCurrent = musicState.currentTrack && String(musicState.currentTrack.id) === String(t.id);
     return `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${isCurrent ? 'rgba(6,182,212,0.2)' : 'rgba(255,255,255,0.06)'};border-radius:10px;margin-bottom:6px;cursor:pointer;" onclick="playTrackById(${t.id});document.getElementById('fs-queue-drawer').classList.add('hidden');">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${isCurrent ? 'rgba(6,182,212,0.22)' : 'rgba(255,255,255,0.06)'};border-radius:10px;margin-bottom:6px;cursor:pointer;border:1px solid ${isCurrent ? '#06b6d4' : 'transparent'};" onclick="playTrackById(${t.id});document.getElementById('fs-queue-drawer').classList.add('hidden');">
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:0.8rem;color:${isCurrent ? '#06b6d4' : 'rgba(255,255,255,0.5)'};">${idx + 1}</span>
           <img src="${t.cover_url || '/static/icons/icon.svg'}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;" />
@@ -398,14 +485,20 @@ function renderQueueDrawer() {
             <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);">${escapeHtml(t.artist || '')}</div>
           </div>
         </div>
-        <span style="font-size:0.75rem;color:rgba(255,255,255,0.5);">${t.duration ? formatTrackTime(t.duration) : ''}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:0.75rem;color:rgba(255,255,255,0.5);">${t.duration ? formatTrackTime(t.duration) : ''}</span>
+          <button type="button" class="music-icon-action" style="font-size:0.85rem;padding:2px 6px;" onclick="deleteTrackItem(${t.id}, event)" title="Видалити">🗑️</button>
+        </div>
       </div>
     `;
   }).join("");
 }
 
 async function toggleFavTrack(trackId, event) {
-  if (event) event.stopPropagation();
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
   try {
     const res = await apiFetch(`/api/v1/music/tracks/${trackId}/favorite`, { method: "POST" });
     if (res) {
@@ -432,7 +525,10 @@ async function toggleFavTrack(trackId, event) {
 }
 
 async function assignTrackToCar(trackId, event) {
-  if (event) event.stopPropagation();
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
   try {
     await apiFetch(`/api/v1/music/tracks/${trackId}/playlist`, {
       method: "POST",
@@ -445,15 +541,60 @@ async function assignTrackToCar(trackId, event) {
   }
 }
 
+// -------------------------------------------------------------
+// НАДІЙНЕ ВИДАЛЕННЯ ТРЕКУ З МИТТЄВОЮ ЗУПИНКОЮ ТА ОЧИЩЕННЯМ ЧЕРГИ
+// -------------------------------------------------------------
 async function deleteTrackItem(trackId, event) {
-  if (event) event.stopPropagation();
-  if (!confirm("Видалити цей трек із медіатеки?")) return;
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+
+  const strId = String(trackId);
+  const track = (musicState.tracks || []).find(t => String(t.id) === strId) ||
+                (musicState.allTracks || []).find(t => String(t.id) === strId) ||
+                (musicState.currentTrack && String(musicState.currentTrack.id) === strId ? musicState.currentTrack : null);
+  const trackTitle = track ? `«${track.title}»` : "цей трек";
+
+  if (!confirm(`Видалити ${trackTitle} із медіатеки?`)) return;
+
+  // 1. Позначаємо трек видаленим у поточній сесії (блокує будь-які повторні виклики)
+  musicState.deletedTrackIds.add(strId);
+
+  // 2. Перевіряємо, чи цей трек зараз грає або завантажений
+  const isCurrent = musicState.currentTrack && String(musicState.currentTrack.id) === strId;
+
+  // 3. Миттєво видаляємо трек з усіх масивів у пам'яті
+  musicState.tracks = (musicState.tracks || []).filter(t => String(t.id) !== strId);
+  musicState.allTracks = (musicState.allTracks || []).filter(t => String(t.id) !== strId);
+  musicState.queue = (musicState.queue || []).filter(t => String(t.id) !== strId);
+
+  // 4. Якщо грає видалений трек — миттєво глушимо аудіо та перемикаємо на наступний
+  if (isCurrent) {
+    stopPlayback();
+    if (musicState.queue.length > 0) {
+      const nextTrack = musicState.queue[0];
+      showToast(`🗑️ ${trackTitle} видалено. Грає: «${nextTrack.title}»`);
+      playTrack(nextTrack, musicState.queue);
+    } else {
+      showToast(`🗑️ ${trackTitle} видалено. Медіатека порожня.`);
+      resetPlayerUI();
+    }
+  } else {
+    showToast(`🗑️ ${trackTitle} видалено`);
+  }
+
+  // 5. Миттєво оновлюємо список та чергу без затримок
+  renderMusicTracks(musicState.tracks);
+  renderQueueDrawer();
+  updatePlaylistCounts();
+
+  // 6. Надсилаємо запит на сервер для видалення з БД та видалення аудіофайлу з диска
   try {
     await apiFetch(`/api/v1/music/tracks/${trackId}`, { method: "DELETE" });
-    showToast("🗑️ Трек видалено");
-    loadMusicTab();
   } catch (err) {
-    showToast(`Помилка видалення: ${err.message}`);
+    console.error("Failed to delete track from server:", err);
+    showToast(`Помилка видалення на сервері: ${err.message}`);
   }
 }
 
@@ -601,10 +742,26 @@ function initMusicPlayer() {
     });
 
     audio.addEventListener("error", (e) => {
-      console.warn("[Music] Stream error, auto-skipping to next track in 1.2s...", e);
+      if (!audio.src || audio.src === window.location.href || !audio.getAttribute("src")) return;
+      console.warn("[Music] Stream error:", e);
+      musicState.consecutiveErrors = (musicState.consecutiveErrors || 0) + 1;
+      if (musicState.consecutiveErrors > 4) {
+        showToast("⚠️ Помилка завантаження кількох треків. Плеєр зупинено.");
+        stopPlayback();
+        musicState.consecutiveErrors = 0;
+        return;
+      }
+
+      // If current track failed, drop it from queue to prevent loop
+      if (musicState.currentTrack) {
+        const badId = String(musicState.currentTrack.id);
+        musicState.queue = musicState.queue.filter(t => String(t.id) !== badId);
+      }
+
+      showToast("⚠️ Помилка аудіопотоку, перемикаю на наступний трек...");
       setTimeout(() => {
         playNextTrack();
-      }, 1200);
+      }, 800);
     });
 
     audio.addEventListener("play", () => updatePlayState(true));
@@ -680,6 +837,45 @@ function initMusicPlayer() {
     await assignTrackToCar(musicState.currentTrack.id);
   });
 
+  // Direct Delete from Fullscreen / Car Mode
+  document.getElementById("fs-delete-btn")?.addEventListener("click", () => {
+    if (musicState.currentTrack) {
+      deleteTrackItem(musicState.currentTrack.id);
+    }
+  });
+
+  // Volume & Mute in Fullscreen
+  const volSlider = document.getElementById("fs-volume-slider");
+  const muteBtn = document.getElementById("fs-mute-btn");
+  volSlider?.addEventListener("input", (e) => {
+    const v = parseFloat(e.target.value);
+    musicState.volume = v;
+    if (audio) {
+      audio.volume = v;
+      audio.muted = (v === 0);
+    }
+    if (muteBtn) muteBtn.textContent = v === 0 ? "🔇" : (v < 0.5 ? "🔉" : "🔊");
+  });
+
+  muteBtn?.addEventListener("click", () => {
+    if (!audio) return;
+    musicState.isMuted = !musicState.isMuted;
+    audio.muted = musicState.isMuted;
+    muteBtn.textContent = musicState.isMuted ? "🔇" : (musicState.volume < 0.5 ? "🔉" : "🔊");
+  });
+
+  // Speed changer in Fullscreen
+  const speedBtn = document.getElementById("fs-speed-btn");
+  speedBtn?.addEventListener("click", () => {
+    const speeds = [1.0, 1.25, 1.5];
+    const curIdx = speeds.indexOf(musicState.playbackRate);
+    const nextSpeed = speeds[(curIdx + 1) % speeds.length];
+    musicState.playbackRate = nextSpeed;
+    if (audio) audio.playbackRate = nextSpeed;
+    if (speedBtn) speedBtn.textContent = `${nextSpeed}x`;
+    showToast(`⚡ Швидкість відтворення: ${nextSpeed}x`);
+  });
+
   // Scrubber dragging
   const timeSlider = document.getElementById("fs-time-slider");
   timeSlider?.addEventListener("input", (e) => {
@@ -702,8 +898,9 @@ function initMusicPlayer() {
   // Continuous Car Banner Buttons
   document.getElementById("music-play-all-btn")?.addEventListener("click", () => {
     const q = (musicState.tracks && musicState.tracks.length > 0) ? musicState.tracks : musicState.allTracks;
-    if (q.length > 0) {
-      musicState.queue = [...q];
+    const cleanQ = q.filter(t => !musicState.deletedTrackIds.has(String(t.id)));
+    if (cleanQ.length > 0) {
+      musicState.queue = [...cleanQ];
       playTrack(musicState.queue[0], musicState.queue);
       showToast("▶ Запущено відтворення всіх треків підряд!");
     } else {
@@ -713,8 +910,9 @@ function initMusicPlayer() {
 
   document.getElementById("music-shuffle-all-btn")?.addEventListener("click", () => {
     const q = (musicState.tracks && musicState.tracks.length > 0) ? musicState.tracks : musicState.allTracks;
-    if (q.length > 0) {
-      musicState.queue = [...q].sort(() => Math.random() - 0.5);
+    const cleanQ = q.filter(t => !musicState.deletedTrackIds.has(String(t.id)));
+    if (cleanQ.length > 0) {
+      musicState.queue = [...cleanQ].sort(() => Math.random() - 0.5);
       musicState.isShuffle = true;
       document.getElementById("fs-shuffle-btn")?.classList.add("active");
       playTrack(musicState.queue[0], musicState.queue);
@@ -733,9 +931,23 @@ function initMusicPlayer() {
     });
   });
 
-  // Search input & button
+  // Instant local filtering + online search on Enter
   const searchInput = document.getElementById("music-search-input");
   const searchBtn = document.getElementById("music-search-btn");
+
+  searchInput?.addEventListener("input", (e) => {
+    const val = (e.target.value || "").toLowerCase().trim();
+    if (!val) {
+      renderMusicTracks(musicState.tracks);
+      return;
+    }
+    const filtered = (musicState.tracks || []).filter(t =>
+      (t.title && t.title.toLowerCase().includes(val)) ||
+      (t.artist && t.artist.toLowerCase().includes(val))
+    );
+    renderMusicTracks(filtered);
+  });
+
   const runSearch = () => {
     const val = searchInput?.value?.trim();
     if (!val) return;
@@ -745,6 +957,7 @@ function initMusicPlayer() {
       searchMusicOnline(val);
     }
   };
+
   searchBtn?.addEventListener("click", runSearch);
   searchInput?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
