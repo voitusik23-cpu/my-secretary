@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.7.4">
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.5">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -616,9 +616,15 @@
           </div>
 
           <div class="ai-chat-input-bar">
-            <button type="button" id="ai-chat-mic-btn" class="ai-chat-mic-btn" title="Диктувати голосом">🎙️</button>
-            <input type="text" id="ai-chat-input" placeholder="Спитайте, порівняйте речі чи дізнайтесь де купити..." autocomplete="off" />
-            <button type="button" id="ai-chat-send-btn" class="ai-chat-send-btn" title="Надіслати">
+            <button type="button" id="ai-chat-mic-btn" class="ai-chat-mic-btn" title="Диктувати запитання голосом" aria-label="Диктувати голосом">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="22"></line>
+              </svg>
+            </button>
+            <input type="text" id="ai-chat-input" placeholder="Спитайте що завгодно чи диктуйте..." autocomplete="off" />
+            <button type="button" id="ai-chat-send-btn" class="ai-chat-send-btn" title="Надіслати" aria-label="Надіслати">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             </button>
           </div>
@@ -1491,14 +1497,14 @@
     </div>
   </div>
 
-  <script src="/static/modules/ai_chat.js?v=3.7.4"></script>
-  <script src="/static/modules/auth_phone.js?v=3.7.4"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.7.4"></script>
-  <script src="/static/modules/business.js?v=3.7.4"></script>
-  <script src="/static/modules/mailbox.js?v=3.7.4"></script>
-  <script src="/static/modules/movies.js?v=3.7.4"></script>
-  <script src="/static/modules/music.js?v=3.7.4"></script>
-  <script src="/static/app.js?v=3.7.4"></script>
+  <script src="/static/modules/ai_chat.js?v=3.7.5"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.5"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.5"></script>
+  <script src="/static/modules/business.js?v=3.7.5"></script>
+  <script src="/static/modules/mailbox.js?v=3.7.5"></script>
+  <script src="/static/modules/movies.js?v=3.7.5"></script>
+  <script src="/static/modules/music.js?v=3.7.5"></script>
+  <script src="/static/app.js?v=3.7.5"></script>
 </body>
 </html>
 
