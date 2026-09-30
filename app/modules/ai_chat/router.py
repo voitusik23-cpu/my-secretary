@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc
 
@@ -23,6 +23,11 @@ ai_chat_router = APIRouter(
     dependencies=[Depends(verify_secret_key)],
 )
 
+def get_chat_user(request: Request) -> str:
+    """Визначає ідентифікатор користувача для повної ізоляції переписок та контексту."""
+    raw = request.headers.get("x-secretary-user") or request.query_params.get("user") or "admin"
+    return raw.strip() or "admin"
+
 SYSTEM_PROMPT = """Ти — розумний, досвідчений та доброзичливий персональний AI-співрозмовник («Мій Секретар»).
 Користувач звертається до тебе за порадами, бесідою або аналізом.
 Ти вільно володієш українською та російською мовами (відповідай тією ж мовою, якою запитує користувач).
@@ -42,10 +47,12 @@ SYSTEM_PROMPT = """Ти — розумний, досвідчений та доб
 
 
 @ai_chat_router.get("/history", response_model=AIChatHistoryResponse)
-def get_chat_history(limit: int = 50, db: Session = Depends(get_db)):
-    """Отримати історію повідомлень поточного користувача."""
+def get_chat_history(request: Request, limit: int = 50, db: Session = Depends(get_db)):
+    """Отримати історію повідомлень поточного користувача (повністю ізольовано)."""
+    current_user = get_chat_user(request)
     messages = (
         db.query(AIChatMessage)
+        .filter(AIChatMessage.user_phone == current_user)
         .order_by(asc(AIChatMessage.created_at))
         .limit(limit)
         .all()
@@ -54,22 +61,26 @@ def get_chat_history(limit: int = 50, db: Session = Depends(get_db)):
 
 
 @ai_chat_router.delete("/history")
-def clear_chat_history(db: Session = Depends(get_db)):
-    """Очистити історію чату (почати новий діалог)."""
-    count = db.query(AIChatMessage).delete()
+def clear_chat_history(request: Request, db: Session = Depends(get_db)):
+    """Очистити історію чату поточного користувача (почати новий діалог без зачіпання інших)."""
+    current_user = get_chat_user(request)
+    count = db.query(AIChatMessage).filter(AIChatMessage.user_phone == current_user).delete()
     db.commit()
     return {"status": "ok", "deleted_messages": count}
 
 
 @ai_chat_router.post("/message", response_model=AIChatMessageResponse)
-async def send_chat_message(payload: AIChatRequest, db: Session = Depends(get_db)):
-    """Надіслати повідомлення AI-співрозмовнику та отримати відповідь."""
+async def send_chat_message(payload: AIChatRequest, request: Request, db: Session = Depends(get_db)):
+    """Надіслати повідомлення AI-співрозмовнику та отримати відповідь із ізольованим контекстом."""
     user_msg_text = payload.message.strip()
     if not user_msg_text:
         raise HTTPException(status_code=400, detail="Повідомлення не може бути порожнім")
 
-    # 1. Save user message to database
+    current_user = get_chat_user(request)
+
+    # 1. Save user message to database isolated by user_phone
     user_msg = AIChatMessage(
+        user_phone=current_user,
         role="user",
         content=user_msg_text,
         created_at=datetime.utcnow()
@@ -78,12 +89,12 @@ async def send_chat_message(payload: AIChatRequest, db: Session = Depends(get_db
     db.commit()
     db.refresh(user_msg)
 
-    # 2. Load context history (last 8 messages)
+    # 2. Load context history ONLY for this specific user (last 8 messages)
     history_records = []
     if payload.include_history:
         history_records = (
             db.query(AIChatMessage)
-            .filter(AIChatMessage.id != user_msg.id)
+            .filter(AIChatMessage.user_phone == current_user, AIChatMessage.id != user_msg.id)
             .order_by(desc(AIChatMessage.created_at))
             .limit(8)
             .all()
@@ -136,8 +147,9 @@ async def send_chat_message(payload: AIChatRequest, db: Session = Depends(get_db
         if not ai_reply_text:
             ai_reply_text = "Не вдалося отримати відповідь від ШІ. Будь ласка, спробуйте ще раз через кілька секунд."
 
-    # 4. Save assistant response to database
+    # 4. Save assistant response to database isolated by user_phone
     ai_msg = AIChatMessage(
+        user_phone=current_user,
         role="assistant",
         content=ai_reply_text,
         created_at=datetime.utcnow()
