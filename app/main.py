@@ -69,7 +69,7 @@ START_TIME = time.time()
 app = FastAPI(
     title="Мой Секретарь (My Secretary)",
     description="Автономный персональный AI-секретарь на FastAPI и Google Gemini",
-    version="3.7.3",
+    version="3.7.4",
     lifespan=lifespan,
 )
 
