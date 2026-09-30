@@ -1,12 +1,16 @@
-const CACHE_NAME = "my-secretary-v3.6.1";
+const CACHE_NAME = "my-secretary-v3.6.2";
 const STATIC_ASSETS = [
   "/",
   "/static/index.html",
   "/static/styles.css",
   "/static/app.js",
+  "/static/modules/blocks_manager.js",
+  "/static/modules/movies.js",
+  "/static/modules/music.js",
   "/static/manifest.json",
   "/static/icons/icon.svg"
 ];
+
 
 // Install: pre-cache core assets & activate immediately
 self.addEventListener("install", (event) => {

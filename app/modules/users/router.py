@@ -1,6 +1,7 @@
 import json
+import re
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.auth import verify_secret_key
@@ -20,10 +21,11 @@ from app.modules.users.service import (
 )
 
 users_router = APIRouter(
-    prefix="/api/v1/users",
+    prefix="/users",
     tags=["Users & Profiles"],
     dependencies=[Depends(verify_secret_key)],
 )
+
 
 
 @users_router.get("/catalog/modules", response_model=List[ModuleCatalogItem])
@@ -160,3 +162,118 @@ def update_user_settings(user_id: int, payload: UserSettingsUpdate, db: Session 
         custom_system_prompt=settings.custom_system_prompt,
         updated_at=settings.updated_at,
     )
+
+
+@users_router.get("/me/profile")
+def get_current_user_profile(request: Request, db: Session = Depends(get_db)):
+    """Отримати профіль та активні модулі поточного користувача."""
+    raw_user = request.headers.get("x-secretary-user") or request.query_params.get("user") or "admin"
+    clean_user = re.sub(r"[^a-zA-Z0-9_-]", "", raw_user.strip().lower())
+    if not clean_user:
+        clean_user = "admin"
+
+    if clean_user in ("admin", "owner", "default"):
+        user = get_or_create_default_admin(db)
+    else:
+        user = db.query(User).filter(User.username == clean_user).first()
+        if not user:
+            user = User(
+                username=clean_user,
+                display_name=clean_user.capitalize(),
+                role="guest",
+                is_active=True,
+            )
+            db.add(user)
+            db.flush()
+            default_mods = ["feed", "music", "movies", "tasks", "shopping"]
+            settings_obj = UserSettings(
+                user_id=user.id,
+                enabled_modules_json=json.dumps(default_mods),
+                ai_persona="friendly",
+                currency="UAH",
+            )
+            db.add(settings_obj)
+            db.commit()
+            db.refresh(user)
+
+    enabled_mods = []
+    if user.settings and user.settings.enabled_modules_json:
+        try:
+            enabled_mods = json.loads(user.settings.enabled_modules_json)
+        except Exception:
+            enabled_mods = []
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "display_name": user.display_name,
+        "role": user.role,
+        "enabled_modules": enabled_mods,
+        "currency": user.settings.currency if user.settings else "UAH",
+        "ai_persona": user.settings.ai_persona if user.settings else "warm_concierge",
+    }
+
+
+@users_router.put("/me/modules")
+def update_current_user_modules(payload: dict, request: Request, db: Session = Depends(get_db)):
+    """Оновити список активних модулів поточного користувача."""
+    raw_user = request.headers.get("x-secretary-user") or request.query_params.get("user") or "admin"
+    clean_user = re.sub(r"[^a-zA-Z0-9_-]", "", raw_user.strip().lower())
+    if not clean_user:
+        clean_user = "admin"
+
+    if clean_user in ("admin", "owner", "default"):
+        user = get_or_create_default_admin(db)
+    else:
+        user = db.query(User).filter(User.username == clean_user).first()
+        if not user:
+            user = User(
+                username=clean_user,
+                display_name=clean_user.capitalize(),
+                role="guest",
+                is_active=True,
+            )
+            db.add(user)
+            db.flush()
+
+    if not user.settings:
+        user.settings = UserSettings(user_id=user.id, enabled_modules_json="[]")
+        db.add(user.settings)
+
+    new_mods = payload.get("enabled_modules", [])
+    user.settings.enabled_modules_json = json.dumps(new_mods)
+    db.commit()
+
+    return {"status": "ok", "enabled_modules": new_mods}
+
+
+@users_router.post("/invite")
+def create_invite_link(payload: dict, request: Request):
+    """
+    Генератор швидких персональних посилань для друзів/сім'ї.
+    Створює посилання без встановлення додаткових додатків.
+    """
+    username = payload.get("username", "").strip()
+    clean_user = re.sub(r"[^a-zA-Z0-9_-]", "", username.lower())
+    if not clean_user:
+        raise HTTPException(status_code=400, detail="Вкажіть коректне ім'я користувача (латиницею)")
+
+    from app.config import settings
+    base_url = str(request.base_url).rstrip("/")
+    # Forwarded host check for Cloudflare / Reverse Proxy
+    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    forwarded_proto = request.headers.get("x-forwarded-proto", "https")
+    if forwarded_host:
+        base_url = f"{forwarded_proto}://{forwarded_host}"
+
+    secret_key = settings.SECRET_KEY.strip() if settings.SECRET_KEY else ""
+    invite_url = f"{base_url}/?user={clean_user}"
+    if secret_key:
+        invite_url += f"&key={secret_key}"
+
+    return {
+        "username": clean_user,
+        "invite_url": invite_url,
+        "instructions": "Надішліть це посилання другу. Він відкриє його у Safari/Chrome і зможе додати на головний екран в 1 клік."
+    }
+

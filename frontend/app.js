@@ -7,10 +7,15 @@ const initialKey = urlParams.get("key") || localStorage.getItem("secret_key") ||
 if (urlParams.get("key")) {
   localStorage.setItem("secret_key", initialKey);
 }
+const initialUser = urlParams.get("user") || localStorage.getItem("secretary_user") || "admin";
+if (urlParams.get("user")) {
+  localStorage.setItem("secretary_user", initialUser);
+}
 
 const state = {
   activeTab: "feed",
   secretKey: initialKey,
+  currentUser: initialUser,
   serverUrl: localStorage.getItem("server_url") || window.location.origin,
   isRecording: false,
   mediaRecorder: null,
@@ -18,6 +23,7 @@ const state = {
   recordInterval: null,
   recordStartTime: null,
 };
+
 
 // --- Service Worker Registration with Safe Auto-Update ---
 if ("serviceWorker" in navigator) {
@@ -31,7 +37,7 @@ if ("serviceWorker" in navigator) {
     });
 
     navigator.serviceWorker
-      .register("/sw.js?v=3.6.1")
+      .register("/sw.js?v=3.6.2")
       .then((reg) => {
         reg.update().catch(() => {});
       })
@@ -49,6 +55,10 @@ async function apiFetch(endpoint, options = {}) {
   if (state.secretKey) {
     headers["X-Secret-Key"] = state.secretKey;
   }
+  if (state.currentUser) {
+    headers["X-Secretary-User"] = state.currentUser;
+  }
+
 
   // Set Content-Type only if not FormData
   if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
@@ -3796,15 +3806,19 @@ document.addEventListener("DOMContentLoaded", () => {
   initVoice();
   initTextInput();
   initTabs();
+  if (window.BlocksManager && typeof window.BlocksManager.initBlocksManager === "function") {
+    window.BlocksManager.initBlocksManager();
+  }
   initSettingsModal();
   initManualAddModal();
   initStep2Handlers();
   initStep3Handlers();
   initStep5Handlers();
   initVitalsScreen();
-  initMusicPlayer();
+  if (typeof initMusicPlayer === "function") initMusicPlayer();
   initNetworkListeners();
   checkHealth();
   checkSystemFeatures();
   loadFeed();
 });
+

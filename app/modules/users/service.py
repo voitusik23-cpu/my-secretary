@@ -97,9 +97,25 @@ MODULE_CATALOG: List[ModuleCatalogItem] = [
     ModuleCatalogItem(
         id="movies",
         title="Фільми та серіали",
-        description="Список 'Що подивитися', оцінки, жанри",
+        description="Онлайн-перегляд, закладки, пошук фільмів",
         category="Дозвілля",
         icon="🎬",
+        default_for_roles=["admin", "family", "child", "guest"]
+    ),
+    ModuleCatalogItem(
+        id="music",
+        title="Музика та плеєр (в авто)",
+        description="Стрімінг, Shazam-треки, офлайн-кеш, автоплейлист для поїздок",
+        category="Дозвілля",
+        icon="🎵",
+        default_for_roles=["admin", "family", "child", "guest"]
+    ),
+    ModuleCatalogItem(
+        id="media",
+        title="Склерозник та замітки",
+        description="Швидкі нотатки, збережені посилання, фото, пам'ятки",
+        category="Продуктивність",
+        icon="🧠",
         default_for_roles=["admin", "family", "child", "guest"]
     ),
     ModuleCatalogItem(
@@ -110,7 +126,16 @@ MODULE_CATALOG: List[ModuleCatalogItem] = [
         icon="🌐",
         default_for_roles=["admin", "family", "child"]
     ),
+    ModuleCatalogItem(
+        id="agent",
+        title="Розумний пошук та аналітика",
+        description="Пошук в інтернеті, аналіз веб-сторінок через ШІ",
+        category="Інструменти",
+        icon="🔍",
+        default_for_roles=["admin", "family"]
+    ),
 ]
+
 
 
 def get_default_modules_for_role(role: str) -> List[str]:

@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.6.1">
+  <link rel="stylesheet" href="/static/styles.css?v=3.6.2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -55,7 +55,11 @@
         </div>
       </div>
       <div class="header-actions">
+        <button id="blocks-toggle-btn" class="icon-btn" title="Конструктор блоків" aria-label="Конструктор блоків">
+          <span style="font-size: 1.15rem; line-height: 1;">🧩</span>
+        </button>
         <button id="theme-toggle-btn" class="icon-btn" title="Переключить тему" aria-label="Сменить тему">
+
           <svg class="sun-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="5"></circle>
             <line x1="12" y1="1" x2="12" y2="3"></line>
@@ -1100,6 +1104,43 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.6.1"></script>
+  <!-- Step 7: Block Manager Modal (Конструктор блоків) -->
+  <div id="blocks-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="blocks-modal-title">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 id="blocks-modal-title">🧩 Конструктор блоків</h3>
+        <button id="blocks-modal-close-btn" class="icon-btn-close" aria-label="Закрити">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px;">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.45;">
+          Увімкніть тільки ті блоки, які вам потрібні. Зайві вкладки будуть сховані, залишаючи інтерфейс чистим:
+        </p>
+
+        <!-- Presets Bar -->
+        <div class="blocks-presets-bar">
+          <button type="button" id="preset-media-blocks-btn" class="preset-pill-btn">🎵 Музика + Кіно</button>
+          <button type="button" id="preset-car-blocks-btn" class="preset-pill-btn">🚗 Для авто</button>
+          <button type="button" id="preset-all-blocks-btn" class="preset-pill-btn">⚡ Усі блоки</button>
+        </div>
+
+        <!-- Dynamic List of Blocks -->
+        <div id="blocks-modal-list" class="blocks-modal-grid">
+          <!-- Populated dynamically by blocks_manager.js -->
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 14px;">
+          <button id="blocks-save-btn" class="btn-primary" style="flex: 1; padding: 12px; font-weight: 700; border-radius: 10px; border: none; cursor: pointer; background: var(--primary); color: #fff;">
+            💾 Зберегти налаштування
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/modules/blocks_manager.js?v=3.6.2"></script>
+  <script src="/static/modules/movies.js?v=3.6.2"></script>
+  <script src="/static/modules/music.js?v=3.6.2"></script>
+  <script src="/static/app.js?v=3.6.2"></script>
 </body>
 </html>
+
