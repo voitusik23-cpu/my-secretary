@@ -15,7 +15,7 @@ const ALL_APP_BLOCKS = [
 
   { id: "fitness", label: "Спорт та активність", icon: "🏃", desc: "Кроки, дистанція, тренування, вага" },
   { id: "vitals", label: "Тиск та пульс", icon: "❤️", desc: "Журнал артеріального тиску, графіки норми" },
-  { id: "media", label: "Склерозник / Замітки", icon: "🧠", desc: "Пам'ятки, фото документів, збережені посилання" },
+  { id: "vault", label: "🔒 Склерозник (Паролі та ШІ)", icon: "🔒", desc: "Сейф паролів, ШІ, соцмережі, Wi-Fi, біржі, 2FA, фото блокнота" },
   { id: "inventory", label: "Де що лежить (Інвентар)", icon: "📦", desc: "Швидкий пошук домашніх речей та інструментів" },
   { id: "auto", label: "Гараж та авто", icon: "🚗", desc: "Пробіг, витрати на ТО, страховка" },
   { id: "utilities", label: "Лічильники та ЖКГ", icon: "💡", desc: "Показники світла, води, газу та квитанції" },
@@ -41,7 +41,16 @@ function getLocalEnabledBlocks() {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Auto-enable vault if user had media or if vault missing for admin/owner
+        if (parsed.includes("media") && !parsed.includes("vault")) {
+          parsed.push("vault");
+        }
+        if (!parsed.includes("vault") && (user === "admin" || user === "owner" || user === "default")) {
+          parsed.push("vault");
+        }
+        return parsed;
+      }
     } catch (e) {}
   }
   // Default: if admin/owner -> all blocks, if friend/guest -> guest blocks
@@ -70,7 +79,8 @@ function applyEnabledBlocks(blocks) {
     const tabName = btn.dataset.tab;
     if (!tabName) return;
 
-    if (blocks.includes(tabName)) {
+    const isEnabled = blocks.includes(tabName) || (tabName === "vault" && (blocks.includes("media") || blocks.includes("vault")));
+    if (isEnabled) {
       btn.classList.remove("block-hidden");
       if (!firstVisibleTab) firstVisibleTab = tabName;
       if (btn.classList.contains("active")) {

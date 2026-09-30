@@ -28,7 +28,7 @@ const state = {
 
 
 // --- Service Worker Registration with Safe Auto-Update & Hard-Cache Flush ---
-const APP_VERSION = "3.7.8";
+const APP_VERSION = "3.7.9";
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // If version changed, purge old caches to prevent stale script/audio issues on iPhone
@@ -500,20 +500,25 @@ async function loadFeed() {
       .map((item) => {
         let badgeClass = `badge-${item.domain}`;
         if (item.domain === "finance" && item.is_positive) badgeClass += " positive";
-        const dateStr = new Date(item.created_at).toLocaleString("ru-RU", {
+        const dateStr = new Date(item.created_at).toLocaleString("uk-UA", {
           day: "numeric",
           month: "short",
           hour: "2-digit",
           minute: "2-digit",
         });
 
+        const isVault = item.domain === "vault";
+        const clickAttr = isVault ? `onclick="window.switchToTab('vault')"` : "";
+        const cardStyle = isVault ? `style="cursor:pointer;"` : "";
+
         return `
-          <div class="item-card">
+          <div class="item-card" ${clickAttr} ${cardStyle}>
             <div class="item-content">
               <span class="item-title ${item.is_completed ? "completed" : ""}">${escapeHtml(item.title)}</span>
               <span class="item-subtitle">${escapeHtml(item.subtitle)} • ${dateStr}</span>
               <span class="item-badge ${badgeClass}">${escapeHtml(item.badge || item.domain)}</span>
             </div>
+            ${isVault ? `<div class="item-actions"><span style="font-size:0.78rem;color:#38bdf8;font-weight:700;">Перейти ➔</span></div>` : ''}
           </div>`;
       })
       .join("");

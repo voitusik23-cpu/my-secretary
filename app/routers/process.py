@@ -124,13 +124,40 @@ async def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Di
                     db.flush()
                     created_items["business"].append(BusinessTransactionResponse.model_validate(b_tx).model_dump())
 
+            elif domain in ["vault", "vault_items"]:
+                from app.modules.vault.models import VaultItem
+                from app.modules.vault.schemas import VaultItemResponse
+                v_title = data.get("title") or data.get("name") or "Новий доступ"
+                v_cat = data.get("category") or "other"
+                v_login = data.get("login") or data.get("username") or data.get("email") or data.get("ssid")
+                v_pwd = data.get("password") or data.get("pin")
+                v_url = data.get("website_url") or data.get("url")
+                v_plan = data.get("plan_type")
+                v_2fa = data.get("two_factor_note") or data.get("2fa")
+                v_notes = data.get("notes") or data.get("comment")
+
+                v_item = VaultItem(
+                    title=v_title,
+                    category=v_cat,
+                    login=v_login,
+                    password=v_pwd,
+                    website_url=v_url,
+                    plan_type=v_plan,
+                    two_factor_note=v_2fa,
+                    notes=v_notes,
+                    user_phone="admin",
+                )
+                db.add(v_item)
+                db.flush()
+                created_items.setdefault("vault", []).append(VaultItemResponse.model_validate(v_item).model_dump())
+
         except Exception as e:
             continue
 
     db.commit()
     try:
         from app.core.undo_service import record_action
-        for dom in ["shopping", "finance", "tasks", "media_notes", "auto", "health_vitals", "movies", "music", "business"]:
+        for dom in ["shopping", "finance", "tasks", "media_notes", "auto", "health_vitals", "movies", "music", "business", "vault"]:
             its = created_items.get(dom, [])
             if its:
                 ids = [it["id"] for it in its if "id" in it]
@@ -270,6 +297,43 @@ def get_unified_feed(db: Session = Depends(get_db), limit: int = 40):
             "badge": m.status,
             "url": m.url,
         })
+
+    # 5. Vault / Склерозник
+    try:
+        from app.modules.vault.models import VaultItem
+        vault_items = db.query(VaultItem).order_by(desc(VaultItem.created_at)).limit(limit // 2).all()
+        cat_labels = {
+            "ai": "🤖 ШІ",
+            "social": "💬 Соцмережі",
+            "email": "📬 Пошта",
+            "crypto": "📈 Крипта",
+            "wifi": "📶 Wi-Fi",
+            "devices": "📱 Гаджети",
+            "other": "🔒 Сейф"
+        }
+        for v in vault_items:
+            cat_badge = cat_labels.get(v.category, "🔒 Сейф")
+            sub_parts = []
+            if v.login:
+                lbl = "SSID" if v.category == "wifi" else "Логін"
+                sub_parts.append(f"{lbl}: {v.login}")
+            if v.plan_type:
+                sub_parts.append(f"Тариф: {v.plan_type.upper()}")
+            if v.notes:
+                sub_parts.append(v.notes)
+            sub_text = " • ".join(sub_parts) if sub_parts else "Пароль збережено в Склерознику"
+
+            feed.append({
+                "domain": "vault",
+                "id": v.id,
+                "title": f"🔒 {v.title}",
+                "subtitle": sub_text,
+                "created_at": v.created_at.isoformat() if v.created_at else datetime.utcnow().isoformat(),
+                "badge": cat_badge,
+                "is_completed": False,
+            })
+    except Exception as e:
+        pass
 
     # Сортировка по дате добавления (новые сверху)
     feed.sort(key=lambda x: x["created_at"], reverse=True)
