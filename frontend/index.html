@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.6.9">
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -189,8 +189,8 @@
         <span class="tab-label">Счетчики</span>
       </button>
       <button class="tab-btn" data-tab="agent" role="tab" aria-selected="false">
-        <span class="tab-icon">🔍</span>
-        <span class="tab-label">Поиск</span>
+        <span class="tab-icon">🤖</span>
+        <span class="tab-label">AI-Чат</span>
       </button>
       <button class="tab-btn hidden" id="tab-btn-hospitality" data-tab="hospitality" role="tab" aria-selected="false">
         <span class="tab-icon">🏨</span>
@@ -597,53 +597,26 @@
         </div>
       </section>
 
-      <!-- 9. WEB SEARCH AGENT TAB -->
+      <!-- 9. AI CHAT & COMPANION TAB -->
       <section id="tab-agent" class="tab-panel">
         <div class="panel-header">
-          <h2>🔍 AI-Агент (Розумний Пошук)</h2>
-          <button id="agent-tts-btn" class="action-btn-sm hidden" title="Озвучити відповідь голосом">🔊 Озвучити</button>
-        </div>
-
-        <div class="stat-card" style="margin-bottom:8px;background:rgba(6,182,212,0.08);border-color:rgba(6,182,212,0.25);">
-          <p style="font-size:0.85rem;color:var(--text-main);margin:0;">
-            🤖 Запитуйте будь-що у реальному часі: погоду, актуальні курси, ремонт, інструкції чи сайти. Голосом або текстом!
-          </p>
-        </div>
-
-        <!-- Quick suggestion chips -->
-        <div class="agent-chips-container" id="agent-chips-container">
-          <button type="button" class="agent-chip" data-q="Яка погода в Одесі на найближчі дні?">🌤️ Погода в Одесі</button>
-          <button type="button" class="agent-chip" data-q="Актуальний курс долара та євро в Україні сьогодні">💶 Курс валют</button>
-          <button type="button" class="agent-chip" data-q="Покрокова інструкція як правильно класти плитку у дворі">🧱 Як класти плитку</button>
-          <button type="button" class="agent-chip" data-q="Коли за законом міняти літню гуму на зимову в Україні">🚗 Зимова гума</button>
-        </div>
-
-        <!-- Agent Search Form with dedicated Voice Mic -->
-        <form id="agent-search-form" class="quick-input-form" style="margin-top:2px;">
-          <button type="button" id="agent-voice-btn" class="icon-btn-mic" title="Диктувати запит голосом">🎙️</button>
-          <input type="text" id="agent-query-input" placeholder="«Яка погода в Одесі?», «Як полагодити...»" autocomplete="off" />
-          <button type="submit" class="send-btn" title="Запитати агента">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-          </button>
-        </form>
-
-        <div id="agent-loading" class="empty-state hidden" style="padding:20px;">
-          <div style="font-size:1.5rem;animation:pulse-mic 1s infinite;">🌐</div>
-          <p>Агент шукає та аналізує дані в інтернеті...</p>
-        </div>
-
-        <div id="agent-response-card" class="stat-card hidden" style="margin-top:10px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:6px;flex-wrap:wrap;">
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:1.1rem;">💡</span>
-              <strong id="agent-res-query" style="font-size:0.95rem;"></strong>
-            </div>
-            <button id="agent-copy-btn" class="action-btn-sm" style="font-size:0.75rem;padding:3px 8px;">📋 Копіювати</button>
+          <h2>🤖 AI-Співрозмовник</h2>
+          <div class="panel-actions">
+            <button type="button" id="ai-chat-clear-btn" class="action-btn-sm" title="Очистити історію">🗑️ Новий діалог</button>
           </div>
-          <div id="agent-res-answer" style="font-size:0.9rem;line-height:1.6;color:var(--text-main);"></div>
-          <div id="agent-res-sources" style="margin-top:12px;border-top:1px solid var(--border-color);padding-top:8px;" class="hidden">
-            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">Джерела та корисні сайти:</span>
-            <div id="agent-sources-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;"></div>
+        </div>
+
+        <div class="ai-chat-wrapper">
+          <div id="ai-chat-messages-container" class="ai-chat-feed">
+            <!-- Messages rendered by AIChatModule -->
+          </div>
+
+          <div class="ai-chat-input-bar">
+            <button type="button" id="ai-chat-mic-btn" class="ai-chat-mic-btn" title="Диктувати голосом">🎙️</button>
+            <input type="text" id="ai-chat-input" placeholder="Спитайте, порівняйте речі чи дізнайтесь де купити..." autocomplete="off" />
+            <button type="button" id="ai-chat-send-btn" class="ai-chat-send-btn" title="Надіслати">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
           </div>
         </div>
       </section>
@@ -1355,12 +1328,13 @@
     </div>
   </div>
 
-  <script src="/static/modules/auth_phone.js?v=3.6.9"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.6.9"></script>
-  <script src="/static/modules/business.js?v=3.6.9"></script>
-  <script src="/static/modules/movies.js?v=3.6.9"></script>
-  <script src="/static/modules/music.js?v=3.6.9"></script>
-  <script src="/static/app.js?v=3.6.9"></script>
+  <script src="/static/modules/ai_chat.js?v=3.7.0"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.0"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.0"></script>
+  <script src="/static/modules/business.js?v=3.7.0"></script>
+  <script src="/static/modules/movies.js?v=3.7.0"></script>
+  <script src="/static/modules/music.js?v=3.7.0"></script>
+  <script src="/static/app.js?v=3.7.0"></script>
 </body>
 </html>
 

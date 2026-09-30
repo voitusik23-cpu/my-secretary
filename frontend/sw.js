@@ -1,9 +1,10 @@
-const CACHE_NAME = "my-secretary-v3.6.9";
+const CACHE_NAME = "my-secretary-v3.7.0";
 const STATIC_ASSETS = [
   "/",
   "/static/index.html",
   "/static/styles.css",
   "/static/app.js",
+  "/static/modules/ai_chat.js",
   "/static/modules/auth_phone.js",
   "/static/modules/blocks_manager.js",
   "/static/modules/business.js",

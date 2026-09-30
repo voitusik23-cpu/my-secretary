@@ -442,7 +442,8 @@ function loadTabData(tab) {
       loadHospitality();
       break;
     case "agent":
-      document.getElementById("agent-query-input")?.focus();
+      if (typeof window.loadAgentTab === "function") window.loadAgentTab();
+      document.getElementById("ai-chat-input")?.focus();
       break;
     case "translator":
       initTranslatorScreen();
@@ -2763,6 +2764,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   if (window.BusinessModule && typeof window.BusinessModule.init === "function") {
     window.BusinessModule.init();
+  }
+  if (window.AIChatModule && typeof window.AIChatModule.init === "function") {
+    window.AIChatModule.init();
   }
 
   initSettingsModal();

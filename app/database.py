@@ -84,6 +84,7 @@ def init_all_models():
         from app.modules.users.models import User, UserSettings
         from app.modules.utilities.models import UtilityReading
         from app.modules.business.models import BusinessTransaction
+        from app.modules.ai_chat.models import AIChatMessage
     except Exception as e:
         import logging
         logging.getLogger("my_secretary.db").warning(f"Model registration warning: {e}")

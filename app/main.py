@@ -31,6 +31,7 @@ from app.modules.plants import plants_router, Plant
 from app.modules.recipes import recipes_router, Recipe
 from app.modules.music import music_router, MusicTrack, MusicPlaylist
 from app.modules.business import business_router, BusinessTransaction
+from app.modules.ai_chat import ai_chat_router
 from app.core import web_agent_router, gemini_router, system_router, start_nightly_backup_task
 from app.core.undo_service import router as undo_router
 from app.database import Base, engine
@@ -99,6 +100,7 @@ api_v1.include_router(plants_router)
 api_v1.include_router(recipes_router)
 api_v1.include_router(music_router)
 api_v1.include_router(business_router)
+api_v1.include_router(ai_chat_router)
 
 
 # Dormant Hospitality Module (Feature-flagged)
