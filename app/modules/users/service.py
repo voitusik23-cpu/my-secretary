@@ -119,6 +119,14 @@ MODULE_CATALOG: List[ModuleCatalogItem] = [
         default_for_roles=["admin", "family", "child", "guest"]
     ),
     ModuleCatalogItem(
+        id="business",
+        title="Бизнес и касса",
+        description="Учет доходов и расходов бизнеса, баланс на руках, быстрый отчет",
+        category="Финансы",
+        icon="💼",
+        default_for_roles=["admin"]
+    ),
+    ModuleCatalogItem(
         id="translator",
         title="Перекладач ІІ",
         description="Миттєвий переклад текстів і вивчення мов",

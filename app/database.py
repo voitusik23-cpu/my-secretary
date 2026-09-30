@@ -83,6 +83,7 @@ def init_all_models():
         from app.modules.recipes.models import Recipe
         from app.modules.users.models import User, UserSettings
         from app.modules.utilities.models import UtilityReading
+        from app.modules.business.models import BusinessTransaction
     except Exception as e:
         import logging
         logging.getLogger("my_secretary.db").warning(f"Model registration warning: {e}")

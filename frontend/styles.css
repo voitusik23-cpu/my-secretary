@@ -2319,6 +2319,217 @@ body {
   color: var(--primary);
 }
 
+/* --- Business & Cashflow Module Styles --- */
+.biz-balance-hero {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+.biz-balance-hero.positive {
+  border-color: rgba(48, 209, 88, 0.4);
+  background: linear-gradient(145deg, var(--bg-card), rgba(48, 209, 88, 0.08));
+}
+
+.biz-balance-hero.negative {
+  border-color: rgba(255, 69, 58, 0.4);
+  background: linear-gradient(145deg, var(--bg-card), rgba(255, 69, 58, 0.08));
+}
+
+.biz-balance-hero.neutral {
+  border-color: var(--border-color);
+}
+
+.biz-balance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.biz-balance-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.biz-balance-amount {
+  font-size: 2.2rem;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  margin-bottom: 14px;
+}
+
+.biz-balance-hero.positive .biz-balance-amount {
+  color: #30d158;
+}
+
+.biz-balance-hero.negative .biz-balance-amount {
+  color: #ff453a;
+}
+
+.biz-balance-hero.neutral .biz-balance-amount {
+  color: var(--text-main);
+}
+
+.biz-stats-row {
+  display: flex;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.biz-stat-item {
+  flex: 1;
+}
+
+.biz-stat-title {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+
+.biz-stat-val {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.biz-stat-val.income {
+  color: #30d158;
+}
+
+.biz-stat-val.expense {
+  color: #ff453a;
+}
+
+.biz-actions-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.biz-report-btn {
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 3px 10px rgba(14, 165, 233, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.biz-report-btn:active {
+  transform: scale(0.98);
+}
+
+.biz-input-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 18px;
+}
+
+.biz-quick-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.biz-tx-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.biz-tx-card:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.biz-tx-card.biz-tx-income {
+  border-left: 4px solid #30d158;
+}
+
+.biz-tx-card.biz-tx-expense {
+  border-left: 4px solid #ff453a;
+}
+
+.biz-tx-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.biz-tx-badge {
+  font-size: 1.25rem;
+}
+
+.biz-tx-desc {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.biz-tx-meta {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.biz-tx-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.biz-tx-amount {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.biz-tx-amount.biz-tx-income {
+  color: #30d158;
+}
+
+.biz-tx-amount.biz-tx-expense {
+  color: #ff453a;
+}
+
+.biz-tx-del-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.95rem;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 4px;
+  transition: opacity 0.2s;
+}
+
+.biz-tx-del-btn:hover {
+  opacity: 1;
+}
+
+
 
 
 

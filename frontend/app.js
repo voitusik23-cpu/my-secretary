@@ -37,7 +37,7 @@ if ("serviceWorker" in navigator) {
     });
 
     navigator.serviceWorker
-      .register("/sw.js?v=3.6.4")
+      .register("/sw.js?v=3.6.5")
       .then((reg) => {
         reg.update().catch(() => {});
       })
@@ -392,6 +392,10 @@ function loadTabData(tab) {
     case "finance":
       loadFinance();
       break;
+    case "business":
+      if (typeof window.loadBusinessTab === "function") window.loadBusinessTab();
+      break;
+
     case "shopping":
       loadShopping();
       break;
@@ -2745,6 +2749,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (window.BlocksManager && typeof window.BlocksManager.initBlocksManager === "function") {
     window.BlocksManager.initBlocksManager();
   }
+  if (window.BusinessModule && typeof window.BusinessModule.init === "function") {
+    window.BusinessModule.init();
+  }
+
   initSettingsModal();
   initManualAddModal();
   initStep2Handlers();

@@ -139,6 +139,11 @@
         <span class="tab-icon">💰</span>
         <span class="tab-label">Финансы</span>
       </button>
+      <button class="tab-btn" data-tab="business" role="tab" aria-selected="false">
+        <span class="tab-icon">💼</span>
+        <span class="tab-label">Бизнес</span>
+      </button>
+
       <button class="tab-btn" data-tab="shopping" role="tab" aria-selected="false">
         <span class="tab-icon">🛒</span>
         <span class="tab-label">Покупки</span>
@@ -235,6 +240,94 @@
 
         <div id="finance-list" class="items-list">
           <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- 2B. BUSINESS & CASHFLOW TAB -->
+      <section id="tab-business" class="tab-panel">
+        <div class="panel-header">
+          <h2>💼 Бізнес і каса</h2>
+          <div class="panel-actions">
+            <button id="biz-refresh-btn" class="action-btn-sm">🔄 Оновити</button>
+            <button id="biz-copy-report-btn" class="biz-report-btn">📋 Скопіювати звіт</button>
+          </div>
+        </div>
+
+        <!-- Big Balance Hero Card -->
+        <div id="biz-balance-card" class="biz-balance-hero neutral">
+          <div class="biz-balance-header">
+            <span class="biz-balance-label">Залишок / Баланс у кишені</span>
+            <span id="biz-count-val" style="font-size:0.8rem;color:var(--text-muted);">0 операцій</span>
+          </div>
+          <div id="biz-balance-val" class="biz-balance-amount">0 ₴</div>
+          <div class="biz-stats-row">
+            <div class="biz-stat-item">
+              <div class="biz-stat-title">🟢 Надходження (+)</div>
+              <div id="biz-income-val" class="biz-stat-val income">+0 ₴</div>
+            </div>
+            <div class="biz-stat-item">
+              <div class="biz-stat-title">🔴 Витрати (-)</div>
+              <div id="biz-expense-val" class="biz-stat-val expense">-0 ₴</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Entry Card -->
+        <div class="biz-input-card">
+          <div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">
+            ✍️ Швидкий запис операції
+          </div>
+
+          <!-- Quick Text Input (ChatGPT style) -->
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <input 
+              type="text" 
+              id="biz-quick-text-input" 
+              placeholder="«отримав оренду офіс 100000» або «зарплата толіку 40000»" 
+              style="flex:1;padding:11px 14px;border-radius:10px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-main);font-size:0.9rem;"
+            />
+            <button type="button" id="biz-quick-submit-btn" class="btn-primary" style="padding:10px 16px;border-radius:10px;border:none;background:var(--primary);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap;">
+              ⚡ Записати
+            </button>
+          </div>
+
+          <div style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">
+            — або заповніть поля вручну —
+          </div>
+
+          <!-- Structured Form -->
+          <div class="biz-quick-form">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <input 
+                type="text" 
+                id="biz-desc-input" 
+                placeholder="Опис (напр. Оренда офіс, Зарплата Толіку...)" 
+                style="flex:2;min-width:180px;padding:11px 14px;border-radius:10px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-main);font-size:0.9rem;"
+              />
+              <input 
+                type="number" 
+                id="biz-amount-input" 
+                placeholder="Сума (грн)" 
+                style="flex:1;min-width:110px;padding:11px 14px;border-radius:10px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-main);font-size:0.9rem;font-weight:700;"
+              />
+            </div>
+            <div style="display:flex;gap:10px;">
+              <button type="button" id="biz-add-income-btn" style="flex:1;padding:12px;border-radius:10px;border:none;background:#30d158;color:#fff;font-weight:800;font-size:0.92rem;cursor:pointer;">
+                🟢 + Дохід (Прихід)
+              </button>
+              <button type="button" id="biz-add-expense-btn" style="flex:1;padding:12px;border-radius:10px;border:none;background:#ff453a;color:#fff;font-weight:800;font-size:0.92rem;cursor:pointer;">
+                🔴 - Витрата
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transactions List -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <h3 style="font-size:1rem;margin:0;font-weight:700;">Історія каси</h3>
+        </div>
+        <div id="biz-transactions-list" class="items-list">
+          <!-- Populated by business.js -->
         </div>
       </section>
 
@@ -1182,11 +1275,12 @@
     </div>
   </div>
 
-  <script src="/static/modules/auth_phone.js?v=3.6.4"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.6.4"></script>
-  <script src="/static/modules/movies.js?v=3.6.4"></script>
-  <script src="/static/modules/music.js?v=3.6.4"></script>
-  <script src="/static/app.js?v=3.6.4"></script>
+  <script src="/static/modules/auth_phone.js?v=3.6.5"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.6.5"></script>
+  <script src="/static/modules/business.js?v=3.6.5"></script>
+  <script src="/static/modules/movies.js?v=3.6.5"></script>
+  <script src="/static/modules/music.js?v=3.6.5"></script>
+  <script src="/static/app.js?v=3.6.5"></script>
 </body>
 </html>
 
