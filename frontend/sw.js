@@ -1,4 +1,4 @@
-const CACHE_NAME = "my-secretary-v3.7.2";
+const CACHE_NAME = "my-secretary-v3.7.3";
 const STATIC_ASSETS = [
   "/",
   "/static/index.html",
@@ -47,6 +47,12 @@ self.addEventListener("activate", (event) => {
 // Fetch: Network-First for API, HTML, CSS and JS; Stale-While-Revalidate for images
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
+
+  // 0. Audio streams: NEVER intercept through Service Worker!
+  // Bypasses SW entirely so browser / iOS Safari gets native Range requests (HTTP 206) and zero audio caching
+  if (url.pathname.startsWith("/api/v1/music/stream")) {
+    return;
+  }
 
   // 1. API calls: Always Network-First, offline JSON fallback
   if (url.pathname.startsWith("/api/")) {

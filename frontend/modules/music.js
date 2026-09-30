@@ -140,9 +140,11 @@ function playTrack(track, queue = null) {
     musicState.currentIndex = musicState.queue.length - 1;
   }
 
-  // Construct authenticated stream url with ?key= and cache buster
-  const keyParam = state.secretKey ? `?key=${encodeURIComponent(state.secretKey)}` : "";
-  const streamUrl = `${state.serverUrl}/api/v1/music/stream/${track.id}${keyParam}`;
+  // Construct authenticated stream url with ?key= and timestamp cache buster
+  const keyParam = state.secretKey ? `key=${encodeURIComponent(state.secretKey)}` : "";
+  const tParam = `_t=${Date.now()}`;
+  const queryStr = [keyParam, tParam].filter(Boolean).join("&");
+  const streamUrl = `${state.serverUrl}/api/v1/music/stream/${track.id}?${queryStr}`;
 
   try {
     audio.pause();

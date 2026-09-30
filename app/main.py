@@ -44,6 +44,17 @@ async def lifespan(app: FastAPI):
     init_db()
     Base.metadata.create_all(bind=engine)
 
+    # Purge any orphaned or mismatched audio cache on startup
+    try:
+        from app.database import SessionLocal
+        from app.modules.music.service import clean_orphan_cache
+        with SessionLocal() as db:
+            purged = clean_orphan_cache(db)
+            if purged > 0:
+                print(f"[Music] Purged {purged} invalid/orphan cache files on startup")
+    except Exception as e:
+        print(f"[Music] Startup cache cleaning warning: {e}")
+
     # Start background Google Drive nightly backup task
     backup_task = asyncio.create_task(start_nightly_backup_task())
     try:
@@ -58,7 +69,7 @@ START_TIME = time.time()
 app = FastAPI(
     title="Мой Секретарь (My Secretary)",
     description="Автономный персональный AI-секретарь на FastAPI и Google Gemini",
-    version="3.1.0",
+    version="3.7.3",
     lifespan=lifespan,
 )
 

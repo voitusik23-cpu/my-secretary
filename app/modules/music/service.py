@@ -101,16 +101,63 @@ def _extract_audio_stream_sync(artist: str, title: str) -> Optional[str]:
     return None
 
 
-def _download_and_cache_track_sync(track_id: int, artist: str, title: str) -> Optional[str]:
-    """Завантажує трек у локальний кеш сервера для миттєвого відтворення в авто."""
+def _get_audio_file_duration(path: str) -> Optional[float]:
+    """Визначає реальну тривалість аудіофайлу на диску через mutagen."""
+    try:
+        import mutagen
+        mf = mutagen.File(path)
+        if mf and mf.info and hasattr(mf.info, "length"):
+            return float(mf.info.length)
+    except Exception as e:
+        logger.debug(f"Could not read audio duration from {path}: {e}")
+    return None
+
+
+def _is_cache_duration_valid(file_path: str, expected_duration: int) -> bool:
+    """Перевіряє, чи кешований файл дійсно відповідає треку за тривалістю (запобігає підміні альбому старим треком)."""
+    if not expected_duration or expected_duration <= 0:
+        return True
+    dur = _get_audio_file_duration(file_path)
+    if dur is None or dur <= 0:
+        return True
+    # Якщо трек довгий (альбом/збірка > 10 хв), а кешований файл коротший за 5 хв — це явна помилка або старий залишок
+    if expected_duration > 600 and dur < 300:
+        logger.warning(f"File {file_path} duration {dur}s too short for expected {expected_duration}s album!")
+        return False
+    # Якщо очікується короткий трек (< 5 хв), а файл довший за 20 хв
+    if expected_duration < 300 and dur > 1200:
+        logger.warning(f"File {file_path} duration {dur}s too long for expected {expected_duration}s track!")
+        return False
+    # Якщо розбіжність більша за 45 сек і перевищує 40%
+    if abs(dur - expected_duration) > 45 and (dur < expected_duration * 0.5 or dur > expected_duration * 1.8):
+        logger.warning(f"File {file_path} duration {dur}s differs significantly from expected {expected_duration}s!")
+        return False
+    return True
+
+
+def _download_and_cache_track_sync(track_id: int, artist: str, title: str, expected_duration: int = 0) -> Optional[str]:
+    """Завантажує трек у локальний кеш сервера для миттєвого відтворення в авто з атомарним перейменуванням."""
     target_path = os.path.join(MUSIC_CACHE_DIR, f"{track_id}.m4a")
     if os.path.exists(target_path) and os.path.getsize(target_path) > 10000:
-        return target_path
+        if _is_cache_duration_valid(target_path, expected_duration):
+            return target_path
+        else:
+            try:
+                os.remove(target_path)
+                logger.warning(f"Removed mismatched existing cache: {target_path}")
+            except Exception:
+                pass
 
+    # Never cache huge multi-hour compilations to disk in background (stream them directly)
+    if expected_duration > 3600:
+        logger.info(f"Skipping background file download for huge album {track_id} ({expected_duration}s)")
+        return None
+
+    temp_template = os.path.join(MUSIC_CACHE_DIR, f"{track_id}_tmp.%(ext)s")
     search_query = f"ytsearch1:{artist} - {title} audio"
     ydl_opts = {
         "format": "bestaudio[ext=m4a]/bestaudio/best",
-        "outtmpl": os.path.join(MUSIC_CACHE_DIR, f"{track_id}.%(ext)s"),
+        "outtmpl": temp_template,
         "noplaylist": True,
         "quiet": True,
     }
@@ -118,11 +165,32 @@ def _download_and_cache_track_sync(track_id: int, artist: str, title: str) -> Op
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([search_query])
 
-        # Check downloaded file
+        # Check downloaded temp files
+        downloaded = None
         for ext in ["m4a", "webm", "mp3", "opus"]:
-            p = os.path.join(MUSIC_CACHE_DIR, f"{track_id}.{ext}")
+            p = os.path.join(MUSIC_CACHE_DIR, f"{track_id}_tmp.{ext}")
             if os.path.exists(p) and os.path.getsize(p) > 10000:
-                return p
+                downloaded = p
+                break
+
+        if downloaded:
+            if _is_cache_duration_valid(downloaded, expected_duration):
+                _, ext = os.path.splitext(downloaded)
+                final_path = os.path.join(MUSIC_CACHE_DIR, f"{track_id}{ext}")
+                if os.path.exists(final_path):
+                    try:
+                        os.remove(final_path)
+                    except Exception:
+                        pass
+                os.replace(downloaded, final_path)
+                logger.info(f"Successfully cached verified track {track_id} to {final_path}")
+                return final_path
+            else:
+                logger.warning(f"Downloaded audio for track {track_id} duration mismatch. Discarding temp file {downloaded}.")
+                try:
+                    os.remove(downloaded)
+                except Exception:
+                    pass
     except Exception as e:
         logger.error(f"Failed to cache track {track_id}: {e}")
     return None
@@ -140,52 +208,86 @@ def is_track_cached(track_id: int) -> bool:
 def delete_track_cache(track_id: int) -> int:
     """Видаляє всі кешовані аудіофайли треку з диска, щоб видалений трек не міг грати."""
     removed = 0
-    for ext in ["m4a", "webm", "mp3", "opus", "part", "temp"]:
-        target_path = os.path.join(MUSIC_CACHE_DIR, f"{track_id}.{ext}")
-        if os.path.exists(target_path):
-            try:
-                os.remove(target_path)
-                removed += 1
-                logger.info(f"Deleted cached audio file: {target_path}")
-            except Exception as e:
-                logger.warning(f"Could not remove {target_path}: {e}")
+    for ext in ["m4a", "webm", "mp3", "opus", "part", "temp", "tmp", "ytdl"]:
+        for pattern in [f"{track_id}.{ext}", f"{track_id}_tmp.{ext}"]:
+            target_path = os.path.join(MUSIC_CACHE_DIR, pattern)
+            if os.path.exists(target_path):
+                try:
+                    os.remove(target_path)
+                    removed += 1
+                    logger.info(f"Deleted cached audio file: {target_path}")
+                except Exception as e:
+                    logger.warning(f"Could not remove {target_path}: {e}")
     return removed
 
 
 def clean_orphan_cache(db: Session) -> int:
-    """Видаляє будь-які файли з папки music_cache, для яких вже немає запису в базі даних."""
-    valid_ids = {str(row[0]) for row in db.query(MusicTrack.id).all()}
+    """Видаляє будь-які файли з папки music_cache, для яких вже немає запису в базі даних або де тривалість фатально відрізняється."""
+    tracks = db.query(MusicTrack.id, MusicTrack.duration).all()
+    valid_map = {str(row[0]): (row[1] or 0) for row in tracks}
     purged = 0
     if not os.path.exists(MUSIC_CACHE_DIR):
         return 0
     for filename in os.listdir(MUSIC_CACHE_DIR):
         base, ext = os.path.splitext(filename)
-        if ext.lower() in [".m4a", ".webm", ".mp3", ".opus", ".part"]:
-            if base not in valid_ids:
-                full_path = os.path.join(MUSIC_CACHE_DIR, filename)
+        ext_clean = ext.lower()
+        full_path = os.path.join(MUSIC_CACHE_DIR, filename)
+
+        # 1. Clean temp / partial files
+        if ext_clean in [".part", ".temp", ".tmp", ".ytdl"] or "_tmp" in base:
+            try:
+                os.remove(full_path)
+                purged += 1
+                logger.info(f"Purged residual temp file: {full_path}")
+            except Exception:
+                pass
+            continue
+
+        # 2. Check audio files
+        if ext_clean in [".m4a", ".webm", ".mp3", ".opus"]:
+            if base not in valid_map:
                 try:
                     os.remove(full_path)
                     purged += 1
                     logger.info(f"Purged orphan music cache file: {full_path}")
                 except Exception as e:
                     logger.warning(f"Failed to remove orphan file {full_path}: {e}")
+            else:
+                expected_dur = valid_map[base]
+                if not _is_cache_duration_valid(full_path, expected_dur):
+                    try:
+                        os.remove(full_path)
+                        purged += 1
+                        logger.warning(f"Purged mismatched music cache file (wrong audio/album): {full_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to remove mismatched file {full_path}: {e}")
     return purged
 
 
 async def get_track_audio_url(track: MusicTrack) -> Optional[str]:
-    """Повертає локальний кешований файл або прямий стрім."""
-    # 1. Check local cached file
+    """Повертає перевірений локальний кешований файл або прямий стрім."""
+    # 1. Check local cached file with duration validation
     for ext in ["m4a", "webm", "mp3", "opus"]:
         local_f = os.path.join(MUSIC_CACHE_DIR, f"{track.id}.{ext}")
         if os.path.exists(local_f) and os.path.getsize(local_f) > 10000:
-            return local_f
+            if _is_cache_duration_valid(local_f, track.duration):
+                return local_f
+            else:
+                try:
+                    os.remove(local_f)
+                    logger.warning(f"Purged mismatched cache file for track {track.id}: {local_f}")
+                except Exception:
+                    pass
 
     # 2. Extract direct stream
     loop = asyncio.get_running_loop()
     direct_url = await loop.run_in_executor(None, _extract_audio_stream_sync, track.artist, track.title)
     
-    # 3. Trigger background cache download for next time
-    asyncio.create_task(asyncio.to_thread(_download_and_cache_track_sync, track.id, track.artist, track.title))
+    # 3. Trigger background cache download for next time (only for songs <= 1 hour)
+    if track.duration and track.duration <= 3600:
+        asyncio.create_task(asyncio.to_thread(_download_and_cache_track_sync, track.id, track.artist, track.title, track.duration))
+    else:
+        logger.info(f"Direct streaming track {track.id} ({track.duration}s); skipping background disk caching.")
     
     return direct_url
 

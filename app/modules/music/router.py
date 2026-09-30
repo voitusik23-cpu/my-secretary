@@ -102,9 +102,13 @@ def add_track(payload: TrackCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(track)
 
-    # Trigger background download
-    import asyncio
-    asyncio.create_task(asyncio.to_thread(_download_and_cache_track_sync, track.id, track.artist, track.title))
+    # Immediately ensure no old cache file collides with this ID
+    delete_track_cache(track.id)
+
+    # Trigger background download only for songs <= 1 hour
+    if track.duration and track.duration <= 3600:
+        import asyncio
+        asyncio.create_task(asyncio.to_thread(_download_and_cache_track_sync, track.id, track.artist, track.title, track.duration))
 
     return {
         "id": track.id,
@@ -150,10 +154,15 @@ async def stream_track(track_id: int, request: Request, db: Session = Depends(ge
             path=audio_res,
             media_type=media_type,
             filename=f"{track.artist} - {track.title}.m4a",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
         )
 
     # Otherwise redirect to high-speed CDN audio stream
-    return RedirectResponse(audio_res, status_code=307)
+    return RedirectResponse(
+        audio_res,
+        status_code=307,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
 
 
 @router.post("/tracks/{track_id}/favorite")

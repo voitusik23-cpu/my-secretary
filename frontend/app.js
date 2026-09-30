@@ -25,9 +25,24 @@ const state = {
 };
 
 
-// --- Service Worker Registration with Safe Auto-Update ---
+// --- Service Worker Registration with Safe Auto-Update & Hard-Cache Flush ---
+const APP_VERSION = "3.7.3";
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    // If version changed, purge old caches to prevent stale script/audio issues on iPhone
+    if (localStorage.getItem("secretary_sw_version") !== APP_VERSION) {
+      localStorage.setItem("secretary_sw_version", APP_VERSION);
+      if ("caches" in window) {
+        caches.keys().then((keys) => {
+          keys.forEach((key) => {
+            if (key !== `my-secretary-v${APP_VERSION}`) {
+              caches.delete(key);
+            }
+          });
+        });
+      }
+    }
+
     let refreshing = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (!refreshing) {
@@ -37,7 +52,7 @@ if ("serviceWorker" in navigator) {
     });
 
     navigator.serviceWorker
-      .register("/sw.js?v=3.6.5")
+      .register(`/sw.js?v=${APP_VERSION}`)
       .then((reg) => {
         reg.update().catch(() => {});
       })
