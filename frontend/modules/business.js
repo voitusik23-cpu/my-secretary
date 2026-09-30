@@ -195,23 +195,73 @@ const BusinessModule = {
     }
   },
 
-  copyReport() {
+  openReportModal() {
     const text = this.state.summary.text_report;
+    const modal = document.getElementById("biz-report-modal");
+    const textarea = document.getElementById("biz-report-textarea");
+    const tgBtn = document.getElementById("biz-share-tg-btn");
+    const waBtn = document.getElementById("biz-share-wa-btn");
+    const emailBtn = document.getElementById("biz-share-email-btn");
+
     if (!text) {
       if (typeof showToast === "function") showToast("⚠️ Звіт порожній");
       return;
     }
 
+    if (textarea) textarea.value = text;
+
+    const enc = encodeURIComponent(text);
+    if (tgBtn) tgBtn.href = `https://t.me/share/url?url=&text=${enc}`;
+    if (waBtn) waBtn.href = `https://api.whatsapp.com/send?text=${enc}`;
+    if (emailBtn) emailBtn.href = `mailto:?subject=${encodeURIComponent("Фінансовий звіт (Бізнес-каса)")}&body=${enc}`;
+
+    if (modal) modal.classList.remove("hidden");
+  },
+
+  closeReportModal() {
+    const modal = document.getElementById("biz-report-modal");
+    if (modal) modal.classList.add("hidden");
+  },
+
+  async shareNative() {
+    const text = this.state.summary.text_report || document.getElementById("biz-report-textarea")?.value;
+    if (!text) return;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "💼 Фінансовий звіт бізнес-каси",
+          text: text
+        });
+        if (typeof showToast === "function") showToast("✅ Звіт успішно надіслано!");
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.warn("Native share error:", err);
+          this.copyReportText();
+        }
+      }
+    } else {
+      this.copyReportText();
+    }
+  },
+
+  copyReportText() {
+    const text = this.state.summary.text_report || document.getElementById("biz-report-textarea")?.value;
+    if (!text) return;
+
     navigator.clipboard.writeText(text)
       .then(() => {
         if (typeof showToast === "function") {
-          showToast("📋 Звіт скопійовано! Вставте його у повідомлення партнеру чи бухгалтеру.");
+          showToast("✅ Звіт скопійовано! Вставте його у Telegram, WhatsApp чи Email.");
         }
       })
       .catch(() => {
-        // Fallback prompt
         window.prompt("Скопіюйте звіт вручну:", text);
       });
+  },
+
+  copyReport() {
+    this.openReportModal();
   },
 
   // Voice dictation state
@@ -449,8 +499,17 @@ const BusinessModule = {
     // Quick buttons
     document.getElementById("biz-add-income-btn")?.addEventListener("click", () => this.addTransaction("income"));
     document.getElementById("biz-add-expense-btn")?.addEventListener("click", () => this.addTransaction("expense"));
-    document.getElementById("biz-copy-report-btn")?.addEventListener("click", () => this.copyReport());
+    document.getElementById("biz-open-report-btn")?.addEventListener("click", () => this.openReportModal());
+    document.getElementById("biz-copy-report-btn")?.addEventListener("click", () => this.openReportModal());
     document.getElementById("biz-refresh-btn")?.addEventListener("click", () => this.loadTab());
+
+    // Report modal controls
+    document.getElementById("biz-report-modal-close")?.addEventListener("click", () => this.closeReportModal());
+    document.getElementById("biz-share-native-btn")?.addEventListener("click", () => this.shareNative());
+    document.getElementById("biz-share-copy-btn")?.addEventListener("click", () => this.copyReportText());
+    document.getElementById("biz-report-modal")?.addEventListener("click", (e) => {
+      if (e.target && e.target.id === "biz-report-modal") this.closeReportModal();
+    });
 
     const quickBtn = document.getElementById("biz-quick-submit-btn");
     const quickInput = document.getElementById("biz-quick-text-input");

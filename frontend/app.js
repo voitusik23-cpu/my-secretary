@@ -257,6 +257,9 @@ function initVoice() {
     const formData = new FormData();
     const ext = mimeType.includes("mp4") ? "mp4" : (mimeType.includes("aac") ? "aac" : (mimeType.includes("wav") ? "wav" : "webm"));
     formData.append("audio", blob, `voice_record.${ext}`);
+    if (state.currentTab) {
+      formData.append("current_tab", state.currentTab);
+    }
 
     try {
       const data = await apiFetch("/api/process/audio", {
@@ -315,7 +318,10 @@ function initTextInput() {
     try {
       const data = await apiFetch("/api/process", {
         method: "POST",
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({
+          text,
+          current_tab: state.currentTab
+        }),
       });
 
       if (data) {

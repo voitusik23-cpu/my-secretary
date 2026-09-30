@@ -81,14 +81,14 @@ def detect_audio_mime(audio_bytes: bytes, fallback_mime: str = "audio/webm") -> 
     return (fallback_mime.split(";")[0].strip() if fallback_mime else "audio/webm") or "audio/webm"
 
 
-def _heuristic_fallback(text: str) -> Dict[str, Any]:
-    """Резервний евристичний парсер на випадок збою AI з підтримкою змішаних запитів."""
+def _heuristic_fallback(text: str, current_tab: Optional[str] = None) -> Dict[str, Any]:
+    """Резервний евристичний парсер на випадок збою AI з підтримкою змішаних запитів та контексту вкладки."""
     actions = []
     lower = text.lower()
     summary_parts = []
 
-    # 0. Бізнес та каса (business) — за ключовим словом
-    if any(k in lower for k in ["бізнес", "бизнес", "по бізнесу", "по бизнесу", "в касу", "в кассу"]):
+    # 0. Бізнес та каса (business) — за ключовим словом або відкритою вкладкою business
+    if current_tab == "business" or any(k in lower for k in ["бізнес", "бизнес", "по бізнесу", "по бизнесу", "в касу", "в кассу"]):
         try:
             from app.modules.business.router import parse_spoken_amount
             clean_biz = re.sub(r'^(?:по\s+)?(?:бізнесу|бизнесу|бізнес|бизнес|в\s+касу|в\s+кассу):?\s*', '', text, flags=re.IGNORECASE).strip()
@@ -250,14 +250,27 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
     }
 
 
-async def parse_with_gemini(text: Optional[str] = None, audio_bytes: Optional[bytes] = None, mime_type: str = "audio/webm") -> Dict[str, Any]:
-    """Аналізує текст або аудіо з автоматичним перемиканням моделей (failover)."""
+async def parse_with_gemini(text: Optional[str] = None, audio_bytes: Optional[bytes] = None, mime_type: str = "audio/webm", current_tab: Optional[str] = None) -> Dict[str, Any]:
+    """Аналізує текст або аудіо з автоматичним перемиканням моделей (failover) та врахуванням поточної вкладки."""
     api_key = settings.GEMINI_API_KEY.strip() if settings.GEMINI_API_KEY else ""
     if not api_key:
         logger.info("GEMINI_API_KEY missing. Using fallback parser.")
-        return _heuristic_fallback(text or "Голосова замітка")
+        return _heuristic_fallback(text or "Голосова замітка", current_tab=current_tab)
 
     prompt = SYSTEM_INSTRUCTION.format(current_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    if current_tab:
+        tab_names = {
+            "business": "БІЗНЕС ТА КАСА (business)",
+            "shopping": "СПИСОК ПОКУПОК (shopping)",
+            "tasks": "СПИСОК СПРАВ ТА РОБІТ (tasks)",
+            "auto": "АВТО ТА ПРОБІГ (auto)",
+            "finance": "ОСОБИСТІ ФІНАНСИ (finance)",
+            "health_vitals": "ТИСК ТА ПУЛЬС (health_vitals)",
+            "movies": "ФІЛЬМИ (movies)",
+            "music": "МУЗИКА (music)",
+        }
+        tab_label = tab_names.get(current_tab, current_tab)
+        prompt += f"\nКОНТЕКСТ: Користувач зараз знаходиться у відкритому розділі «{tab_label}». Якщо запис користувача не вказує явно на іншу тему, спрямуй результат у розділ '{current_tab}'!"
 
     models_to_try = list(dict.fromkeys([m for m in [settings.AI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"] if m]))
 
@@ -306,7 +319,7 @@ async def parse_with_gemini(text: Optional[str] = None, audio_bytes: Optional[by
 
     logger.error(f"All Gemini models failed: {last_error}.")
     if text:
-        return _heuristic_fallback(text)
+        return _heuristic_fallback(text, current_tab=current_tab)
 
     return {
         "summary": "Не вдалося обробити аудіо через навантаження AI. Будь ласка, повторіть ще раз.",

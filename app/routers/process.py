@@ -18,6 +18,7 @@ router = APIRouter(prefix="", tags=["Process & Feed"], dependencies=[Depends(ver
 
 class ProcessTextRequest(BaseModel):
     text: str = Field(..., description="Голосовая расшифровка или текст команды")
+    current_tab: Optional[str] = Field(None, description="Поточна активна вкладка користувача")
 
 
 async def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str, List[Any]]:
@@ -152,7 +153,7 @@ async def process_text_input(payload: ProcessTextRequest, db: Session = Depends(
         u_res = undo_last_action(db)
         return {"status": u_res.get("status", "success"), "summary": u_res.get("message", "Дію скасовано"), "transcription": text, "actions_count": 0, "created": {}}
 
-    parsed = await parse_with_gemini(text=text)
+    parsed = await parse_with_gemini(text=text, current_tab=payload.current_tab)
     actions = parsed.get("actions", [])
     created = await _save_parsed_actions(actions, db)
 
@@ -169,6 +170,7 @@ async def process_text_input(payload: ProcessTextRequest, db: Session = Depends(
 async def process_audio_input(
     audio: UploadFile = File(..., description="Аудіофайл"),
     text: Optional[str] = Form(None),
+    current_tab: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     """Приймає аудіозапис, розпізнає та зберігає дії."""
@@ -177,7 +179,7 @@ async def process_audio_input(
         raise HTTPException(status_code=400, detail="Файл аудио пустой")
 
     mime_type = audio.content_type or "audio/webm"
-    parsed = await parse_with_gemini(text=text, audio_bytes=audio_bytes, mime_type=mime_type)
+    parsed = await parse_with_gemini(text=text, audio_bytes=audio_bytes, mime_type=mime_type, current_tab=current_tab)
 
     transcription = parsed.get("transcription", "")
     lower_tr = transcription.lower()
