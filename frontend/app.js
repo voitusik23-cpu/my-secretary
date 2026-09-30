@@ -19,24 +19,21 @@ const state = {
   recordStartTime: null,
 };
 
-// --- Service Worker Registration with Auto-Update ---
+// --- Service Worker Registration with Safe Auto-Update ---
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
+
     navigator.serviceWorker
-      .register("/sw.js?v=3.5.8")
+      .register("/sw.js?v=3.6.1")
       .then((reg) => {
-        reg.update();
-        reg.addEventListener("updatefound", () => {
-          const newWorker = reg.installing;
-          if (newWorker) {
-            newWorker.addEventListener("statechange", () => {
-              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                console.log("[PWA] New version installed! Reloading for latest features...");
-                window.location.reload();
-              }
-            });
-          }
-        });
+        reg.update().catch(() => {});
       })
       .catch((err) => {
         console.warn("ServiceWorker registration failed:", err);
@@ -2918,6 +2915,7 @@ function initVitalsScreen() {
 
 const musicState = {
   tracks: [],
+  allTracks: [],
   queue: [],
   currentIndex: -1,
   currentTrack: null,
@@ -2992,30 +2990,41 @@ function playTrack(track, queue = null) {
   const audio = musicState.audio;
   if (!audio) return;
 
-  if (queue) {
+  if (queue && queue.length > 0) {
     musicState.queue = queue;
-  } else if (musicState.queue.length === 0) {
+  } else if (musicState.allTracks && musicState.allTracks.length > 0) {
+    musicState.queue = musicState.allTracks;
+  } else {
     musicState.queue = musicState.tracks;
   }
 
   musicState.currentTrack = track;
   musicState.currentIndex = musicState.queue.findIndex(t => String(t.id) === String(track.id));
   if (musicState.currentIndex === -1) {
-    musicState.queue.unshift(track);
-    musicState.currentIndex = 0;
+    musicState.queue.push(track);
+    musicState.currentIndex = musicState.queue.length - 1;
   }
 
   // Construct authenticated stream url with ?key=
   const keyParam = state.secretKey ? `?key=${encodeURIComponent(state.secretKey)}` : "";
   const streamUrl = `${state.serverUrl}/api/v1/music/stream/${track.id}${keyParam}`;
 
+  try {
+    audio.pause();
+  } catch (e) {}
+
   audio.src = streamUrl;
-  audio.play().then(() => {
-    updatePlayState(true);
-  }).catch(err => {
-    console.warn("Audio autoplay blocked or failed:", err);
-    updatePlayState(false);
-  });
+  audio.load();
+
+  const playPromise = audio.play();
+  if (playPromise !== undefined) {
+    playPromise.then(() => {
+      updatePlayState(true);
+    }).catch(err => {
+      console.warn("Audio autoplay blocked or failed:", err);
+      updatePlayState(false);
+    });
+  }
 
   // Update Mini-Player UI
   const miniPlayer = document.getElementById("music-floating-player");
@@ -3052,20 +3061,31 @@ function playTrack(track, queue = null) {
 }
 
 function playTrackById(trackId) {
-  const t = musicState.tracks.find(x => String(x.id) === String(trackId));
+  const t = (musicState.tracks.find(x => String(x.id) === String(trackId))) ||
+            (musicState.allTracks.find(x => String(x.id) === String(trackId)));
   if (t) {
-    playTrack(t, musicState.tracks);
+    const q = (musicState.tracks && musicState.tracks.length > 1) ? musicState.tracks : musicState.allTracks;
+    playTrack(t, q);
   }
 }
 
 function playNextTrack() {
+  // If current queue has only 1 track, expand to allTracks so we NEVER get stuck on 1 song!
+  if (!musicState.queue || musicState.queue.length <= 1) {
+    if (musicState.allTracks && musicState.allTracks.length > 1) {
+      musicState.queue = [...musicState.allTracks];
+      if (musicState.currentTrack) {
+        musicState.currentIndex = musicState.queue.findIndex(t => String(t.id) === String(musicState.currentTrack.id));
+      }
+    }
+  }
+
   if (!musicState.queue || musicState.queue.length === 0) return;
 
   if (musicState.isRepeat && musicState.currentTrack) {
     if (musicState.audio) {
       musicState.audio.currentTime = 0;
-      musicState.audio.play();
-      updatePlayState(true);
+      musicState.audio.play().then(() => updatePlayState(true)).catch(console.warn);
       return;
     }
   }
@@ -3079,10 +3099,23 @@ function playNextTrack() {
     nextIdx = (musicState.currentIndex + 1) % musicState.queue.length;
   }
 
-  playTrack(musicState.queue[nextIdx], musicState.queue);
+  const nextTrack = musicState.queue[nextIdx];
+  if (nextTrack) {
+    showToast(`▶ Грає: «${nextTrack.title}» - ${nextTrack.artist}`);
+    playTrack(nextTrack, musicState.queue);
+  }
 }
 
 function playPrevTrack() {
+  if (!musicState.queue || musicState.queue.length <= 1) {
+    if (musicState.allTracks && musicState.allTracks.length > 1) {
+      musicState.queue = [...musicState.allTracks];
+      if (musicState.currentTrack) {
+        musicState.currentIndex = musicState.queue.findIndex(t => String(t.id) === String(musicState.currentTrack.id));
+      }
+    }
+  }
+
   if (!musicState.queue || musicState.queue.length === 0) return;
 
   if (musicState.audio && musicState.audio.currentTime > 4) {
@@ -3091,7 +3124,10 @@ function playPrevTrack() {
   }
 
   const prevIdx = (musicState.currentIndex - 1 + musicState.queue.length) % musicState.queue.length;
-  playTrack(musicState.queue[prevIdx], musicState.queue);
+  const prevTrack = musicState.queue[prevIdx];
+  if (prevTrack) {
+    playTrack(prevTrack, musicState.queue);
+  }
 }
 
 function togglePlayPause() {
@@ -3101,6 +3137,8 @@ function togglePlayPause() {
   if (!audio.src || audio.src === window.location.href) {
     if (musicState.queue.length > 0) {
       playTrack(musicState.queue[0]);
+    } else if (musicState.allTracks.length > 0) {
+      playTrack(musicState.allTracks[0]);
     } else if (musicState.tracks.length > 0) {
       playTrack(musicState.tracks[0]);
     }
@@ -3113,6 +3151,28 @@ function togglePlayPause() {
     audio.pause();
     updatePlayState(false);
   }
+}
+
+async function updatePlaylistCounts() {
+  try {
+    const playlists = await apiFetch("/api/v1/music/playlists");
+    if (!playlists || !Array.isArray(playlists)) return;
+    const countMap = {};
+    playlists.forEach(p => { countMap[p.name] = p.tracks_count; });
+
+    const pills = document.querySelectorAll("#music-playlists-bar .music-pl-pill");
+    pills.forEach(pill => {
+      const pl = pill.dataset.playlist;
+      const cnt = countMap[pl] ?? (pl === "Всі треки" ? musicState.allTracks.length : 0);
+      let icon = "🎵";
+      if (pl === "Shazam") icon = "⚡";
+      else if (pl === "Улюблені") icon = "❤️";
+      else if (pl.includes("авто")) icon = "🚗";
+      else if (pl.includes("Релакс")) icon = "🌙";
+
+      pill.textContent = `${icon} ${pl} (${cnt})`;
+    });
+  } catch (e) {}
 }
 
 async function loadMusicTab(playlist = null) {
@@ -3131,6 +3191,8 @@ async function loadMusicTab(playlist = null) {
       </div>
     `;
 
+    // 1. Fetch filtered tracks and all tracks concurrently
+    const allPromise = apiFetch("/api/v1/music/tracks");
     let url = "/api/v1/music/tracks";
     const params = new URLSearchParams();
     if (targetPlaylist === "Улюблені") {
@@ -3142,13 +3204,21 @@ async function loadMusicTab(playlist = null) {
       url += `?${params.toString()}`;
     }
 
-    const tracks = await apiFetch(url);
-    musicState.tracks = tracks || [];
-    if (!musicState.currentTrack) {
-      musicState.queue = [...musicState.tracks];
+    const [filteredTracks, allTracks] = await Promise.all([
+      apiFetch(url),
+      allPromise
+    ]);
+
+    musicState.allTracks = allTracks || [];
+    musicState.tracks = filteredTracks || [];
+
+    // Continuous queue: if filtered has few tracks, keep allTracks in queue
+    if (!musicState.queue || musicState.queue.length <= 1) {
+      musicState.queue = [...musicState.allTracks];
     }
 
     renderMusicTracks(musicState.tracks);
+    updatePlaylistCounts();
   } catch (err) {
     listEl.innerHTML = `
       <div class="empty-state">
@@ -3169,7 +3239,7 @@ function renderMusicTracks(tracks) {
         <span class="empty-icon">🎵</span>
         <p>У цій категорії ще немає треків.</p>
         <p style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">
-          Скористайтесь кнопкою <strong>«⚡ Shazam»</strong> або рядком пошуку вище!
+          Скористайтесь кнопкою <strong>«📋 Вставити трек»</strong> або рядком пошуку вище!
         </p>
       </div>
     `;
@@ -3194,11 +3264,14 @@ function renderMusicTracks(tracks) {
             <span class="music-track-artist">${escapeHtml(t.artist || "Невідомий виконавець")}</span>
             <div class="music-track-badges">
               <span class="music-pill-tag">⏱ ${durStr}</span>
-              <span class="music-pill-tag">📂 ${escapeHtml(t.playlist || "Shazam")}</span>
+              <span class="music-pill-tag">📂 ${escapeHtml(t.playlist || "Всі треки")}</span>
             </div>
           </div>
         </div>
         <div class="music-track-right">
+          <button class="music-icon-action" onclick="assignTrackToCar(${t.id}, event)" title="Додати в плейліст В авто">
+            🚗
+          </button>
           <button class="music-icon-action ${t.is_favorite ? 'fav-active' : ''}" onclick="toggleFavTrack(${t.id}, event)" title="${t.is_favorite ? 'Видалити з улюблених' : 'В улюблені'}">
             ${t.is_favorite ? '❤️' : '🤍'}
           </button>
@@ -3248,7 +3321,7 @@ async function toggleFavTrack(trackId, event) {
     const res = await apiFetch(`/api/v1/music/tracks/${trackId}/favorite`, { method: "POST" });
     if (res) {
       const isFav = res.is_favorite;
-      const t = musicState.tracks.find(x => x.id === trackId);
+      const t = musicState.tracks.find(x => x.id === trackId) || musicState.allTracks.find(x => x.id === trackId);
       if (t) t.is_favorite = isFav;
       if (musicState.currentTrack && musicState.currentTrack.id === trackId) {
         musicState.currentTrack.is_favorite = isFav;
@@ -3261,8 +3334,23 @@ async function toggleFavTrack(trackId, event) {
         }
       }
       renderMusicTracks(musicState.tracks);
+      updatePlaylistCounts();
       showToast(isFav ? "❤️ Додано в улюблені!" : "🤍 Видалено з улюблених");
     }
+  } catch (err) {
+    showToast(`Помилка: ${err.message}`);
+  }
+}
+
+async function assignTrackToCar(trackId, event) {
+  if (event) event.stopPropagation();
+  try {
+    await apiFetch(`/api/v1/music/tracks/${trackId}/playlist`, {
+      method: "POST",
+      body: JSON.stringify({ playlist: "В авто 🚗" })
+    });
+    showToast("🚗 Трек додано у плейліст 'В авто'!");
+    loadMusicTab();
   } catch (err) {
     showToast(`Помилка: ${err.message}`);
   }
@@ -3332,7 +3420,7 @@ async function addSearchedTrack(item) {
       duration: item.duration || 0,
       cover_url: item.cover_url,
       source: item.source || "search",
-      playlist: musicState.activePlaylist || "Всі треки"
+      playlist: musicState.activePlaylist === "Всі треки" ? "В авто 🚗" : musicState.activePlaylist
     };
 
     const saved = await apiFetch("/api/v1/music/tracks", {
@@ -3352,6 +3440,45 @@ async function addSearchedTrack(item) {
   } catch (err) {
     showToast(`Помилка додавання: ${err.message}`);
   }
+}
+
+async function quickPasteShazamTrack(targetPlaylist = "В авто 🚗") {
+  let clipboardText = "";
+  try {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      clipboardText = await navigator.clipboard.readText();
+    }
+  } catch (clipErr) {
+    console.warn("Clipboard access:", clipErr);
+  }
+
+  clipboardText = (clipboardText || "").trim();
+
+  if (clipboardText && (clipboardText.includes("shazam") || clipboardText.includes("http") || clipboardText.length > 3)) {
+    showToast("⚡ Розпізнаю посилання із буфера обміну...");
+    try {
+      const resp = await apiFetch("/api/v1/music/shazam", {
+        method: "POST",
+        body: JSON.stringify({
+          url_or_text: clipboardText,
+          playlist: targetPlaylist
+        })
+      });
+
+      if (resp?.track) {
+        showToast(`⚡ Додано з Shazam: «${resp.track.title}» - ${resp.track.artist}!`);
+        await loadMusicTab();
+        if (resp.track.id) {
+          playTrackById(resp.track.id);
+        }
+        return;
+      }
+    } catch (err) {
+      showToast(`Помилка імпорту: ${err.message}`);
+    }
+  }
+
+  importFromShazamModal(clipboardText);
 }
 
 function initMusicPlayer() {
@@ -3380,7 +3507,15 @@ function initMusicPlayer() {
     });
 
     audio.addEventListener("ended", () => {
+      console.log("[Music] Track ended naturally, continuous auto-next...");
       playNextTrack();
+    });
+
+    audio.addEventListener("error", (e) => {
+      console.warn("[Music] Stream error, auto-skipping to next track in 1.2s...", e);
+      setTimeout(() => {
+        playNextTrack();
+      }, 1200);
     });
 
     audio.addEventListener("play", () => updatePlayState(true));
@@ -3453,23 +3588,7 @@ function initMusicPlayer() {
 
   document.getElementById("fs-car-btn")?.addEventListener("click", async () => {
     if (!musicState.currentTrack) return;
-    try {
-      await apiFetch("/api/v1/music/tracks", {
-        method: "POST",
-        body: JSON.stringify({
-          title: musicState.currentTrack.title,
-          artist: musicState.currentTrack.artist,
-          album: musicState.currentTrack.album,
-          duration: musicState.currentTrack.duration,
-          cover_url: musicState.currentTrack.cover_url,
-          playlist: "В авто 🚗",
-          source: "car"
-        })
-      });
-      showToast("🚗 Додано в плейліст «В авто»!");
-    } catch (err) {
-      showToast(`Помилка: ${err.message}`);
-    }
+    await assignTrackToCar(musicState.currentTrack.id);
   });
 
   // Scrubber dragging
@@ -3493,8 +3612,9 @@ function initMusicPlayer() {
 
   // Continuous Car Banner Buttons
   document.getElementById("music-play-all-btn")?.addEventListener("click", () => {
-    if (musicState.tracks.length > 0) {
-      musicState.queue = [...musicState.tracks];
+    const q = (musicState.tracks && musicState.tracks.length > 0) ? musicState.tracks : musicState.allTracks;
+    if (q.length > 0) {
+      musicState.queue = [...q];
       playTrack(musicState.queue[0], musicState.queue);
       showToast("▶ Запущено відтворення всіх треків підряд!");
     } else {
@@ -3503,8 +3623,9 @@ function initMusicPlayer() {
   });
 
   document.getElementById("music-shuffle-all-btn")?.addEventListener("click", () => {
-    if (musicState.tracks.length > 0) {
-      musicState.queue = [...musicState.tracks].sort(() => Math.random() - 0.5);
+    const q = (musicState.tracks && musicState.tracks.length > 0) ? musicState.tracks : musicState.allTracks;
+    if (q.length > 0) {
+      musicState.queue = [...q].sort(() => Math.random() - 0.5);
       musicState.isShuffle = true;
       document.getElementById("fs-shuffle-btn")?.classList.add("active");
       playTrack(musicState.queue[0], musicState.queue);
@@ -3547,12 +3668,34 @@ function initMusicPlayer() {
     document.getElementById("music-search-results")?.classList.add("hidden");
   });
 
+  // Quick 1-tap clipboard paste button from header
+  document.getElementById("quick-paste-shazam-btn")?.addEventListener("click", () => {
+    quickPasteShazamTrack(musicState.activePlaylist === "Всі треки" ? "В авто 🚗" : musicState.activePlaylist);
+  });
+
   // Shazam Import Modal
   const shazamModal = document.getElementById("shazam-modal");
   const shazamInput = document.getElementById("shazam-input-text");
   const shazamTargetPl = document.getElementById("shazam-target-playlist");
   const shazamSubmitBtn = document.getElementById("shazam-submit-btn");
   const shazamFeedback = document.getElementById("shazam-status-feedback");
+  const pasteClipBtn = document.getElementById("shazam-paste-clipboard-btn");
+
+  pasteClipBtn?.addEventListener("click", async () => {
+    let txt = "";
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        txt = await navigator.clipboard.readText();
+      }
+    } catch (e) {}
+    if (txt && shazamInput) {
+      shazamInput.value = txt.trim();
+      shazamSubmitBtn?.click();
+    } else {
+      shazamInput?.focus();
+      showToast("Вставте посилання у поле вводу");
+    }
+  });
 
   const openShazamModal = (initialText = "") => {
     if (shazamInput) shazamInput.value = initialText;
@@ -3577,7 +3720,7 @@ function initMusicPlayer() {
       shazamSubmitBtn.disabled = true;
       shazamSubmitBtn.textContent = "⚡ Розпізнаю та додаю...";
 
-      const targetPl = shazamTargetPl?.value || "Shazam";
+      const targetPl = shazamTargetPl?.value || "В авто 🚗";
       const resp = await apiFetch("/api/v1/music/shazam", {
         method: "POST",
         body: JSON.stringify({
@@ -3598,11 +3741,11 @@ function initMusicPlayer() {
       if (shazamFeedback) shazamFeedback.textContent = `Помилка: ${err.message}`;
     } finally {
       shazamSubmitBtn.disabled = false;
-      shazamSubmitBtn.textContent = "⚡ Імпортувати та додати";
+      shazamSubmitBtn.textContent = "⚡ Імпортувати та додати в плеєр";
     }
   });
 
-  // + Add Track Button (Quick prompt fallback)
+  // + Add Track Button
   document.getElementById("add-music-track-btn")?.addEventListener("click", () => {
     openShazamModal();
   });
@@ -3613,12 +3756,15 @@ function importFromShazamModal(initialText) {
   const shazamInput = document.getElementById("shazam-input-text");
   if (shazamInput) shazamInput.value = initialText;
   shazamModal?.classList.remove("hidden");
+  shazamInput?.focus();
 }
 
 window.playTrackById = playTrackById;
 window.toggleFavTrack = toggleFavTrack;
+window.assignTrackToCar = assignTrackToCar;
 window.deleteTrackItem = deleteTrackItem;
 window.addSearchedTrack = addSearchedTrack;
+window.quickPasteShazamTrack = quickPasteShazamTrack;
 
 // --- Offline Listener ---
 function initNetworkListeners() {

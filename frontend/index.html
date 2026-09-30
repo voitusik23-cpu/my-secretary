@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.6.0">
+  <link rel="stylesheet" href="/static/styles.css?v=3.6.1">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -331,7 +331,10 @@
       <section id="tab-music" class="tab-panel">
         <div class="panel-header">
           <h2>🎵 Музика & Плеєр</h2>
-          <div class="panel-actions">
+          <div class="panel-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button id="quick-paste-shazam-btn" class="action-btn-sm" style="background:#2563eb;color:#fff;border:none;font-weight:700;display:inline-flex;align-items:center;gap:4px;" title="Вставити скопійоване посилання Shazam із буфера">
+              📋 Вставити трек
+            </button>
             <button id="shazam-import-btn" class="action-btn-sm" style="background: linear-gradient(135deg, #0088ff, #00d2ff); color: white; border: none; font-weight: 700; box-shadow: 0 2px 10px rgba(0, 136, 255, 0.35);">
               ⚡ Shazam
             </button>
@@ -913,7 +916,7 @@
 
           <hr style="border:none;border-top:1px solid var(--border-color);margin:16px 0;" />
           <button id="clear-cache-reload-btn" class="btn-secondary" style="width:100%;padding:10px;font-size:0.85rem;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;">
-            <span>🔄 Очистити кеш та оновити вигляд (v3.6.0)</span>
+            <span>🔄 Очистити кеш та оновити вигляд (v3.6.1)</span>
           </button>
         </div>
       </div>
@@ -1024,21 +1027,37 @@
         <button id="shazam-modal-close-btn" class="icon-btn-close">&times;</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">
-          Вставте посилання на трек із Shazam (напр. <code>https://www.shazam.com/track/...</code>) або текст «Поділитися» із додатку Shazam:
-        </p>
-        <textarea id="shazam-input-text" rows="3" placeholder="Вставте посилання або скопійований текст із Shazam..." style="width:100%;margin-bottom:12px;box-sizing:border-box;border-radius:10px;padding:10px;background:var(--bg-input);color:var(--text-main);border:1px solid var(--border-color);"></textarea>
+        <!-- Quick App Switcher button for iPhone / iPad -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <a href="shazam://" id="open-shazam-app-btn" class="action-btn-sm" style="flex:1;background:linear-gradient(135deg, #0088ff, #00d2ff);color:#fff;text-align:center;padding:10px;text-decoration:none;border-radius:10px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;" title="Запустити додаток Shazam">
+            <span>📲 Відкрити Shazam</span>
+          </a>
+          <button type="button" id="shazam-paste-clipboard-btn" class="action-btn-sm" style="flex:1;background:#2563eb;color:#fff;border:none;border-radius:10px;font-weight:700;padding:10px;display:flex;align-items:center;justify-content:center;gap:6px;">
+            <span>📋 Вставити з буфера</span>
+          </button>
+        </div>
+
+        <div style="background:rgba(0,136,255,0.08);border:1px solid rgba(0,136,255,0.25);border-radius:10px;padding:10px;margin-bottom:12px;font-size:0.8rem;line-height:1.45;color:var(--text-muted);">
+          💡 <strong>Як це працює:</strong><br>
+          1. У Shazam розпізнайте трек ➔ натисніть <strong>«Поділитися» ➔ «Скопіювати»</strong>.<br>
+          2. Поверніться сюди та натисніть кнопку <strong>«📋 Вставити з буфера»</strong>!<br>
+          3. Секретар знайде трек у найвищій якості та додасть у ваш плеєр.
+        </div>
+
+        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">Або вставте посилання вручну:</label>
+        <textarea id="shazam-input-text" rows="2" placeholder="https://www.shazam.com/track/... або назва треку" style="width:100%;margin-bottom:10px;box-sizing:border-box;border-radius:10px;padding:10px;background:var(--bg-input);color:var(--text-main);border:1px solid var(--border-color);font-size:0.85rem;"></textarea>
         
         <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">Додати у плейліст:</label>
         <select id="shazam-target-playlist" style="width:100%;margin-bottom:14px;box-sizing:border-box;border-radius:8px;padding:8px;background:var(--bg-input);color:var(--text-main);border:1px solid var(--border-color);">
-          <option value="Shazam" selected>⚡ Shazam</option>
-          <option value="В авто 🚗">🚗 В авто</option>
+          <option value="В авто 🚗" selected>🚗 В авто (для машини)</option>
+          <option value="Shazam">⚡ Shazam</option>
+          <option value="Всі треки">🎵 Всі треки</option>
           <option value="Улюблені">❤️ Улюблені</option>
           <option value="Релакс 🌙">🌙 Релакс</option>
         </select>
 
         <button id="shazam-submit-btn" class="btn-primary" style="width:100%;background:linear-gradient(135deg, #0088ff, #00d2ff);color:#fff;border:none;font-weight:700;padding:12px;border-radius:10px;cursor:pointer;">
-          ⚡ Імпортувати та додати
+          ⚡ Імпортувати та додати в плеєр
         </button>
         <div id="shazam-status-feedback" class="test-result-text" style="margin-top:8px;"></div>
       </div>
@@ -1081,6 +1100,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.6.0"></script>
+  <script src="/static/app.js?v=3.6.1"></script>
 </body>
 </html>
