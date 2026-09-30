@@ -284,6 +284,9 @@ function initVoice() {
             renderMovieResult(data.created.movies[0].movie_info);
             document.getElementById("movie-result-card")?.classList.remove("hidden");
           }
+        } else if (data.created?.business?.length > 0) {
+          window.switchToTab("business");
+          if (typeof window.loadBusinessTab === "function") window.loadBusinessTab();
         } else {
           reloadCurrentTab();
         }
@@ -332,6 +335,9 @@ function initTextInput() {
             renderMovieResult(data.created.movies[0].movie_info);
             document.getElementById("movie-result-card")?.classList.remove("hidden");
           }
+        } else if (data.created?.business?.length > 0) {
+          window.switchToTab("business");
+          if (typeof window.loadBusinessTab === "function") window.loadBusinessTab();
         } else {
           reloadCurrentTab();
         }
