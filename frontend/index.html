@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.7.1">
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -191,6 +191,10 @@
       <button class="tab-btn" data-tab="agent" role="tab" aria-selected="false">
         <span class="tab-icon">🤖</span>
         <span class="tab-label">AI-Чат</span>
+      </button>
+      <button class="tab-btn" data-tab="mailbox" role="tab" aria-selected="false">
+        <span class="tab-icon">📬</span>
+        <span class="tab-label">Пошта</span>
       </button>
       <button class="tab-btn hidden" id="tab-btn-hospitality" data-tab="hospitality" role="tab" aria-selected="false">
         <span class="tab-icon">🏨</span>
@@ -617,6 +621,63 @@
             <button type="button" id="ai-chat-send-btn" class="ai-chat-send-btn" title="Надіслати">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9b. MAILBOX & SPAM FILTER TAB -->
+      <section id="tab-mailbox" class="tab-panel">
+        <div class="panel-header">
+          <h2>📬 Пошта та Фільтр Спаму</h2>
+          <div class="panel-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button type="button" id="mail-check-all-btn" class="action-btn-sm" style="background:#2563eb;color:#fff;border:none;font-weight:700;">
+              ⚡ Перевірити пошту
+            </button>
+            <button type="button" id="mail-clean-spam-btn" class="action-btn-sm" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;font-weight:700;" title="Видалити весь спам з пошти">
+              🗑️ Очистити сміття
+            </button>
+            <button type="button" id="mail-add-account-btn" class="action-btn-sm">+ Скринька</button>
+          </div>
+        </div>
+
+        <!-- Mailbox Summary Digest Card -->
+        <div id="mail-digest-card" class="stat-card" style="margin-bottom:12px;background:rgba(37,99,235,0.08);border-color:rgba(37,99,235,0.25);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div style="flex:1;min-width:240px;">
+              <div style="font-weight:700;font-size:0.95rem;display:flex;align-items:center;gap:6px;">
+                <span>🤖 Звіт AI-Секретаря</span>
+              </div>
+              <p id="mail-digest-text" style="font-size:0.84rem;color:var(--text-main);margin:4px 0 0 0;line-height:1.45;">
+                Підключіть до 20 скриньок та натисніть «⚡ Перевірити пошту», щоб AI відсортував спам від важливих листів.
+              </p>
+            </div>
+            <button type="button" id="mail-speak-digest-btn" class="action-btn-sm" title="Озвучити звіт голосом">🔊 Озвучити</button>
+          </div>
+        </div>
+
+        <!-- Account Filter Pills Bar -->
+        <div class="music-playlists-bar" id="mail-accounts-bar" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;scrollbar-width:none;">
+          <button class="music-pl-pill active">🌐 Всі скриньки</button>
+        </div>
+
+        <!-- Category Filter Tabs -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border-color);padding-bottom:8px;overflow-x:auto;">
+          <button type="button" class="mail-cat-pill active" data-cat="spam" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:6px 14px;border-radius:18px;font-size:0.85rem;font-weight:700;cursor:pointer;">
+            🗑️ Сміття та Спам (<span id="mail-spam-count">0</span>)
+          </button>
+          <button type="button" class="mail-cat-pill" data-cat="important" style="background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.3);padding:6px 14px;border-radius:18px;font-size:0.85rem;font-weight:700;cursor:pointer;">
+            ⭐ Важливі листи (<span id="mail-important-count">0</span>)
+          </button>
+          <button type="button" class="mail-cat-pill" data-cat="accounts" style="background:rgba(148,163,184,0.12);color:var(--text-main);border:1px solid var(--border-color);padding:6px 14px;border-radius:18px;font-size:0.85rem;font-weight:600;cursor:pointer;">
+            ⚙️ Мої скриньки (<span id="mail-accounts-count">0</span>)
+          </button>
+        </div>
+
+        <!-- Content Area -->
+        <div id="mail-content-area" class="items-list">
+          <div class="empty-state">
+            <span class="empty-icon">📬</span>
+            <p>Завантаження пошти...</p>
           </div>
         </div>
       </section>
@@ -1340,13 +1401,66 @@
     </div>
   </div>
 
-  <script src="/static/modules/ai_chat.js?v=3.7.1"></script>
-  <script src="/static/modules/auth_phone.js?v=3.7.1"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.7.1"></script>
-  <script src="/static/modules/business.js?v=3.7.1"></script>
-  <script src="/static/modules/movies.js?v=3.7.1"></script>
-  <script src="/static/modules/music.js?v=3.7.1"></script>
-  <script src="/static/app.js?v=3.7.1"></script>
+  <!-- Modal: Add Mailbox Account -->
+  <div id="mail-add-account-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 440px; padding: 24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;font-size:1.15rem;font-weight:800;">📬 Підключити пошту</h3>
+        <button type="button" id="mail-acc-close-btn" class="icon-btn-close">&times;</button>
+      </div>
+
+      <p style="font-size:0.83rem;color:var(--text-muted);margin:0 0 14px 0;line-height:1.45;">
+        Введіть адресу та пароль. Підтримуються Gmail, Ukr.net, Yahoo, Outlook та будь-які IMAP-скриньки (до 20 скриньок).
+      </p>
+
+      <form id="mail-add-account-form">
+        <div style="margin-bottom: 12px; text-align: left;">
+          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Email адреса:</label>
+          <input type="email" id="mail-acc-email" placeholder="example@gmail.com, user@ukr.net" required style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
+        </div>
+
+        <div style="margin-bottom: 12px; text-align: left;">
+          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Назва / Ярлик (необов'язково):</label>
+          <input type="text" id="mail-acc-name" placeholder="«Робоча», «Особиста», «Розсилки»" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
+        </div>
+
+        <div style="margin-bottom: 12px; text-align: left;">
+          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Пароль додатку / IMAP:</label>
+          <input type="password" id="mail-acc-password" placeholder="Пароль додатку або IMAP" required autocomplete="current-password" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
+        </div>
+
+        <div id="mail-acc-provider-hint" style="font-size:0.77rem;color:var(--text-muted);background:rgba(255,255,255,0.05);padding:8px 10px;border-radius:8px;margin-bottom:14px;line-height:1.4;">
+          💡 Для Gmail та Ukr.net створіть «Пароль додатків» у налаштуваннях безпеки акаунта.
+        </div>
+
+        <details style="margin-bottom:14px;font-size:0.8rem;color:var(--text-muted);">
+          <summary style="cursor:pointer;font-weight:600;user-select:none;">⚙️ Додаткові налаштування сервера (IMAP)</summary>
+          <div style="margin-top:8px;display:flex;gap:8px;">
+            <input type="text" id="mail-acc-server" placeholder="imap.example.com" style="flex:2;padding:8px 10px;border-radius:8px;background:var(--bg-input);color:var(--text-main);border:1px solid var(--border-color);font-size:0.8rem;" />
+            <input type="number" id="mail-acc-port" value="993" style="width:70px;padding:8px 10px;border-radius:8px;background:var(--bg-input);color:var(--text-main);border:1px solid var(--border-color);font-size:0.8rem;" />
+          </div>
+        </details>
+
+        <div id="mail-acc-feedback" style="font-size: 0.8rem; margin-bottom: 12px; min-height: 18px; color: var(--text-muted);"></div>
+
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="mail-acc-cancel-btn" class="action-btn-sm" style="flex:1;padding:12px;">Скасувати</button>
+          <button type="submit" id="mail-acc-submit-btn" class="btn-primary" style="flex:2;padding:12px;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
+            💾 Підключити скриньку
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/modules/ai_chat.js?v=3.7.2"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.2"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.2"></script>
+  <script src="/static/modules/business.js?v=3.7.2"></script>
+  <script src="/static/modules/mailbox.js?v=3.7.2"></script>
+  <script src="/static/modules/movies.js?v=3.7.2"></script>
+  <script src="/static/modules/music.js?v=3.7.2"></script>
+  <script src="/static/app.js?v=3.7.2"></script>
 </body>
 </html>
 

@@ -85,6 +85,7 @@ def init_all_models():
         from app.modules.utilities.models import UtilityReading
         from app.modules.business.models import BusinessTransaction
         from app.modules.ai_chat.models import AIChatMessage
+        from app.modules.mailbox.models import MailAccount, MailMessage
     except Exception as e:
         import logging
         logging.getLogger("my_secretary.db").warning(f"Model registration warning: {e}")

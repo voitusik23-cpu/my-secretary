@@ -290,6 +290,9 @@ function initVoice() {
         } else if (data.created?.business?.length > 0) {
           window.switchToTab("business");
           if (typeof window.loadBusinessTab === "function") window.loadBusinessTab();
+        } else if (state.activeTab === "mailbox" || (data.summary && (data.summary.toLowerCase().includes("почт") || data.summary.toLowerCase().includes("спам") || data.summary.toLowerCase().includes("скриньк")))) {
+          window.switchToTab("mailbox");
+          if (typeof window.loadMailboxTab === "function") window.loadMailboxTab();
         } else {
           reloadCurrentTab();
         }
@@ -344,6 +347,9 @@ function initTextInput() {
         } else if (data.created?.business?.length > 0) {
           window.switchToTab("business");
           if (typeof window.loadBusinessTab === "function") window.loadBusinessTab();
+        } else if (state.activeTab === "mailbox" || (data.summary && (data.summary.toLowerCase().includes("почт") || data.summary.toLowerCase().includes("спам") || data.summary.toLowerCase().includes("скриньк")))) {
+          window.switchToTab("mailbox");
+          if (typeof window.loadMailboxTab === "function") window.loadMailboxTab();
         } else {
           reloadCurrentTab();
         }
@@ -447,6 +453,9 @@ function loadTabData(tab) {
       break;
     case "translator":
       initTranslatorScreen();
+      break;
+    case "mailbox":
+      if (typeof window.loadMailboxTab === "function") window.loadMailboxTab();
       break;
   }
 }
@@ -2767,6 +2776,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   if (window.AIChatModule && typeof window.AIChatModule.init === "function") {
     window.AIChatModule.init();
+  }
+  if (window.MailboxModule && typeof window.MailboxModule.init === "function") {
+    window.MailboxModule.init();
   }
 
   initSettingsModal();

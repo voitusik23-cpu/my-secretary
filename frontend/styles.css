@@ -3168,6 +3168,25 @@ body {
   40% { transform: scale(1); opacity: 1; }
 }
 
+/* ===================================================
+   Mailbox & Spam Cleaner Module Styles
+   =================================================== */
+.mail-cat-pill {
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.mail-cat-pill:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.15);
+}
+
+.mail-cat-pill.active {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  filter: brightness(1.2);
+}
+
+
 
 
 
