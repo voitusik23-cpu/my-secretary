@@ -51,11 +51,13 @@ const AuthPhone = {
     const submitBtn = document.getElementById("phone-login-submit-btn");
     const errorEl = document.getElementById("phone-login-error");
 
-    // Check if admin accessed via ?key=...
+    // Check if admin accessed via ?key=... or previously stored key
     const urlParams = new URLSearchParams(window.location.search);
     const keyFromUrl = urlParams.get("key");
     if (keyFromUrl) {
       localStorage.setItem("secret_key", keyFromUrl);
+      localStorage.setItem("secretary_user", "admin");
+    } else if (localStorage.getItem("secret_key")) {
       if (!localStorage.getItem("secretary_user")) {
         localStorage.setItem("secretary_user", "admin");
       }
@@ -69,6 +71,7 @@ const AuthPhone = {
       this.updateAccountBadge(currentUser);
       return;
     }
+
 
     // User is visiting for the first time without identity -> show phone login modal
     if (modal) {
