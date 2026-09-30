@@ -155,20 +155,35 @@ def quick_parse_text(payload: dict, db: Session = Depends(get_db)):
     # Clean description
     desc = re.sub(r"(\d+[\d\s.,]*\d*|\d+)", "", text)
     desc = desc.replace("+", " ").replace("-", " ")
-    for w in ["грн", "uah", "гривен", "гривень", "плюс", "мінус", "получил", "отримав", "выдал", "видав"]:
+    for w in [
+        "грн", "uah", "гривен", "гривень", "плюс", "мінус", "получил", "отримав", "выдал", "видав",
+        "бізнес", "бизнес", "по бізнесу", "по бизнесу", "в касу", "в кассу"
+    ]:
         desc = re.sub(rf"\b{re.escape(w)}\b", "", desc, flags=re.IGNORECASE)
     desc = re.sub(r"\s+", " ", desc).strip()
     if not desc:
         desc = "Надходження" if tx_type == "income" else "Витрата"
 
-
     desc = desc.capitalize()
+
+    # Smart category detection
+    cat = "Загальне"
+    if any(k in lower for k in ["зарплат", "зп", "толик", "толіку", "робітникам", "сотрудникам"]):
+        cat = "Зарплата"
+    elif any(k in lower for k in ["оренд", "аренд"]):
+        cat = "Оренда"
+    elif any(k in lower for k in ["шайб", "провод", "кабел", "базар", "ринок", "матеріал", "інструмент", "инструмент", "болт"]):
+        cat = "Матеріали"
+    elif any(k in lower for k in ["подат", "налог"]):
+        cat = "Податки"
+    elif any(k in lower for k in ["палив", "бензин", "дизел", "газ", "заправ", "сто"]):
+        cat = "Авто / Паливо"
 
     tx = BusinessTransaction(
         type=tx_type,
         amount=amount,
         description=desc,
-        category="Загальне",
+        category=cat,
         created_at=datetime.utcnow()
     )
     db.add(tx)

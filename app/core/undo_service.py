@@ -90,6 +90,10 @@ def undo_last_action(db: Session) -> Dict[str, Any]:
             from app.modules.music.models import MusicTrack
             deleted_count = db.query(MusicTrack).filter(MusicTrack.id.in_(ids)).delete(synchronize_session=False)
 
+        elif domain == "business":
+            from app.modules.business.models import BusinessTransaction
+            deleted_count = db.query(BusinessTransaction).filter(BusinessTransaction.id.in_(ids)).delete(synchronize_session=False)
+
         db.commit()
         cleared_action = _last_action
         _last_action = None

@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.6.2">
+  <link rel="stylesheet" href="/static/styles.css?v=3.6.6">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -269,6 +269,25 @@
               <div class="biz-stat-title">🔴 Витрати (-)</div>
               <div id="biz-expense-val" class="biz-stat-val expense">-0 ₴</div>
             </div>
+          </div>
+        </div>
+
+        <!-- Hands-Free Voice Dictation Card (Bazaar, driving, busy hands) -->
+        <div class="biz-voice-card">
+          <button type="button" id="biz-voice-dictate-btn" class="biz-voice-btn" title="Натисніть і надиктуйте витрату чи дохід">
+            <span class="biz-voice-icon-wrap">
+              <span class="biz-voice-icon">🎙️</span>
+            </span>
+            <div class="biz-voice-text-wrap">
+              <div class="biz-voice-title">Надиктувати голосом (руки зайняті)</div>
+              <div class="biz-voice-subtitle">Натисніть і скажіть: «шайбочки на базарі 250 гривень»</div>
+            </div>
+          </button>
+          <div id="biz-voice-status" class="biz-voice-status" style="display:none;">
+            <div class="biz-voice-wave">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <span id="biz-voice-status-text">Слухаю вас... Говоріть</span>
           </div>
         </div>
 
@@ -1275,12 +1294,12 @@
     </div>
   </div>
 
-  <script src="/static/modules/auth_phone.js?v=3.6.5"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.6.5"></script>
-  <script src="/static/modules/business.js?v=3.6.5"></script>
-  <script src="/static/modules/movies.js?v=3.6.5"></script>
-  <script src="/static/modules/music.js?v=3.6.5"></script>
-  <script src="/static/app.js?v=3.6.5"></script>
+  <script src="/static/modules/auth_phone.js?v=3.6.6"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.6.6"></script>
+  <script src="/static/modules/business.js?v=3.6.6"></script>
+  <script src="/static/modules/movies.js?v=3.6.6"></script>
+  <script src="/static/modules/music.js?v=3.6.6"></script>
+  <script src="/static/app.js?v=3.6.6"></script>
 </body>
 </html>
 

@@ -214,7 +214,203 @@ const BusinessModule = {
       });
   },
 
+  // Voice dictation state
+  recognition: null,
+  isVoiceActive: false,
+  mediaRecorder: null,
+  audioChunks: [],
+
+  updateVoiceUI(isListening, statusText) {
+    const btn = document.getElementById("biz-voice-dictate-btn");
+    const statusBox = document.getElementById("biz-voice-status");
+    const statusLabel = document.getElementById("biz-voice-status-text");
+
+    if (btn) {
+      if (isListening) btn.classList.add("listening");
+      else btn.classList.remove("listening");
+    }
+
+    if (statusBox && statusLabel) {
+      if (statusText) {
+        statusBox.style.display = "flex";
+        statusLabel.textContent = statusText;
+      } else {
+        statusBox.style.display = "none";
+      }
+    }
+  },
+
+  async submitVoiceText(text) {
+    if (!text || !text.trim()) return;
+    try {
+      const res = await apiFetch("/api/v1/business/quick-parse", {
+        method: "POST",
+        body: JSON.stringify({ text: text.trim() })
+      });
+
+      const sign = res.type === "income" ? "+" : "-";
+      const formatted = `${res.description} (${sign}${this.formatMoney(res.amount)})`;
+      
+      this.updateVoiceUI(false, `✅ Успішно: ${formatted}`);
+      if (typeof showToast === "function") {
+        showToast(`✅ Записано в касу: ${formatted}`);
+      }
+
+      await this.loadTab();
+
+      setTimeout(() => {
+        const statusBox = document.getElementById("biz-voice-status");
+        if (statusBox) statusBox.style.display = "none";
+      }, 4000);
+    } catch (err) {
+      this.updateVoiceUI(false, `❌ Помилка запису: ${err.message}`);
+      if (typeof showToast === "function") {
+        showToast(`❌ Не вдалося розпізнати: ${err.message}`);
+      }
+    }
+  },
+
+  toggleVoiceDictation() {
+    if (this.isVoiceActive) {
+      this.stopVoice();
+    } else {
+      this.startVoice();
+    }
+  },
+
+  startVoice() {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRec) {
+      try {
+        if (this.recognition) {
+          try { this.recognition.abort(); } catch (e) {}
+        }
+
+        const rec = new SpeechRec();
+        rec.lang = (navigator.language && navigator.language.startsWith("ru")) ? "ru-RU" : "uk-UA";
+        rec.continuous = false;
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+
+        rec.onstart = () => {
+          this.isVoiceActive = true;
+          this.updateVoiceUI(true, "🎙️ Слухаю... Скажіть витрату чи дохід (напр. «шайбочки на базарі 250 гривень»)");
+        };
+
+        rec.onresult = async (event) => {
+          this.isVoiceActive = false;
+          if (event.results && event.results[0] && event.results[0][0]) {
+            const transcript = event.results[0][0].transcript;
+            this.updateVoiceUI(false, `⚡ Почуто: «${transcript}». Записую в касу...`);
+            await this.submitVoiceText(transcript);
+          }
+        };
+
+        rec.onerror = (e) => {
+          this.isVoiceActive = false;
+          console.warn("Speech recognition error:", e);
+          if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+            this.updateVoiceUI(false, "⚠️ Мікрофон заблоковано в налаштуваннях браузера");
+          } else if (e.error === "no-speech") {
+            this.updateVoiceUI(false, "Голос не почуто. Натисніть ще раз щоб повторити");
+          } else {
+            this.updateVoiceUI(false, `Помилка: ${e.error}`);
+          }
+        };
+
+        rec.onend = () => {
+          this.isVoiceActive = false;
+          const btn = document.getElementById("biz-voice-dictate-btn");
+          if (btn) btn.classList.remove("listening");
+        };
+
+        this.recognition = rec;
+        rec.start();
+        return;
+      } catch (recErr) {
+        console.warn("Web Speech API start failed, falling back to MediaRecorder:", recErr);
+      }
+    }
+
+    // Fallback: Audio recording via MediaRecorder
+    this.startAudioRecordingFallback();
+  },
+
+  stopVoice() {
+    if (this.recognition) {
+      try { this.recognition.stop(); } catch (e) {}
+    }
+    if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
+      try { this.mediaRecorder.stop(); } catch (e) {}
+    }
+    this.isVoiceActive = false;
+    this.updateVoiceUI(false, null);
+  },
+
+  async startAudioRecordingFallback() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (typeof showToast === "function") showToast("⚠️ Браузер не підтримує запис голосу");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.audioChunks = [];
+      const mr = new MediaRecorder(stream);
+
+      mr.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) this.audioChunks.push(e.data);
+      };
+
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const audioBlob = new Blob(this.audioChunks, { type: mr.mimeType || "audio/webm" });
+        this.updateVoiceUI(false, "⚡ Розпізнаю аудіо через AI...");
+
+        try {
+          const formData = new FormData();
+          formData.append("audio", audioBlob, "business_voice.webm");
+          formData.append("text", "бізнес операція");
+
+          const token = localStorage.getItem("SECRET_KEY") || "";
+          const resp = await fetch("/api/v1/process/audio", {
+            method: "POST",
+            headers: {
+              ...(token ? { "x-secret-key": token } : {})
+            },
+            body: formData
+          });
+
+          const data = await resp.json();
+          if (resp.ok) {
+            this.updateVoiceUI(false, `✅ ${data.summary || "Запис додано в касу"}`);
+            if (typeof showToast === "function") showToast(`✅ ${data.summary || "Запис додано в касу"}`);
+            await this.loadTab();
+          } else {
+            throw new Error(data.detail || "Помилка сервера");
+          }
+        } catch (postErr) {
+          this.updateVoiceUI(false, `❌ Помилка: ${postErr.message}`);
+          if (typeof showToast === "function") showToast(`❌ Помилка: ${postErr.message}`);
+        }
+      };
+
+      mr.start();
+      this.mediaRecorder = mr;
+      this.isVoiceActive = true;
+      this.updateVoiceUI(true, "🎙️ Запис аудіо... Натисніть кнопку ще раз для збереження");
+    } catch (micErr) {
+      console.error("Microphone error:", micErr);
+      this.isVoiceActive = false;
+      this.updateVoiceUI(false, "⚠️ Помилка доступу до мікрофона");
+    }
+  },
+
   init() {
+    // Voice dictation button
+    document.getElementById("biz-voice-dictate-btn")?.addEventListener("click", () => this.toggleVoiceDictation());
+
     // Quick buttons
     document.getElementById("biz-add-income-btn")?.addEventListener("click", () => this.addTransaction("income"));
     document.getElementById("biz-add-expense-btn")?.addEventListener("click", () => this.addTransaction("expense"));

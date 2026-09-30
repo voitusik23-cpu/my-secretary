@@ -22,7 +22,7 @@ class ProcessTextRequest(BaseModel):
 
 async def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str, List[Any]]:
     """Зберігає вилучені AI дії у відповідні таблиці БД."""
-    created_items: Dict[str, List[Any]] = {k: [] for k in ["finance", "shopping", "tasks", "media_notes", "auto", "health_vitals", "movies", "music"]}
+    created_items: Dict[str, List[Any]] = {k: [] for k in ["finance", "shopping", "tasks", "media_notes", "auto", "health_vitals", "movies", "music", "business"]}
 
     for action in actions:
         domain = action.get("domain")
@@ -103,13 +103,33 @@ async def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Di
                     if m_track and isinstance(m_track, dict) and m_track.get("id"):
                         created_items["music"].append(m_track)
 
+            elif domain == "business":
+                from app.modules.business.models import BusinessTransaction
+                from app.modules.business.schemas import BusinessTransactionResponse
+                amt = float(data.get("amount", 0))
+                if amt > 0:
+                    b_type = data.get("type", "expense")
+                    desc = data.get("description") or "Витрата по бізнесу"
+                    cat = data.get("category", "Матеріали")
+                    b_tx = BusinessTransaction(
+                        type=b_type,
+                        amount=amt,
+                        description=desc,
+                        category=cat,
+                        notes=data.get("notes"),
+                        created_at=datetime.utcnow(),
+                    )
+                    db.add(b_tx)
+                    db.flush()
+                    created_items["business"].append(BusinessTransactionResponse.model_validate(b_tx).model_dump())
+
         except Exception as e:
             continue
 
     db.commit()
     try:
         from app.core.undo_service import record_action
-        for dom in ["shopping", "finance", "tasks", "media_notes", "auto", "health_vitals", "movies", "music"]:
+        for dom in ["shopping", "finance", "tasks", "media_notes", "auto", "health_vitals", "movies", "music", "business"]:
             its = created_items.get(dom, [])
             if its:
                 ids = [it["id"] for it in its if "id" in it]
