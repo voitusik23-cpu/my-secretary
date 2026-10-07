@@ -495,19 +495,38 @@ function initTabs() {
     });
   });
 
-  // Account button listeners -> opens settings & account modal
+  // Account button listeners -> opens dedicated Account & Profile modal
   const handleAccountClick = () => {
-    document.getElementById("settings-open-btn")?.click();
+    const accModal = document.getElementById("account-modal");
+    if (accModal) {
+      accModal.classList.remove("hidden");
+      try {
+        if (typeof loadBackupStatus === "function") {
+          loadBackupStatus();
+        }
+        const currentUser = (window.AuthPhone && window.AuthPhone.getCurrentUser()) || localStorage.getItem("secretary_user") || "";
+        if (window.AuthPhone && typeof window.AuthPhone.updateAccountBadge === "function") {
+          window.AuthPhone.updateAccountBadge(currentUser);
+        }
+      } catch (err) {
+        console.warn("Account modal init error:", err);
+      }
+    }
   };
   document.getElementById("tab-btn-account")?.addEventListener("click", handleAccountClick);
   document.getElementById("dock-account-btn")?.addEventListener("click", handleAccountClick);
 
   // Update account label with current user phone if saved
   function refreshAccountBadge() {
-    const userPhone = localStorage.getItem("secretary_user_phone") || localStorage.getItem("secretary_phone");
+    const userPhone = localStorage.getItem("secretary_user") || localStorage.getItem("secretary_user_phone") || localStorage.getItem("secretary_phone");
     if (userPhone) {
-      const cleanPhone = userPhone.replace(/\D/g, "");
-      const shortPhone = cleanPhone.length > 4 ? `+..${cleanPhone.slice(-4)}` : userPhone;
+      let shortPhone = userPhone;
+      if (userPhone === "admin" || userPhone === "owner") {
+        shortPhone = "Адмін";
+      } else {
+        const cleanPhone = userPhone.replace(/\D/g, "");
+        shortPhone = cleanPhone.length > 4 ? `+..${cleanPhone.slice(-4)}` : userPhone;
+      }
       const accLabel = document.getElementById("nav-account-label");
       const dockLabel = document.getElementById("dock-account-label");
       if (accLabel) accLabel.textContent = shortPhone;
@@ -1463,8 +1482,39 @@ async function loadVersionInfo() {
   }
 }
 
+// --- Account & Profile Modal ---
+function initAccountModal() {
+  const modal = document.getElementById("account-modal");
+  const closeBtn = document.getElementById("account-close-btn");
+  const switchBtn = document.getElementById("switch-account-btn");
+  const logoutBtn = document.getElementById("logout-account-btn");
+
+  closeBtn?.addEventListener("click", () => modal?.classList.add("hidden"));
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
+  });
+
+  switchBtn?.addEventListener("click", () => {
+    modal?.classList.add("hidden");
+    if (window.AuthPhone && typeof window.AuthPhone.switchAccount === "function") {
+      window.AuthPhone.switchAccount();
+    }
+  });
+
+  logoutBtn?.addEventListener("click", () => {
+    if (confirm("Ви дійсно бажаєте вийти з акаунту?")) {
+      modal?.classList.add("hidden");
+      localStorage.removeItem("secretary_user");
+      location.reload();
+    }
+  });
+
+  document.getElementById("trigger-cloud-backup-btn")?.addEventListener("click", triggerCloudBackup);
+}
+
 // --- Settings Modal ---
 function initSettingsModal() {
+  initAccountModal();
   const modal = document.getElementById("settings-modal");
   const openBtn = document.getElementById("settings-open-btn");
   const closeBtn = document.getElementById("settings-close-btn");
@@ -1486,7 +1536,6 @@ function initSettingsModal() {
       if (languageSelect) languageSelect.value = state.preferredLanguage || "uk";
       resultText.textContent = "";
       try {
-        loadBackupStatus();
         loadVersionInfo();
       } catch (err) {
         console.warn("Settings init error:", err);
@@ -1498,8 +1547,6 @@ function initSettingsModal() {
     await loadVersionInfo();
     showToast("✅ Дані версії бота оновлено!");
   });
-
-  document.getElementById("trigger-cloud-backup-btn")?.addEventListener("click", triggerCloudBackup);
 
   document.getElementById("clear-cache-reload-btn")?.addEventListener("click", async () => {
     const feedback = document.getElementById("version-action-feedback");

@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.7.29">
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.30">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -1414,26 +1414,83 @@
       </div>
     </div>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal-overlay hidden">
+    <!-- Account & Profile Modal -->
+    <div id="account-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
       <div class="modal-card">
         <div class="modal-header">
-          <h3>Настройки подключения</h3>
-          <button id="settings-close-btn" class="icon-btn-close">&times;</button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:1.3rem;">👤</span>
+            <h3 style="margin:0;">Профіль та Акаунт</h3>
+          </div>
+          <button id="account-close-btn" class="icon-btn-close">&times;</button>
         </div>
         <div class="modal-body">
-          <div style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+          <!-- User Profile & Phone -->
+          <div class="account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;display:flex;justify-content:space-between;align-items:center;">
             <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">ПОТОЧНИЙ АКАУНТ</div>
-              <div id="account-info-badge" style="font-size:0.95rem;font-weight:700;margin-top:2px;">📱 Завантаження...</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Поточний користувач</div>
+              <div id="account-info-badge" style="font-size:1.05rem;font-weight:800;color:var(--text-main);margin-top:4px;">📱 Завантаження...</div>
+              <div style="font-size:0.75rem;color:var(--text-sub);margin-top:2px;">Персональна база даних активна</div>
             </div>
-            <button type="button" id="switch-account-btn" style="background:transparent;border:1px solid var(--border-color);color:var(--text-muted);border-radius:6px;padding:4px 8px;font-size:0.78rem;cursor:pointer;">
-              Змінити номер
+            <button type="button" id="switch-account-btn" style="background:rgba(132,204,22,0.15);border:1.5px solid var(--border-color);color:var(--text-main);border-radius:10px;padding:8px 12px;font-size:0.82rem;font-weight:700;cursor:pointer;">
+              Змінити
             </button>
           </div>
 
+          <!-- Subscription & App Store License Status -->
+          <div class="account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <span style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Статус ліцензії</span>
+              <span style="font-size:0.72rem;font-weight:800;background:rgba(132,204,22,0.22);color:#2d5508;padding:3px 10px;border-radius:20px;border:1px solid rgba(132,204,22,0.45);">🌟 PRO АКТИВНА</span>
+            </div>
+            <div style="font-size:0.92rem;font-weight:800;color:var(--text-main);margin-bottom:4px;">Мой Секретарь — Довічний доступ</div>
+            <div style="font-size:0.78rem;color:var(--text-sub);line-height:1.4;">
+              • Голосове розпізнавання Whisper без обмежень<br>
+              • Розумна обробка ШІ (фінанси, списки, склерозник)<br>
+              • Повна синхронізація через хмару та локальне збереження
+            </div>
+          </div>
+
+          <!-- Google Drive 5TB Backup Section -->
+          <div class="backup-settings-section account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;">
+            <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;">☁️ Хмарний бекап (Google Drive 5TB)</div>
+            <p style="font-size:0.8rem;color:var(--text-sub);margin:0 0 10px 0;line-height:1.4;">
+              256-бітний зашифрований архів SQLite у вашу папку <code>Secretary_AI_Backups</code>.
+            </p>
+            <div id="backup-status-badge" style="font-size:0.8rem;padding:8px 12px;border-radius:8px;background:var(--bg-card);border:1px solid var(--border-color);margin-bottom:10px;">
+              <strong>Останній бекап:</strong> <span id="last-backup-time-label">немає даних</span>
+              <div id="last-backup-details-label" style="color:var(--text-muted);margin-top:2px;"></div>
+            </div>
+            <button id="trigger-cloud-backup-btn" class="btn-primary" style="width:100%;background:linear-gradient(135deg, #0ea5e9, #2563eb);display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;padding:10px 14px;border-radius:10px;">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span>Створити резервну копію зараз</span>
+            </button>
+            <p id="backup-action-feedback" class="test-result-text" style="margin-top:6px;"></p>
+          </div>
+
+          <!-- Security & Session -->
+          <div style="display:flex;justify-content:center;padding-top:4px;">
+            <button type="button" id="logout-account-btn" style="background:transparent;border:1px solid rgba(239,68,68,0.4);color:#ef4444;border-radius:10px;padding:10px 18px;font-size:0.86rem;font-weight:700;cursor:pointer;width:100%;">
+              🚪 Вийти з акаунту
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:1.3rem;">⚙️</span>
+            <h3 style="margin:0;">Системні налаштування</h3>
+          </div>
+          <button id="settings-close-btn" class="icon-btn-close">&times;</button>
+        </div>
+        <div class="modal-body">
           <!-- Regional Settings (Currency & Language) -->
-          <div style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div class="account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;">
             <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">🌍 Регіональні налаштування</div>
             <div style="display:flex;gap:10px;">
               <div style="flex:1;">
@@ -1459,45 +1516,29 @@
             </div>
           </div>
 
-          <label for="server-url-input">Адрес сервера:</label>
-          <input type="url" id="server-url-input" placeholder="http://localhost:8000" />
-
-
-          <label for="secret-key-input">Секретный ключ (SECRET_KEY):</label>
-          <input type="password" id="secret-key-input" placeholder="Введите ваш SECRET_KEY из .env" />
-          <small class="help-text">Ключ защищает ваши эндпоинты и передается в заголовке X-Secret-Key.</small>
-
-          <div class="modal-actions">
-            <button id="test-connection-btn" class="btn-secondary">Проверить связь</button>
-            <button id="save-settings-btn" class="btn-primary">Сохранить</button>
-          </div>
-          <p id="settings-test-result" class="test-result-text"></p>
-
-          <hr style="border:none;border-top:1px solid var(--border-color);margin:16px 0;" />
-
-          <!-- Google Drive 5TB Backup Section -->
-          <div class="backup-settings-section">
-            <h4 style="margin:0 0 6px 0;font-size:0.95rem;display:flex;align-items:center;gap:6px;">
-              <span>☁️ Резервна копія на Google Drive (5TB)</span>
-            </h4>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 10px 0;">
-              Створює 256-бітний зашифрований архів бази даних SQLite та вивантажує у вашу папку <code>Secretary_AI_Backups</code>.
-            </p>
-            <div id="backup-status-badge" style="font-size:0.8rem;padding:6px 10px;border-radius:6px;background:var(--bg-card);border:1px solid var(--border-color);margin-bottom:10px;">
-              <strong>Останній бекап:</strong> <span id="last-backup-time-label">немає даних</span>
-              <div id="last-backup-details-label" style="color:var(--text-muted);margin-top:2px;"></div>
+          <!-- Server Connection Settings -->
+          <div class="account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+            <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">🔗 Підключення до сервера</div>
+            <div>
+              <label for="server-url-input" style="font-size:0.78rem;margin-bottom:4px;display:block;">Адрес сервера:</label>
+              <input type="url" id="server-url-input" placeholder="http://localhost:8000" />
             </div>
-            <button id="trigger-cloud-backup-btn" class="btn-primary" style="width:100%;background:#0a84ff;display:flex;align-items:center;justify-content:center;gap:6px;">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              <span>Створити резервну копію зараз</span>
-            </button>
-            <p id="backup-action-feedback" class="test-result-text" style="margin-top:6px;"></p>
-          </div>
 
-          <hr style="border:none;border-top:1px solid var(--border-color);margin:16px 0;" />
+            <div>
+              <label for="secret-key-input" style="font-size:0.78rem;margin-bottom:4px;display:block;">Секретный ключ (SECRET_KEY):</label>
+              <input type="password" id="secret-key-input" placeholder="Введите ваш SECRET_KEY из .env" />
+              <small class="help-text" style="font-size:0.74rem;display:block;margin-top:3px;">Ключ защищает ваши эндпоинты и передается в заголовке X-Secret-Key.</small>
+            </div>
+
+            <div class="modal-actions" style="margin-top:4px;">
+              <button id="test-connection-btn" class="btn-secondary">Проверить связь</button>
+              <button id="save-settings-btn" class="btn-primary">Сохранить</button>
+            </div>
+            <p id="settings-test-result" class="test-result-text"></p>
+          </div>
 
           <!-- Bot & System Version Section -->
-          <div class="system-version-card" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;margin-bottom:6px;">
+          <div class="system-version-card" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
               <div style="display:flex;align-items:center;gap:10px;">
                 <div style="width:36px;height:36px;border-radius:10px;background:rgba(14,165,233,0.15);display:flex;align-items:center;justify-content:center;font-size:1.25rem;">
@@ -1506,7 +1547,7 @@
                 <div>
                   <div style="font-size:0.72rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Версія системи та бота</div>
                   <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
-                    <span id="bot-version-badge" style="font-size:1.05rem;font-weight:800;color:var(--text-main);">v3.7.10</span>
+                    <span id="bot-version-badge" style="font-size:1.05rem;font-weight:800;color:var(--text-main);">v3.7.30</span>
                     <span id="bot-status-tag" style="font-size:0.72rem;font-weight:600;background:rgba(34,197,94,0.18);color:#22c55e;padding:2px 7px;border-radius:20px;border:1px solid rgba(34,197,94,0.3);">● Актуальна</span>
                   </div>
                 </div>
@@ -1518,12 +1559,12 @@
 
             <div style="font-size:0.8rem;color:var(--text-muted);background:rgba(0,0,0,0.18);padding:10px 12px;border-radius:8px;display:flex;flex-direction:column;gap:6px;border:1px solid rgba(255,255,255,0.05);">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span>📅 <strong>Дата та час збірки:</strong></span>
-                <span id="bot-build-time" style="color:var(--text-main);font-weight:600;">30.09.2026 18:48</span>
+                <span>📅 <strong>Дата збірки:</strong></span>
+                <span id="bot-build-time" style="color:var(--text-main);font-weight:600;">07.10.2026 21:50</span>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>📱 <strong>Клієнт (PWA додаток):</strong></span>
-                <span id="pwa-version-label" style="color:var(--text-main);font-weight:600;">v3.7.10</span>
+                <span id="pwa-version-label" style="color:var(--text-main);font-weight:600;">v3.7.30</span>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>⚡ <strong>Статус сервера:</strong></span>
@@ -2297,15 +2338,15 @@ binance mylogin@crypto.com 2fa увімкнено
     </div>
   </div>
 
-  <script src="/static/modules/ai_chat.js?v=3.7.29"></script>
-  <script src="/static/modules/auth_phone.js?v=3.7.29"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.7.29"></script>
-  <script src="/static/modules/business.js?v=3.7.29"></script>
-  <script src="/static/modules/mailbox.js?v=3.7.29"></script>
-  <script src="/static/modules/movies.js?v=3.7.29"></script>
-  <script src="/static/modules/music.js?v=3.7.29"></script>
-  <script src="/static/modules/vault.js?v=3.7.29"></script>
-  <script src="/static/app.js?v=3.7.29"></script>
+  <script src="/static/modules/ai_chat.js?v=3.7.30"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.30"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.30"></script>
+  <script src="/static/modules/business.js?v=3.7.30"></script>
+  <script src="/static/modules/mailbox.js?v=3.7.30"></script>
+  <script src="/static/modules/movies.js?v=3.7.30"></script>
+  <script src="/static/modules/music.js?v=3.7.30"></script>
+  <script src="/static/modules/vault.js?v=3.7.30"></script>
+  <script src="/static/app.js?v=3.7.30"></script>
 </body>
 </html>
 
