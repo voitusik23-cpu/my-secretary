@@ -230,9 +230,18 @@ function showToast(message) {
 // --- Audio & Voice Recording ---
 function initVoice() {
   const micBtn = document.getElementById("mic-btn");
+  const voiceHeroCard = document.getElementById("voice-hero-card");
   const pulseRings = document.querySelectorAll(".mic-pulse-ring");
   const statusText = document.getElementById("voice-status-text");
   const timerEl = document.getElementById("recording-timer");
+
+  // Tap anywhere on the wide ergonomic card for effortless dictation
+  if (voiceHeroCard) {
+    voiceHeroCard.addEventListener("click", (e) => {
+      if (e.target.closest("#mic-btn")) return; // already handled by micBtn listener
+      micBtn?.click();
+    });
+  }
 
   micBtn.addEventListener("click", async () => {
     // Warm up audio element for iOS Safari autoplay permissions
@@ -298,6 +307,7 @@ function initVoice() {
       state.isRecording = true;
 
       micBtn.classList.add("recording");
+      voiceHeroCard?.classList.add("recording");
       statusText.textContent = "Слушаю... Нажмите ещё раз для отправки";
       timerEl.classList.remove("hidden");
 
@@ -330,6 +340,7 @@ function initVoice() {
     }
     state.isRecording = false;
     micBtn.classList.remove("recording");
+    voiceHeroCard?.classList.remove("recording");
     clearInterval(state.recordInterval);
     timerEl.classList.add("hidden");
     statusText.textContent = "Обрабатываю запись через Gemini AI...";
@@ -484,6 +495,26 @@ function initTabs() {
     });
   });
 
+  // Account nav tab listener -> opens settings & account modal
+  const accountBtn = document.getElementById("tab-btn-account");
+  if (accountBtn) {
+    accountBtn.addEventListener("click", () => {
+      document.getElementById("settings-open-btn")?.click();
+    });
+  }
+
+  // Update account label with current user phone if saved
+  function refreshAccountBadge() {
+    const userPhone = localStorage.getItem("secretary_user_phone") || localStorage.getItem("secretary_phone");
+    const accLabel = document.getElementById("nav-account-label");
+    if (accLabel && userPhone) {
+      const cleanPhone = userPhone.replace(/\D/g, "");
+      const shortPhone = cleanPhone.length > 4 ? `+..${cleanPhone.slice(-4)}` : userPhone;
+      accLabel.textContent = shortPhone;
+    }
+  }
+  refreshAccountBadge();
+
   document.getElementById("refresh-feed-btn")?.addEventListener("click", () => loadTabData("feed"));
 }
 
@@ -552,10 +583,76 @@ function loadTabData(tab) {
   }
 }
 
+// Dynamic updater for Dashboard Bento Grid (Music, Business, Vault, Shopping)
+async function updateDashboardBento() {
+  try {
+    // 1. Music live track
+    if (window.musicState) {
+      const trackName = document.getElementById("bento-track-name");
+      const trackSub = document.getElementById("bento-track-sub");
+      const playBtn = document.getElementById("bento-music-play-btn");
+      if (window.musicState.currentTrack) {
+        if (trackName) trackName.textContent = window.musicState.currentTrack.title || "Трек";
+        if (trackSub) trackSub.textContent = window.musicState.currentTrack.artist || "Музыка";
+      } else {
+        if (trackName) trackName.textContent = "Нажмите для воспроизведения";
+      }
+      if (playBtn) {
+        playBtn.textContent = window.musicState.isPlaying ? "⏸" : "▶";
+      }
+    }
+
+    // 2. Business Balance
+    const bizBalEl = document.getElementById("bento-biz-balance");
+    if (bizBalEl) {
+      try {
+        const balData = await apiFetch("/api/v1/business/balance");
+        if (balData && typeof balData.balance !== "undefined") {
+          const cur = balData.currency || "₴";
+          bizBalEl.textContent = `${cur} ${Number(balData.balance).toLocaleString("uk-UA")}`;
+        }
+      } catch (e) {}
+    }
+
+    // 3. Vault & Notes Preview
+    try {
+      const vaultData = await apiFetch("/api/v1/vault");
+      if (vaultData && Array.isArray(vaultData.items)) {
+        const vCount = document.getElementById("bento-vault-count");
+        if (vCount) vCount.textContent = `${vaultData.items.length} зам.`;
+        const vPrev = document.getElementById("bento-vault-preview");
+        if (vPrev && vaultData.items.length > 0) {
+          const top2 = vaultData.items.slice(0, 2);
+          vPrev.innerHTML = top2.map(item => `<div class="bento-check-item">• ${item.title || item.category || "Заметка"}</div>`).join("");
+        }
+      }
+    } catch (e) {}
+
+    // 4. Shopping List Preview
+    try {
+      const shopItems = await apiFetch("/api/shopping");
+      if (shopItems && Array.isArray(shopItems)) {
+        const activeItems = shopItems.filter(i => !i.is_bought);
+        const shopCount = document.getElementById("bento-shop-count");
+        if (shopCount) shopCount.textContent = `${activeItems.length} поз.`;
+        const shopPrev = document.getElementById("bento-shop-preview");
+        if (shopPrev && activeItems.length > 0) {
+          const top2 = activeItems.slice(0, 2);
+          shopPrev.innerHTML = top2.map(i => `<div class="bento-check-item">• ${i.name || "Товар"}</div>`).join("");
+        }
+      }
+    } catch (e) {}
+  } catch (err) {
+    console.warn("[Dashboard Bento] update error:", err);
+  }
+}
+window.updateDashboardBento = updateDashboardBento;
+
 // --- Data Renderers ---
 
-// 1. Feed
+// 1. Feed & Dashboard
 async function loadFeed() {
+  updateDashboardBento();
   const list = document.getElementById("feed-list");
   try {
     const items = await apiFetch("/api/feed");

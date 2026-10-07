@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.7.27">
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.28">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -89,22 +89,28 @@
 
     <!-- Voice & Quick Ingest Section -->
     <section class="voice-hero">
-      <div class="mic-container">
-        <div class="mic-pulse-ring"></div>
-        <div class="mic-pulse-ring"></div>
-        <div class="mic-pulse-ring"></div>
-        <button id="mic-btn" class="mic-button" aria-label="Записать голос">
-          <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="22" />
-          </svg>
-        </button>
-      </div>
+      <div class="voice-hero-card" id="voice-hero-card" role="button" tabindex="0" title="Нажмите в любом месте для записи голоса">
+        <div class="mic-container">
+          <div class="mic-pulse-ring"></div>
+          <div class="mic-pulse-ring"></div>
+          <div class="mic-pulse-ring"></div>
+          <button id="mic-btn" class="mic-button" aria-label="Записать голос" type="button">
+            <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+            </svg>
+          </button>
+        </div>
 
-      <div class="voice-status">
-        <p id="voice-status-text" class="status-text">Нажмите и говорите или введите текст</p>
-        <span id="recording-timer" class="recording-timer hidden">00:00</span>
+        <div class="voice-hero-info">
+          <div class="voice-hero-badge-row">
+            <span class="voice-hero-badge">⚡ 1 тап в книжку</span>
+            <span id="recording-timer" class="recording-timer hidden">00:00</span>
+          </div>
+          <p id="voice-status-text" class="status-text">Нажмите и надиктуйте заметку...</p>
+          <span class="voice-hero-sub">Любая поза • Распознавание на лету</span>
+        </div>
       </div>
 
       <!-- Quick Text Input -->
@@ -199,6 +205,10 @@
         <span class="tab-icon">📬</span>
         <span class="tab-label">Пошта</span>
       </button>
+      <button class="tab-btn" id="tab-btn-account" type="button" role="tab" aria-selected="false" title="Мій акаунт та налаштування">
+        <span class="tab-icon">👤</span>
+        <span class="tab-label" id="nav-account-label">Акаунт</span>
+      </button>
       <button class="tab-btn hidden" id="tab-btn-hospitality" data-tab="hospitality" role="tab" aria-selected="false">
         <span class="tab-icon">🏨</span>
         <span class="tab-label">Броні</span>
@@ -207,8 +217,134 @@
 
     <!-- Tab Panels Container -->
     <main class="tab-panels">
-      <!-- 1. FEED TAB -->
+      <!-- 1. FEED & BENTO DASHBOARD TAB -->
       <section id="tab-feed" class="tab-panel active">
+        <!-- 2-COLUMN BENTO GRID DASHBOARD -->
+        <div class="dashboard-bento-grid">
+          <!-- Card 1: Music -->
+          <div class="bento-card bento-card-music" onclick="window.switchToTab('music')" title="Перейти в плеер">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">🎵</span>
+                <span class="bento-label">Музыка</span>
+              </div>
+              <span class="bento-pill" id="bento-music-status">Online</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-track-name" id="bento-track-name">Загрузка музыки...</div>
+              <div class="bento-track-sub" id="bento-track-sub">VK & Локальные треки</div>
+            </div>
+            <div class="bento-card-footer" onclick="event.stopPropagation()">
+              <button type="button" class="bento-btn-icon" title="Предыдущий" onclick="if(window.MusicModule) window.MusicModule.playPrev();">⏮</button>
+              <button type="button" class="bento-btn-play" id="bento-music-play-btn" title="Воспроизведение" onclick="if(window.MusicModule) window.MusicModule.togglePlay();">▶</button>
+              <button type="button" class="bento-btn-icon" title="Следующий" onclick="if(window.MusicModule) window.MusicModule.playNext();">⏭</button>
+            </div>
+          </div>
+
+          <!-- Card 2: Movies -->
+          <div class="bento-card bento-card-movies" onclick="window.switchToTab('movies')" title="Перейти в фильмы">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">🎬</span>
+                <span class="bento-label">Фильмы</span>
+              </div>
+              <span class="bento-pill pill-amber" id="bento-movie-rating">★ 8.8</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-title-line" id="bento-movie-title">Каталог фильмов</div>
+              <div class="bento-track-sub" id="bento-movie-sub">HD просмотр и трейлеры</div>
+              <div class="bento-progress-track">
+                <div class="bento-progress-bar" style="width: 72%;"></div>
+              </div>
+            </div>
+            <div class="bento-card-footer">
+              <span class="bento-action-label">Смотреть</span>
+              <span class="bento-arrow">→</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Business -->
+          <div class="bento-card bento-card-business" onclick="window.switchToTab('business')" title="Перейти в бизнес">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">💼</span>
+                <span class="bento-label">Бизнес</span>
+              </div>
+              <span class="bento-pill pill-emerald" id="bento-biz-badge">+18%</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-metric-caption">Касса / Выручка</div>
+              <div class="bento-metric-value" id="bento-biz-balance">₴ 0</div>
+              <div class="bento-metric-sub" id="bento-biz-deals">Отчеты CRM</div>
+            </div>
+            <div class="bento-card-footer">
+              <span class="bento-action-label">Счета</span>
+              <span class="bento-arrow">→</span>
+            </div>
+          </div>
+
+          <!-- Card 4: Vault / Notes (Склерозник) -->
+          <div class="bento-card bento-card-vault" onclick="window.switchToTab('vault')" title="Перейти в Склерозник">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">🧠</span>
+                <span class="bento-label">Склерозник</span>
+              </div>
+              <span class="bento-pill" id="bento-vault-count">Книжка</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-checklist" id="bento-vault-preview">
+                <div class="bento-check-item">• Заметки на лету</div>
+                <div class="bento-check-item">• Оперативные дела</div>
+              </div>
+            </div>
+            <div class="bento-card-footer">
+              <span class="bento-action-label">+ Заметка</span>
+              <span class="bento-arrow">→</span>
+            </div>
+          </div>
+
+          <!-- Card 5: Shopping -->
+          <div class="bento-card bento-card-shopping" onclick="window.switchToTab('shopping')" title="Перейти в покупки">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">🛒</span>
+                <span class="bento-label">Покупки</span>
+              </div>
+              <span class="bento-pill pill-teal" id="bento-shop-count">Корзина</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-checklist" id="bento-shop-preview">
+                <div class="bento-check-item">• Актуальный список</div>
+                <div class="bento-check-item">• Авто-сортировка</div>
+              </div>
+            </div>
+            <div class="bento-card-footer">
+              <span class="bento-action-label">Список</span>
+              <span class="bento-arrow">→</span>
+            </div>
+          </div>
+
+          <!-- Card 6: Safe -->
+          <div class="bento-card bento-card-safe" onclick="window.switchToTab('vault')" title="Открыть сейф">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">🔐</span>
+                <span class="bento-label">Сейф</span>
+              </div>
+              <span class="bento-pill pill-safe">AES-256</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-safe-status">FaceID / PIN-код</div>
+              <div class="bento-track-sub" id="bento-safe-sub">Секреты под замком</div>
+            </div>
+            <div class="bento-card-footer">
+              <span class="bento-action-label">Открыть сейф</span>
+              <span class="bento-arrow">🔒</span>
+            </div>
+          </div>
+        </div>
+
         <div class="panel-header">
           <h2>Последние записи</h2>
           <button id="refresh-feed-btn" class="text-btn">Обновить</button>
@@ -2144,15 +2280,15 @@ binance mylogin@crypto.com 2fa увімкнено
     </div>
   </div>
 
-  <script src="/static/modules/ai_chat.js?v=3.7.27"></script>
-  <script src="/static/modules/auth_phone.js?v=3.7.27"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.7.27"></script>
-  <script src="/static/modules/business.js?v=3.7.27"></script>
-  <script src="/static/modules/mailbox.js?v=3.7.27"></script>
-  <script src="/static/modules/movies.js?v=3.7.27"></script>
-  <script src="/static/modules/music.js?v=3.7.27"></script>
-  <script src="/static/modules/vault.js?v=3.7.27"></script>
-  <script src="/static/app.js?v=3.7.27"></script>
+  <script src="/static/modules/ai_chat.js?v=3.7.28"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.28"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.28"></script>
+  <script src="/static/modules/business.js?v=3.7.28"></script>
+  <script src="/static/modules/mailbox.js?v=3.7.28"></script>
+  <script src="/static/modules/movies.js?v=3.7.28"></script>
+  <script src="/static/modules/music.js?v=3.7.28"></script>
+  <script src="/static/modules/vault.js?v=3.7.28"></script>
+  <script src="/static/app.js?v=3.7.28"></script>
 </body>
 </html>
 
