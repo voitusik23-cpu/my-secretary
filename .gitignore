@@ -7,6 +7,8 @@
 *.db
 *.db-journal
 secretary.db
+data/
+app/data/
 backups/
 
 # Logs & temporary runtime files
@@ -38,6 +40,8 @@ env/
 /Searches/
 /Videos/
 !app/modules/music/**
+app/modules/music/**/__pycache__/
+*.pyc
 NTUSER*
 ntuser*
 .antigravity*

@@ -87,19 +87,30 @@ async def search_movie_ai(title: str) -> Dict[str, Any]:
         }
 
     try:
+        import asyncio
         from google import genai
-        client = genai.Client(api_key=api_key)
-        prompt = MOVIE_SEARCH_PROMPT.format(title=clean_t)
-        res = client.models.generate_content(model=settings.AI_MODEL, contents=prompt)
+
+        def _call_gemini_sync():
+            client = genai.Client(api_key=api_key)
+            prompt = MOVIE_SEARCH_PROMPT.format(title=clean_t)
+            return client.models.generate_content(model=settings.AI_MODEL, contents=prompt)
+
+        # Non-blocking async execution with 10s timeout
+        res = await asyncio.wait_for(asyncio.to_thread(_call_gemini_sync), timeout=10.0)
         raw = (res.text or "").strip()
         if raw.startswith("```"):
             raw = "\n".join(raw.split("\n")[1:])
             raw = raw.rstrip("`").strip()
         data = json.loads(raw)
+        
+        # Normalize type strictly
+        m_type = str(data.get("type", "movie")).lower()
+        data["type"] = "series" if "seri" in m_type or "tv" in m_type else "movie"
+
         if not data.get("found"):
-            data["found"] = True
+            data["found"] = False
             data["title"] = clean_t
-            data["description"] = f"Фільм «{clean_t}»."
+            data["description"] = f"Фільм «{clean_t}» не знайдено в базі ШІ."
 
         data["watch_links"] = build_watch_links(
             data.get("title", clean_t),

@@ -140,10 +140,19 @@ function playTrack(track, queue = null) {
     musicState.currentIndex = musicState.queue.length - 1;
   }
 
-  // Construct authenticated stream url with ?key= and timestamp cache buster
-  const keyParam = state.secretKey ? `key=${encodeURIComponent(state.secretKey)}` : "";
+  // Request signed HMAC stream token (5-min validity) for this track
+  let tokenParam = "";
+  try {
+    const tokenRes = await apiFetch(`/api/v1/music/token/${track.id}`);
+    if (tokenRes && tokenRes.token) {
+      tokenParam = `token=${encodeURIComponent(tokenRes.token)}`;
+    }
+  } catch (err) {
+    console.warn("Could not retrieve signed stream token:", err);
+  }
+
   const tParam = `_t=${Date.now()}`;
-  const queryStr = [keyParam, tParam].filter(Boolean).join("&");
+  const queryStr = [tokenParam, tParam].filter(Boolean).join("&");
   const streamUrl = `${state.serverUrl}/api/v1/music/stream/${track.id}?${queryStr}`;
 
   try {
@@ -624,24 +633,31 @@ async function searchMusicOnline(query) {
       return;
     }
 
-    resList.innerHTML = results.map(item => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px;background:var(--bg-input);border-radius:10px;margin-bottom:6px;">
+    resList.innerHTML = "";
+    results.forEach(item => {
+      const cover = (item.cover_url && item.cover_url.startsWith("http")) ? item.cover_url : "/static/icons/icon.svg";
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:8px;background:var(--bg-input);border-radius:10px;margin-bottom:6px;";
+      row.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;">
-          <img src="${item.cover_url || '/static/icons/icon.svg'}" style="width:42px;height:42px;border-radius:8px;object-fit:cover;" />
+          <img src="${escapeHtml(cover)}" style="width:42px;height:42px;border-radius:8px;object-fit:cover;" />
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
             <div style="font-weight:700;font-size:0.88rem;color:var(--text-main);">${escapeHtml(item.title)}</div>
             <div style="font-size:0.76rem;color:var(--text-muted);">${escapeHtml(item.artist)}</div>
           </div>
         </div>
-        <button class="action-btn-sm" style="margin-left:8px;white-space:nowrap;" onclick="addSearchedTrack(${JSON.stringify(item).replace(/"/g, '&quot;')})">
+        <button class="action-btn-sm add-searched-btn" style="margin-left:8px;white-space:nowrap;">
           + Додати
         </button>
-      </div>
-    `).join("");
+      `;
+      row.querySelector(".add-searched-btn")?.addEventListener("click", () => addSearchedTrack(item));
+      resList.appendChild(row);
+    });
   } catch (err) {
     resList.innerHTML = `<div style="color:var(--danger);font-size:0.85rem;padding:8px;">Помилка пошуку: ${escapeHtml(err.message)}</div>`;
   }
 }
+
 
 async function addSearchedTrack(item) {
   try {
@@ -965,6 +981,163 @@ function initMusicPlayer() {
     if (e.key === "Enter") {
       e.preventDefault();
       runSearch();
+    }
+  });
+
+  // Voice Search / Dictation in Music
+  const musicVoiceBtn = document.getElementById("music-voice-search-btn");
+  let isMusicListening = false;
+  let musicActiveRecognition = null;
+  let musicMediaRecorder = null;
+  let musicAudioChunks = [];
+
+  const stopMusicVoiceUI = () => {
+    isMusicListening = false;
+    if (musicVoiceBtn) {
+      musicVoiceBtn.style.background = "var(--primary)";
+      musicVoiceBtn.style.boxShadow = "none";
+      musicVoiceBtn.title = "Диктувати назву голосом";
+    }
+    if (searchInput) {
+      searchInput.placeholder = "🔍 Шукати пісню, артиста або посилання Shazam...";
+    }
+  };
+
+  const startMusicVoiceUI = () => {
+    isMusicListening = true;
+    if (musicVoiceBtn) {
+      musicVoiceBtn.style.background = "#ef4444";
+      musicVoiceBtn.style.boxShadow = "0 0 12px rgba(239,68,68,0.7)";
+      musicVoiceBtn.title = "Слухаю... Натисніть для зупинки";
+    }
+    if (searchInput) {
+      searchInput.placeholder = "🎙️ Слухаю... Назвіть пісню або виконавця";
+      searchInput.value = "";
+    }
+  };
+
+  const startMediaRecorderDictation = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      musicAudioChunks = [];
+      const mimeType = (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported("audio/mp4"))
+        ? "audio/mp4"
+        : "audio/webm";
+
+      try {
+        musicMediaRecorder = new MediaRecorder(stream, { mimeType });
+      } catch (e) {
+        musicMediaRecorder = new MediaRecorder(stream);
+      }
+
+      musicMediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) musicAudioChunks.push(e.data);
+      };
+
+      musicMediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const actualMime = musicMediaRecorder.mimeType || mimeType;
+        const audioBlob = new Blob(musicAudioChunks, { type: actualMime });
+
+        if (searchInput) {
+          searchInput.placeholder = "⏳ Розпізнаю назву через Gemini AI...";
+        }
+
+        const formData = new FormData();
+        const ext = actualMime.includes("mp4") ? "mp4" : "webm";
+        formData.append("audio", audioBlob, `music_voice.${ext}`);
+
+        try {
+          const res = await apiFetch("/api/v1/system/transcribe-audio", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (res && res.text) {
+            let recognized = res.text.trim();
+            recognized = recognized.replace(/^(постав(ити)?|включи(ти)?|увімкни(ти)?|знайди(ти)?|грай|зіграй)\s+(пісню|трек|музику)?\s*/i, "").trim();
+            if (searchInput) searchInput.value = recognized;
+            showToast(`🎙️ Розпізнано: «${recognized}»`);
+            runSearch();
+          } else {
+            showToast("⚠️ Не вдалося розпізнати слова");
+          }
+        } catch (err) {
+          showToast(`❌ Помилка розпізнавання: ${err.message}`);
+        } finally {
+          stopMusicVoiceUI();
+        }
+      };
+
+      startMusicVoiceUI();
+      musicMediaRecorder.start();
+    } catch (err) {
+      console.error("Mic access error for music voice search:", err);
+      showToast(`❌ Помилка мікрофона: ${err.message || err.name}`);
+      stopMusicVoiceUI();
+    }
+  };
+
+  musicVoiceBtn?.addEventListener("click", () => {
+    if (isMusicListening) {
+      if (musicActiveRecognition) {
+        try { musicActiveRecognition.stop(); } catch (e) {}
+      }
+      if (musicMediaRecorder && musicMediaRecorder.state !== "inactive") {
+        try { musicMediaRecorder.stop(); } catch (e) {}
+      }
+      stopMusicVoiceUI();
+      return;
+    }
+
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRec) {
+      try {
+        const recognition = new SpeechRec();
+        musicActiveRecognition = recognition;
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = navigator.language?.startsWith("ru") ? "ru-RU" : "uk-UA";
+
+        recognition.onstart = () => {
+          startMusicVoiceUI();
+        };
+
+        recognition.onresult = (evt) => {
+          let text = "";
+          for (let i = 0; i < evt.results.length; i++) {
+            text += evt.results[i][0].transcript;
+          }
+          if (searchInput) searchInput.value = text;
+        };
+
+        recognition.onend = () => {
+          stopMusicVoiceUI();
+          musicActiveRecognition = null;
+          let val = searchInput?.value?.trim() || "";
+          if (val) {
+            val = val.replace(/^(постав(ити)?|включи(ти)?|увімкни(ти)?|знайди(ти)?|грай|зіграй)\s+(пісню|трек|музику)?\s*/i, "").trim();
+            if (searchInput) searchInput.value = val;
+            runSearch();
+          }
+        };
+
+        recognition.onerror = (err) => {
+          console.warn("SpeechRec error, falling back to MediaRecorder:", err);
+          musicActiveRecognition = null;
+          stopMusicVoiceUI();
+          if (err.error !== "no-speech" && err.error !== "aborted") {
+            startMediaRecorderDictation();
+          }
+        };
+
+        recognition.start();
+      } catch (e) {
+        console.warn("SpeechRec init failed, falling back to MediaRecorder:", e);
+        startMediaRecorderDictation();
+      }
+    } else {
+      startMediaRecorderDictation();
     }
   });
 

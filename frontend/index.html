@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.7.9">
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.26">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -387,10 +387,29 @@
 
       <!-- 4. TASKS / WORKS TAB -->
       <section id="tab-tasks" class="tab-panel">
-        <div class="panel-header">
-          <h2>Список работ</h2>
-          <button id="add-task-btn" class="action-btn-sm">+ Работа</button>
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.5rem;">📋</span>
+            <div>
+              <h2 style="margin:0;font-size:1.12rem;font-weight:800;">Список робіт</h2>
+              <span id="tasks-total-badge" style="font-size:0.75rem;color:var(--text-muted);">0 активних</span>
+            </div>
+          </div>
+          <button id="add-task-btn" class="btn-primary" style="padding:8px 16px;font-size:0.85rem;font-weight:700;background:linear-gradient(135deg,#8b5cf6,#6d28d9);border:none;border-radius:10px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <span>+</span> Додати роботу
+          </button>
         </div>
+
+        <!-- Filter Pills -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;">
+          <button class="tasks-filter-pill active" data-filter="active" onclick="TasksModule.setFilter('active',this)">⚡ Активні</button>
+          <button class="tasks-filter-pill" data-filter="all" onclick="TasksModule.setFilter('all',this)">🌐 Всі</button>
+          <button class="tasks-filter-pill" data-filter="urgent" onclick="TasksModule.setFilter('urgent',this)">🔥 Термінові</button>
+          <button class="tasks-filter-pill" data-filter="done" onclick="TasksModule.setFilter('done',this)">✅ Виконані</button>
+          <button class="tasks-filter-pill" data-filter="no_date" onclick="TasksModule.setFilter('no_date',this)">📭 Без дедлайну</button>
+        </div>
+
         <div id="tasks-list" class="items-list">
           <!-- Populated by JS -->
         </div>
@@ -442,8 +461,8 @@
           <button type="button" class="vault-cat-pill active" data-cat="all">
             <span>🌐 Всі (<span class="vault-pill-count">0</span>)</span>
           </button>
-          <button type="button" class="vault-cat-pill" data-cat="ai">
-            <span>🤖 ШІ / AI (<span class="vault-pill-count">0</span>)</span>
+          <button type="button" class="vault-cat-pill" data-cat="crypto">
+            <span>📈 Крипта (<span class="vault-pill-count">0</span>)</span>
           </button>
           <button type="button" class="vault-cat-pill" data-cat="social">
             <span>💬 Соцмережі (<span class="vault-pill-count">0</span>)</span>
@@ -451,8 +470,23 @@
           <button type="button" class="vault-cat-pill" data-cat="email">
             <span>📬 Пошти (<span class="vault-pill-count">0</span>)</span>
           </button>
-          <button type="button" class="vault-cat-pill" data-cat="crypto">
-            <span>📈 Крипта (<span class="vault-pill-count">0</span>)</span>
+          <button type="button" class="vault-cat-pill" data-cat="airlines">
+            <span>✈️ Авіа (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="banking">
+            <span>💳 Банки (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="shopping">
+            <span>🛍️ Шопінг (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="ai">
+            <span>🤖 ШІ (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="work">
+            <span>💼 Робота (<span class="vault-pill-count">0</span>)</span>
+          </button>
+          <button type="button" class="vault-cat-pill" data-cat="gaming">
+            <span>🎮 Ігри (<span class="vault-pill-count">0</span>)</span>
           </button>
           <button type="button" class="vault-cat-pill" data-cat="wifi">
             <span>📶 Wi-Fi (<span class="vault-pill-count">0</span>)</span>
@@ -461,7 +495,7 @@
             <span>📱 Пристрої (<span class="vault-pill-count">0</span>)</span>
           </button>
           <button type="button" class="vault-cat-pill" data-cat="other">
-            <span>📝 Інше (<span class="vault-pill-count">0</span>)</span>
+            <span>🔒 Сейф (<span class="vault-pill-count">0</span>)</span>
           </button>
         </div>
 
@@ -534,8 +568,15 @@
         </div>
 
         <!-- Quick Search & Stream bar -->
-        <div class="quick-input-form" style="margin-top:0;margin-bottom:12px;">
+        <div class="quick-input-form" style="margin-top:0;margin-bottom:12px;gap:6px;">
           <input type="text" id="music-search-input" placeholder="🔍 Назва треку, артист або посилання Shazam..." />
+          <button id="music-voice-search-btn" class="send-btn" type="button" title="Надиктувати пісню голосом" style="background:var(--primary);color:#fff;">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+            </svg>
+          </button>
           <button id="music-search-btn" class="send-btn" title="Знайти">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           </button>
@@ -694,53 +735,174 @@
 
       <!-- 9b. MAILBOX & SPAM FILTER TAB -->
       <section id="tab-mailbox" class="tab-panel">
-        <div class="panel-header">
-          <h2>📬 Пошта та Фільтр Спаму</h2>
-          <div class="panel-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button type="button" id="mail-check-all-btn" class="action-btn-sm" style="background:#2563eb;color:#fff;border:none;font-weight:700;">
-              ⚡ Перевірити пошту
-            </button>
-            <button type="button" id="mail-clean-spam-btn" class="action-btn-sm" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;font-weight:700;" title="Видалити весь спам з пошти">
-              🗑️ Очистити сміття
-            </button>
-            <button type="button" id="mail-add-account-btn" class="action-btn-sm">+ Скринька</button>
-          </div>
-        </div>
-
-        <!-- Mailbox Summary Digest Card -->
-        <div id="mail-digest-card" class="stat-card" style="margin-bottom:12px;background:rgba(37,99,235,0.08);border-color:rgba(37,99,235,0.25);">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-            <div style="flex:1;min-width:240px;">
-              <div style="font-weight:700;font-size:0.95rem;display:flex;align-items:center;gap:6px;">
-                <span>🤖 Звіт AI-Секретаря</span>
+        <!-- 1. Header Card with Title, Subtitle, and Add Account -->
+        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:18px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow-sm);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--border-color);">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:1.6rem;">📬</span>
+                <h2 style="margin:0;font-size:1.25rem;font-weight:900;color:var(--text-main);">Поштовий Центр & Anti-Spam</h2>
+                <span style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);font-size:0.68rem;font-weight:800;text-transform:uppercase;padding:2px 8px;border-radius:12px;letter-spacing:0.04em;">AI v3.8</span>
               </div>
-              <p id="mail-digest-text" style="font-size:0.84rem;color:var(--text-main);margin:4px 0 0 0;line-height:1.45;">
-                Підключіть до 20 скриньок та натисніть «⚡ Перевірити пошту», щоб AI відсортував спам від важливих листів.
+              <p style="margin:4px 0 0 0;font-size:0.82rem;color:var(--text-muted);line-height:1.4;">
+                Контроль скриньок • Надійний захист чеків та договорів • Масова очистка спам-розсилок
               </p>
             </div>
-            <button type="button" id="mail-speak-digest-btn" class="action-btn-sm" title="Озвучити звіт голосом">🔊 Озвучити</button>
+            <button type="button" id="mail-add-account-btn" class="action-btn-sm" style="background:rgba(14,165,233,0.18);color:#38bdf8;border:1.5px solid rgba(56,189,248,0.4);font-weight:800;font-size:0.88rem;padding:8px 16px;border-radius:10px;">
+              ➕ Додати Email / Пошту
+            </button>
+          </div>
+
+          <!-- 2. KPI Metrics Grid (3 Pillars) -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:10px;margin-top:14px;">
+            <!-- KPI 1: Spam Found -->
+            <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:14px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:0.72rem;font-weight:800;color:#fca5a5;text-transform:uppercase;letter-spacing:0.04em;display:flex;align-items:center;gap:4px;">
+                  <span>🗑️</span> Знайдено спаму
+                </div>
+                <div style="font-size:1.6rem;font-weight:900;color:#ef4444;margin-top:2px;">
+                  <span id="mail-kpi-spam">0</span> <span style="font-size:0.75rem;font-weight:700;color:rgba(252,165,165,0.85);">листів</span>
+                </div>
+                <div style="font-size:0.74rem;color:rgba(252,165,165,0.75);margin-top:2px;" id="mail-kpi-mb">~0 МБ сміття</div>
+              </div>
+              <div style="width:38px;height:38px;border-radius:50%;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.3);display:flex;align-items:center;justify-content:center;color:#ef4444;font-size:1.1rem;">
+                ⚡
+              </div>
+            </div>
+
+            <!-- KPI 2: Important Protected -->
+            <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.22);border-radius:14px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:0.72rem;font-weight:800;color:#86efac;text-transform:uppercase;letter-spacing:0.04em;display:flex;align-items:center;gap:4px;">
+                  <span>⭐</span> Важливі листи
+                </div>
+                <div style="font-size:1.6rem;font-weight:900;color:#22c55e;margin-top:2px;">
+                  <span id="mail-kpi-important">0</span> <span style="font-size:0.75rem;font-weight:700;color:rgba(134,239,172,0.85);">листів</span>
+                </div>
+                <div style="font-size:0.74rem;color:rgba(134,239,172,0.75);margin-top:2px;">Рахунки, чеки, клієнти</div>
+              </div>
+              <div style="width:38px;height:38px;border-radius:50%;background:rgba(34,197,94,0.18);border:1px solid rgba(34,197,94,0.3);display:flex;align-items:center;justify-content:center;color:#22c55e;font-size:1.1rem;">
+                🛡️
+              </div>
+            </div>
+
+            <!-- KPI 3: Connected Accounts -->
+            <div style="background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.22);border-radius:14px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:0.72rem;font-weight:800;color:#7dd3fc;text-transform:uppercase;letter-spacing:0.04em;display:flex;align-items:center;gap:4px;">
+                  <span>📫</span> Активні пошти
+                </div>
+                <div style="font-size:1.6rem;font-weight:900;color:#38bdf8;margin-top:2px;">
+                  <span id="mail-kpi-accounts">0</span> <span style="font-size:0.75rem;font-weight:700;color:rgba(125,211,252,0.85);">скриньок</span>
+                </div>
+                <div style="font-size:0.74rem;color:rgba(125,211,252,0.75);margin-top:2px;" id="mail-kpi-acc-list">Підключено</div>
+              </div>
+              <div style="width:38px;height:38px;border-radius:50%;background:rgba(14,165,233,0.18);border:1px solid rgba(14,165,233,0.3);display:flex;align-items:center;justify-content:center;color:#38bdf8;font-size:1.1rem;">
+                🌐
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Account Filter Pills Bar -->
-        <div class="music-playlists-bar" id="mail-accounts-bar" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;scrollbar-width:none;">
-          <button class="music-pl-pill active">🌐 Всі скриньки</button>
+        <!-- 3. Smart Action Control Bar (Logical 2-Step Workflow) -->
+        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;padding:14px 16px;margin-bottom:14px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;box-shadow:var(--shadow-sm);">
+          <!-- Step 1: Scan Controls -->
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:4px 10px;">
+              <span style="font-size:0.75rem;color:var(--text-sub);font-weight:700;">Порція:</span>
+              <select id="mail-check-limit-select" style="background:transparent;border:none;color:#ffffff;font-size:0.84rem;font-weight:800;cursor:pointer;outline:none;">
+                <option value="50" style="background:#0f172a;color:#fff;">50 листів</option>
+                <option value="150" style="background:#0f172a;color:#fff;">150 листів</option>
+                <option value="300" selected style="background:#0f172a;color:#fff;">300 листів (Рекомендовано)</option>
+                <option value="500" style="background:#0f172a;color:#fff;">500 листів</option>
+                <option value="1000" style="background:#0f172a;color:#fff;">1,000 листів (Турбо)</option>
+              </select>
+            </div>
+            <button type="button" id="mail-check-all-btn" class="action-btn-sm" style="background:linear-gradient(135deg,#0284c7,#2563eb);color:#fff;border:none;font-weight:800;font-size:0.86rem;padding:8px 16px;border-radius:10px;box-shadow:0 3px 12px rgba(2,132,199,0.35);">
+              ⚡ Сканувати наступну порцію
+            </button>
+          </div>
+
+          <!-- Step 2: 1-Click Clean Spam Button -->
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button type="button" id="mail-clean-spam-btn" class="action-btn-sm" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;font-weight:800;font-size:0.88rem;padding:9px 18px;border-radius:10px;box-shadow:0 4px 14px rgba(239,68,68,0.35);" title="Видалити весь виявлений спам із поштових серверів">
+              🧹 Видалити всі <span id="mail-clean-btn-count">0</span> спам-листів із сервера
+            </button>
+          </div>
         </div>
 
-        <!-- Category Filter Tabs -->
-        <div style="display:flex;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border-color);padding-bottom:8px;overflow-x:auto;">
-          <button type="button" class="mail-cat-pill active" data-cat="spam" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:6px 14px;border-radius:18px;font-size:0.85rem;font-weight:700;cursor:pointer;">
-            🗑️ Сміття та Спам (<span id="mail-spam-count">0</span>)
+        <!-- 4. Category Tabs & Mailbox Account Filter -->
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;border-bottom:1px solid var(--border-color);padding-bottom:10px;">
+          <!-- Category Tabs -->
+          <div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;">
+            <button type="button" class="mail-cat-pill active" data-cat="spam" style="background:rgba(239,68,68,0.14);color:#ef4444;border:1px solid rgba(239,68,68,0.35);padding:6px 14px;border-radius:16px;font-size:0.84rem;font-weight:800;cursor:pointer;">
+              🗑️ Спам і Розсилки (<span id="mail-spam-count">0</span>)
+            </button>
+            <button type="button" class="mail-cat-pill" data-cat="important" style="background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.3);padding:6px 14px;border-radius:16px;font-size:0.84rem;font-weight:700;cursor:pointer;">
+              ⭐ Важливі листи (<span id="mail-important-count">0</span>)
+            </button>
+            <button type="button" class="mail-cat-pill" data-cat="accounts" style="background:rgba(148,163,184,0.12);color:var(--text-main);border:1px solid var(--border-color);padding:6px 14px;border-radius:16px;font-size:0.84rem;font-weight:600;cursor:pointer;">
+              ⚙️ Налаштування скриньок (<span id="mail-accounts-count">0</span>)
+            </button>
+          </div>
+
+          <!-- Account Filter Dropdown -->
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:700;">Скринька:</span>
+            <select id="mail-account-filter-select" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:var(--text-main);font-size:0.82rem;font-weight:700;padding:4px 8px;border-radius:8px;outline:none;cursor:pointer;">
+              <option value="">🌐 Всі скриньки</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 5. Spam Sub-Categories Filter Bar (Visible when on spam tab) -->
+        <div id="mail-spam-subcats-bar" style="display:flex;align-items:center;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:4px;scrollbar-width:none;">
+          <span style="font-size:0.74rem;color:var(--text-muted);font-weight:800;text-transform:uppercase;margin-right:2px;">Тип:</span>
+          <button type="button" class="mail-subcat-pill active" data-subcat="all" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.22);padding:4px 10px;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;">
+            Всі (<span id="mail-subcat-all-count">0</span>)
           </button>
-          <button type="button" class="mail-cat-pill" data-cat="important" style="background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.3);padding:6px 14px;border-radius:18px;font-size:0.85rem;font-weight:700;cursor:pointer;">
-            ⭐ Важливі листи (<span id="mail-important-count">0</span>)
+          <button type="button" class="mail-subcat-pill" data-subcat="casino" style="background:rgba(255,255,255,0.04);color:var(--text-muted);border:1px solid var(--border-color);padding:4px 10px;border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;">
+            🎰 Казино та ставки (<span id="mail-subcat-casino-count">0</span>)
           </button>
-          <button type="button" class="mail-cat-pill" data-cat="accounts" style="background:rgba(148,163,184,0.12);color:var(--text-main);border:1px solid var(--border-color);padding:6px 14px;border-radius:18px;font-size:0.85rem;font-weight:600;cursor:pointer;">
-            ⚙️ Мої скриньки (<span id="mail-accounts-count">0</span>)
+          <button type="button" class="mail-subcat-pill" data-subcat="promo" style="background:rgba(255,255,255,0.04);color:var(--text-muted);border:1px solid var(--border-color);padding:4px 10px;border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;">
+            🛍️ Акції та знижки (<span id="mail-subcat-promo-count">0</span>)
+          </button>
+          <button type="button" class="mail-subcat-pill" data-subcat="bots" style="background:rgba(255,255,255,0.04);color:var(--text-muted);border:1px solid var(--border-color);padding:4px 10px;border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;">
+            🤖 Роботи та No-reply (<span id="mail-subcat-bots-count">0</span>)
           </button>
         </div>
 
-        <!-- Content Area -->
+        <!-- 6. Batch Selection Toolbar (When Spam List has items) -->
+        <div id="mail-batch-toolbar" style="display:flex;justify-content:space-between;align-items:center;background:rgba(239,68,68,0.08);border:1px dashed rgba(239,68,68,0.3);padding:8px 12px;border-radius:10px;margin-bottom:12px;font-size:0.82rem;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;color:var(--text-main);">
+            <input type="checkbox" id="mail-select-all-cb" style="cursor:pointer;" checked />
+            <span>Вибрати всі листи для видалення</span>
+          </label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span id="mail-selected-status-text" style="color:#ef4444;font-weight:700;">Вибрано 0 листів</span>
+            <button type="button" id="mail-delete-selected-btn" class="action-btn-sm" style="background:#dc2626;color:#fff;border:none;font-weight:800;font-size:0.76rem;padding:4px 10px;border-radius:6px;display:none;">
+              Видалити вибрані
+            </button>
+          </div>
+        </div>
+
+        <!-- 7. Mailbox Summary Digest Card -->
+        <div id="mail-digest-card" class="stat-card" style="margin-bottom:12px;background:rgba(37,99,235,0.06);border-color:rgba(37,99,235,0.2);padding:10px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div style="flex:1;min-width:220px;">
+              <div style="font-weight:700;font-size:0.86rem;display:flex;align-items:center;gap:6px;color:#38bdf8;">
+                <span>🤖 AI-Звіт Секретаря</span>
+              </div>
+              <p id="mail-digest-text" style="font-size:0.8rem;color:var(--text-main);margin:3px 0 0 0;line-height:1.4;">
+                Підключіть скриньки та запустіть сканування, щоб AI відсортував спам від важливих листів.
+              </p>
+            </div>
+            <button type="button" id="mail-speak-digest-btn" class="action-btn-sm" style="font-size:0.78rem;padding:4px 10px;" title="Озвучити звіт голосом">🔊 Озвучити</button>
+          </div>
+        </div>
+
+        <!-- 8. Content Area -->
         <div id="mail-content-area" class="items-list">
           <div class="empty-state">
             <span class="empty-icon">📬</span>
@@ -1191,7 +1353,7 @@
                 <div>
                   <div style="font-size:0.72rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Версія системи та бота</div>
                   <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
-                    <span id="bot-version-badge" style="font-size:1.05rem;font-weight:800;color:var(--text-main);">v3.7.9</span>
+                    <span id="bot-version-badge" style="font-size:1.05rem;font-weight:800;color:var(--text-main);">v3.7.10</span>
                     <span id="bot-status-tag" style="font-size:0.72rem;font-weight:600;background:rgba(34,197,94,0.18);color:#22c55e;padding:2px 7px;border-radius:20px;border:1px solid rgba(34,197,94,0.3);">● Актуальна</span>
                   </div>
                 </div>
@@ -1204,11 +1366,11 @@
             <div style="font-size:0.8rem;color:var(--text-muted);background:rgba(0,0,0,0.18);padding:10px 12px;border-radius:8px;display:flex;flex-direction:column;gap:6px;border:1px solid rgba(255,255,255,0.05);">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>📅 <strong>Дата та час збірки:</strong></span>
-                <span id="bot-build-time" style="color:var(--text-main);font-weight:600;">30.09.2026 18:35</span>
+                <span id="bot-build-time" style="color:var(--text-main);font-weight:600;">30.09.2026 18:48</span>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>📱 <strong>Клієнт (PWA додаток):</strong></span>
-                <span id="pwa-version-label" style="color:var(--text-main);font-weight:600;">v3.7.9</span>
+                <span id="pwa-version-label" style="color:var(--text-main);font-weight:600;">v3.7.10</span>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>⚡ <strong>Статус сервера:</strong></span>
@@ -1648,71 +1810,96 @@
   </div>
 
   <!-- Modal: Add Mailbox Account -->
-  <div id="mail-add-account-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-    <div class="modal-card" style="max-width: 440px; padding: 24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <h3 style="margin:0;font-size:1.15rem;font-weight:800;">📬 Підключити пошту</h3>
-        <button type="button" id="mail-acc-close-btn" class="icon-btn-close">&times;</button>
+  <div id="mail-add-account-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" style="align-items:flex-start;overflow-y:auto;padding:16px 10px;">
+    <div class="modal-card" style="max-width: 500px; width: 94%; margin: auto; max-height: 88vh; max-height: 88dvh; display: flex; flex-direction: column; border-radius: 18px; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.2); box-shadow: 0 20px 50px rgba(0,0,0,0.85); overflow: hidden;">
+      
+      <!-- Fixed Modal Header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.12);flex-shrink:0;">
+        <h3 style="margin:0;font-size:1.22rem;font-weight:900;color:#ffffff;display:flex;align-items:center;gap:8px;">
+          <span>📬</span> Додати Email / Пошту
+        </h3>
+        <button type="button" id="mail-acc-close-btn" class="icon-btn-close" style="font-size:1.8rem;line-height:1;color:#cbd5e1;cursor:pointer;background:transparent;border:none;padding:2px 6px;">&times;</button>
       </div>
 
-      <p style="font-size:0.83rem;color:var(--text-muted);margin:0 0 14px 0;line-height:1.45;">
-        Введіть адресу та пароль. Підтримуються Gmail, Ukr.net, Yahoo, Outlook та будь-які IMAP-скриньки (до 20 скриньок).
-      </p>
+      <form id="mail-add-account-form" style="display:flex;flex-direction:column;flex:1;min-height:0;margin:0;">
+        <!-- Scrollable Modal Body -->
+        <div style="padding:16px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1 1 auto;">
+          <p style="font-size:0.88rem;color:#cbd5e1;margin:0 0 14px 0;line-height:1.45;">
+            Введіть адресу та пароль додатку. Штучний інтелект буде автоматично відсіювати спам та виділяти важливі листи.
+          </p>
 
-      <form id="mail-add-account-form">
-        <div style="margin-bottom: 12px; text-align: left;">
-          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Email адреса:</label>
-          <input type="email" id="mail-acc-email" placeholder="example@gmail.com, user@ukr.net" required style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
-        </div>
-
-        <div style="margin-bottom: 12px; text-align: left;">
-          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Назва / Ярлик (необов'язково):</label>
-          <input type="text" id="mail-acc-name" placeholder="«Робоча», «Особиста», «Розсилки»" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
-        </div>
-
-        <div style="margin-bottom: 12px; text-align: left;">
-          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Пароль додатку / IMAP:</label>
-          <input type="password" id="mail-acc-password" placeholder="Пароль додатку або IMAP" required autocomplete="current-password" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
-        </div>
-
-        <div id="mail-acc-provider-hint" style="font-size:0.8rem;color:var(--text-muted);background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.25);padding:10px 12px;border-radius:10px;margin-bottom:14px;line-height:1.45;">
-          <div style="font-weight:700;color:#38bdf8;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
-            <span>🔑</span> Пароль додатків (16 літер):
+          <!-- 1. Email Address -->
+          <div style="margin-bottom: 12px; text-align: left;">
+            <label style="display: block; font-size: 0.94rem; font-weight: 800; color: #ffffff; margin-bottom: 5px;">
+              Email адреса:
+            </label>
+            <input type="email" id="mail-acc-email" placeholder="example@gmail.com або user@ukr.net" required style="width: 100%; box-sizing: border-box; font-size: 0.98rem; font-weight: 600; padding: 11px 14px; border-radius: 10px; background: rgba(30, 41, 59, 0.9); color: #ffffff; border: 1.5px solid rgba(255, 255, 255, 0.22); outline: none;" />
           </div>
-          <div id="mail-hint-text">
-            Для захисту Google вимагає окремий 16-значний пароль для зовнішніх програм.
+
+          <!-- 2. Account Label / Name -->
+          <div style="margin-bottom: 12px; text-align: left;">
+            <label style="display: block; font-size: 0.92rem; font-weight: 800; color: #ffffff; margin-bottom: 5px;">
+              Назва або ярлик (необов'язково):
+            </label>
+            <input type="text" id="mail-acc-name" placeholder="«Особиста», «Робоча», «Розсилки»" style="width: 100%; box-sizing: border-box; font-size: 0.96rem; font-weight: 500; padding: 11px 14px; border-radius: 10px; background: rgba(30, 41, 59, 0.9); color: #ffffff; border: 1.5px solid rgba(255, 255, 255, 0.22); outline: none;" />
           </div>
-          <div style="margin-top:6px;">
-            <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;color:#38bdf8;font-weight:700;text-decoration:none;background:rgba(14,165,233,0.15);padding:5px 9px;border-radius:6px;font-size:0.78rem;">
-              <span>🔗 Отримати пароль у Google (16 літер) ↗</span>
-            </a>
+
+          <!-- 3. Password Input with Visibility Toggle -->
+          <div style="margin-bottom: 12px; text-align: left;">
+            <label style="display: block; font-size: 0.94rem; font-weight: 800; color: #ffffff; margin-bottom: 5px;">
+              Пароль додатку (16 букв):
+            </label>
+            <div style="position: relative; display: flex; align-items: center;">
+              <input type="password" id="mail-acc-password" placeholder="16 букв пароля додатку" required autocomplete="current-password" style="width: 100%; box-sizing: border-box; font-size: 0.98rem; font-weight: 600; padding: 11px 44px 11px 14px; border-radius: 10px; background: rgba(30, 41, 59, 0.9); color: #ffffff; border: 1.5px solid rgba(255, 255, 255, 0.22); outline: none; letter-spacing: 0.03em;" />
+              <button type="button" id="mail-acc-pwd-toggle" style="position: absolute; right: 8px; background: transparent; border: none; font-size: 1.25rem; cursor: pointer; padding: 4px; opacity: 0.85;" title="Показати/сховати пароль">👁️</button>
+            </div>
           </div>
-          <details style="margin-top:6px;font-size:0.76rem;color:var(--text-muted);" open>
-            <summary style="cursor:pointer;color:#38bdf8;font-weight:600;">📖 Покрокова інструкція: де взяти 16 букв</summary>
-            <ol style="margin:6px 0 0 0;padding-left:16px;line-height:1.5;">
-              <li>Натисніть посилання вище (або відкрийте <em>myaccount.google.com/apppasswords</em>).</li>
-              <li>Увійдіть у свій Google-акаунт, якщо запитає.</li>
-              <li>У полі введіть назву, наприклад <strong>«Секретар»</strong>, та натисніть «Створити».</li>
-              <li>Google видасть жовте віконце з <strong>16 буквами</strong> (наприклад: <code>abcd efgh ijkl mnop</code>).</li>
-              <li>Скопіюйте ці 16 букв і вставте в поле пароля (пробіли видаляти не обов'язково — бот прибере їх автоматично).</li>
-            </ol>
+
+          <!-- 4. Dynamic Provider Hint -->
+          <div id="mail-acc-provider-hint" style="font-size: 0.88rem; color: #f8fafc; background: rgba(14, 165, 233, 0.12); border: 1.5px solid rgba(56, 189, 248, 0.45); padding: 12px 14px; border-radius: 12px; margin-bottom: 14px; line-height: 1.5;">
+            <div style="font-weight: 800; font-size: 0.98rem; color: #38bdf8; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>🔑</span> Де взяти пароль додатку (16 букв)?
+            </div>
+            <div id="mail-hint-text" style="font-size: 0.88rem; color: #f1f5f9; margin-bottom: 8px;">
+              Для захисту Google вимагає окремий <strong>16-значний пароль додатку</strong> замість основного пароля.
+            </div>
+            <div id="mail-hint-action-btn" style="margin-bottom: 8px;">
+              <a id="mail-hint-link" href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #0284c7, #2563eb); color: #ffffff; font-weight: 800; text-decoration: none; padding: 8px 14px; border-radius: 8px; font-size: 0.88rem; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);">
+                <span>🔗 Отримати пароль у Google (16 літер) ↗</span>
+              </a>
+            </div>
+            <details style="margin-top: 6px; font-size: 0.84rem; color: #e2e8f0;">
+              <summary style="cursor: pointer; color: #38bdf8; font-weight: 700; font-size: 0.88rem; user-select: none;">📖 Покрокова інструкція: де взяти 16 букв</summary>
+              <div id="mail-hint-steps" style="margin-top: 6px; line-height: 1.55;">
+                <ol style="margin: 0; padding-left: 18px;">
+                  <li style="margin-bottom: 3px;">Натисніть синю кнопку вище (або відкрийте <em>myaccount.google.com/apppasswords</em>).</li>
+                  <li style="margin-bottom: 3px;">У полі назви введіть <strong>«Секретар»</strong> та натисніть «Створити».</li>
+                  <li style="margin-bottom: 3px;">Google видасть жовте віконце з <strong>16 буквами</strong> (наприклад: <code>abcd efgh ijkl mnop</code>).</li>
+                  <li>Скопіюйте ці 16 букв і вставте в поле пароля вище.</li>
+                </ol>
+              </div>
+            </details>
+          </div>
+
+          <!-- 5. Advanced Server Settings (Collapsible) -->
+          <details style="margin-bottom: 12px; font-size: 0.86rem; color: #94a3b8;">
+            <summary style="cursor: pointer; font-weight: 700; font-size: 0.88rem; color: #94a3b8; user-select: none;">⚙️ Додаткові налаштування сервера (IMAP)</summary>
+            <div style="margin-top: 8px; display: flex; gap: 8px;">
+              <input type="text" id="mail-acc-server" placeholder="imap.gmail.com" style="flex: 2; padding: 8px 12px; border-radius: 8px; background: rgba(30, 41, 59, 0.9); color: #ffffff; border: 1.5px solid rgba(255, 255, 255, 0.15); font-size: 0.9rem;" />
+              <input type="number" id="mail-acc-port" value="993" style="width: 75px; padding: 8px 12px; border-radius: 8px; background: rgba(30, 41, 59, 0.9); color: #ffffff; border: 1.5px solid rgba(255, 255, 255, 0.15); font-size: 0.9rem;" />
+            </div>
           </details>
+
+          <div id="mail-acc-feedback" style="font-size: 0.88rem; font-weight: 700; margin-bottom: 6px; min-height: 18px; color: var(--text-muted);"></div>
         </div>
 
-        <details style="margin-bottom:14px;font-size:0.8rem;color:var(--text-muted);">
-          <summary style="cursor:pointer;font-weight:600;user-select:none;">⚙️ Додаткові налаштування сервера (IMAP)</summary>
-          <div style="margin-top:8px;display:flex;gap:8px;">
-            <input type="text" id="mail-acc-server" placeholder="imap.example.com" style="flex:2;padding:8px 10px;border-radius:8px;background:var(--bg-input);color:var(--text-main);border:1px solid var(--border-color);font-size:0.8rem;" />
-            <input type="number" id="mail-acc-port" value="993" style="width:70px;padding:8px 10px;border-radius:8px;background:var(--bg-input);color:var(--text-main);border:1px solid var(--border-color);font-size:0.8rem;" />
-          </div>
-        </details>
-
-        <div id="mail-acc-feedback" style="font-size: 0.8rem; margin-bottom: 12px; min-height: 18px; color: var(--text-muted);"></div>
-
-        <div style="display:flex;gap:8px;">
-          <button type="button" id="mail-acc-cancel-btn" class="action-btn-sm" style="flex:1;padding:12px;">Скасувати</button>
-          <button type="submit" id="mail-acc-submit-btn" class="btn-primary" style="flex:2;padding:12px;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
-            💾 Підключити скриньку
+        <!-- 6. Sticky Action Buttons Footer -->
+        <div style="padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.12); background: #0f172a; flex-shrink: 0; display: flex; gap: 10px;">
+          <button type="button" id="mail-acc-cancel-btn" class="action-btn-sm" style="flex: 1; padding: 11px; font-size: 0.95rem; font-weight: 700; border-radius: 10px;">
+            Скасувати
+          </button>
+          <button type="submit" id="mail-acc-submit-btn" class="btn-primary" style="flex: 2; padding: 11px; background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; font-weight: 800; font-size: 1.02rem; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);">
+            💾 Підключити пошту
           </button>
         </div>
       </form>
@@ -1762,34 +1949,43 @@
 
   <!-- Modal: Vault Item Add / Edit -->
   <div id="vault-edit-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-    <div class="modal-card" style="max-width: 480px; padding: 22px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid var(--border-color);padding-bottom:10px;">
-        <h3 id="vault-modal-title" style="margin:0;font-size:1.15rem;font-weight:800;">➕ Додати в Склерозник</h3>
-        <button type="button" id="vault-modal-close-btn" class="icon-btn-close">&times;</button>
+    <div class="modal-card vault-edit-modal-card" style="max-width: 520px; width: 94%; max-height: 90vh; overflow-y: auto; padding: 22px; background: #0f172a; border: 1px solid rgba(255,255,255,0.18); border-radius: 20px; box-shadow: 0 24px 60px rgba(0,0,0,0.8);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.12);padding-bottom:12px;">
+        <h3 id="vault-modal-title" style="margin:0;font-size:1.25rem;font-weight:800;color:#ffffff;display:flex;align-items:center;gap:8px;">
+          <span>➕ Додати в Склерозник</span>
+        </h3>
+        <button type="button" id="vault-modal-close-btn" class="icon-btn-close" style="width:36px;height:36px;border-radius:50%;font-size:1.3rem;">&times;</button>
       </div>
 
       <form id="vault-form">
-        <div style="margin-bottom: 12px; text-align: left;">
-          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Назва сервісу або речі *:</label>
-          <input type="text" id="v-input-title" placeholder="ChatGPT, Binance, Wi-Fi Дім, Apple ID" required style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
+        <!-- Title Input -->
+        <div style="margin-bottom: 14px; text-align: left;">
+          <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Назва біржі, сервісу або речі *:</label>
+          <input type="text" id="v-input-title" placeholder="Binance, ChatGPT, Wi-Fi Дім, Apple ID, Ryanair" required style="width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; background: rgba(15,23,42,0.95); color: #ffffff; border: 1.5px solid rgba(255,255,255,0.22); outline: none; font-size: 1.05rem; font-weight: 600;" />
         </div>
 
-        <div style="display:flex;gap:10px;margin-bottom:12px;">
-          <div style="flex:1;">
-            <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Категорія:</label>
-            <select id="v-input-cat" style="width: 100%; box-sizing: border-box; padding: 11px 10px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none; font-size: 0.85rem;">
-              <option value="ai">🤖 ШІ / AI</option>
-              <option value="social">💬 Соцмережі</option>
-              <option value="email">📬 Пошти</option>
-              <option value="crypto">📈 Крипта</option>
-              <option value="wifi">📶 Wi-Fi</option>
-              <option value="devices">📱 Apple & Гаджети</option>
-              <option value="other">📝 Інше</option>
+        <!-- Category and Plan Row -->
+        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:180px;">
+            <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Категорія:</label>
+            <select id="v-input-cat" style="width: 100%; box-sizing: border-box; padding: 12px 12px; border-radius: 12px; background: #1e293b; color: #ffffff; border: 1.5px solid rgba(255,255,255,0.22); outline: none; font-size: 0.95rem; font-weight: 600; cursor: pointer;">
+              <option value="crypto">📈 Криптобіржі та гаманці</option>
+              <option value="social">💬 Соцмережі та медіа</option>
+              <option value="email">📬 Поштові скриньки</option>
+              <option value="airlines">✈️ Авіакомпанії та подорожі</option>
+              <option value="banking">💳 Банки та платежі</option>
+              <option value="shopping">🛍️ Шопінг та аукціони</option>
+              <option value="ai">🤖 ШІ та нейромережі</option>
+              <option value="work">💼 Робота, IT та хмари</option>
+              <option value="gaming">🎮 Ігри та розваги</option>
+              <option value="wifi">📶 Мережі Wi-Fi</option>
+              <option value="devices">📱 Apple ID та пристрої</option>
+              <option value="other">🔒 Інше та сейф</option>
             </select>
           </div>
-          <div style="flex:1;">
-            <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Тариф / План:</label>
-            <select id="v-input-plan" style="width: 100%; box-sizing: border-box; padding: 11px 10px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none; font-size: 0.85rem;">
+          <div style="flex:1;min-width:140px;">
+            <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Тариф / План:</label>
+            <select id="v-input-plan" style="width: 100%; box-sizing: border-box; padding: 12px 12px; border-radius: 12px; background: #1e293b; color: #ffffff; border: 1.5px solid rgba(255,255,255,0.22); outline: none; font-size: 0.95rem; font-weight: 600; cursor: pointer;">
               <option value="">— Без тарифу —</option>
               <option value="pro">💎 PRO / Plus (Платний)</option>
               <option value="free">🆓 Free (Безкоштовний)</option>
@@ -1797,39 +1993,45 @@
           </div>
         </div>
 
-        <div style="margin-bottom: 12px; text-align: left;">
-          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Логін / Email / Назва Wi-Fi мережі (SSID):</label>
-          <input type="text" id="v-input-login" placeholder="myemail@gmail.com, nick_telegram, Home_5G" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
+        <!-- Login / Username Input -->
+        <div style="margin-bottom: 14px; text-align: left;">
+          <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Логін / Email / Телефон / Назва мережі (SSID):</label>
+          <input type="text" id="v-input-login" placeholder="dolli23@ukr.net, @nickname, HomeNet_5G" style="width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; background: rgba(15,23,42,0.95); color: #ffffff; border: 1.5px solid rgba(255,255,255,0.22); outline: none; font-size: 1.05rem; font-weight: 600;" />
         </div>
 
-        <div style="margin-bottom: 12px; text-align: left;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted);">Пароль / Пін-код:</label>
-            <button type="button" id="vault-gen-pwd-btn" style="background:transparent;border:none;color:#38bdf8;font-size:0.76rem;font-weight:700;cursor:pointer;padding:2px 4px;">
+        <!-- Password Input with Generator -->
+        <div style="margin-bottom: 14px; text-align: left;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label style="font-size: 0.85rem; font-weight: 700; color: #cbd5e1;">Пароль / PIN-код / WPA-ключ:</label>
+            <button type="button" id="vault-gen-pwd-btn" style="background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);border-radius:8px;color:#38bdf8;font-size:0.8rem;font-weight:700;cursor:pointer;padding:4px 9px;">
               🎲 Згенерувати 16 знаків
             </button>
           </div>
-          <input type="text" id="v-input-pwd" placeholder="Пароль або код" autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none; font-family: monospace; font-size: 0.95rem;" />
+          <input type="text" id="v-input-pwd" placeholder="Пароль або секретний ключ" autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; background: rgba(15,23,42,0.95); color: #38bdf8; border: 1.5px solid rgba(255,255,255,0.22); outline: none; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 1.08rem; font-weight: 700; letter-spacing: 0.04em;" />
         </div>
 
-        <div style="margin-bottom: 12px; text-align: left;">
-          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Посилання на сайт або сервіс (URL):</label>
-          <input type="url" id="v-input-url" placeholder="https://chatgpt.com" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
+        <!-- URL Input -->
+        <div style="margin-bottom: 14px; text-align: left;">
+          <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Посилання на сайт або біржу (URL):</label>
+          <input type="url" id="v-input-url" placeholder="https://binance.com, https://ryanair.com" style="width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; background: rgba(15,23,42,0.95); color: #ffffff; border: 1.5px solid rgba(255,255,255,0.22); outline: none; font-size: 1rem; font-weight: 500;" />
         </div>
 
-        <div style="margin-bottom: 12px; text-align: left;">
-          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">2FA / Google Authenticator / Резервні коди:</label>
-          <input type="text" id="v-input-2fa" placeholder="Коди бекапу, секретний ключ або нотатка" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none;" />
+        <!-- 2FA Input -->
+        <div style="margin-bottom: 14px; text-align: left;">
+          <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">2FA / Google Authenticator / Резервні коди:</label>
+          <input type="text" id="v-input-2fa" placeholder="Телефон для SMS, торговий пароль, коди бекапу" style="width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; background: rgba(15,23,42,0.95); color: #ffffff; border: 1.5px solid rgba(255,255,255,0.22); outline: none; font-size: 1rem;" />
         </div>
 
-        <div style="margin-bottom: 16px; text-align: left;">
-          <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Нотатки / Деталі активації:</label>
-          <textarea id="v-input-notes" rows="2" placeholder="Для активації айфона, чек у коробці, пароль для гостей..." style="width: 100%; box-sizing: border-box; padding: 10px 14px; border-radius: 10px; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); outline: none; resize: none; font-family: inherit; font-size: 0.85rem;"></textarea>
+        <!-- Notes Textarea -->
+        <div style="margin-bottom: 18px; text-align: left;">
+          <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Нотатки / Деталі (суми, куплені токени, кодові слова):</label>
+          <textarea id="v-input-notes" rows="3" placeholder="Сумма: 4500$, pin: 2301, для верифікації використовується телефон..." style="width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; background: rgba(15,23,42,0.95); color: #ffffff; border: 1.5px solid rgba(255,255,255,0.22); outline: none; resize: vertical; font-family: inherit; font-size: 0.95rem; line-height: 1.45;"></textarea>
         </div>
 
-        <div style="display:flex;gap:8px;">
-          <button type="button" id="vault-modal-cancel-btn" class="action-btn-sm" style="flex:1;padding:12px;">Скасувати</button>
-          <button type="submit" class="btn-primary" style="flex:2;padding:12px;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
+        <!-- Action Buttons -->
+        <div style="display:flex;gap:10px;">
+          <button type="button" id="vault-modal-cancel-btn" class="action-btn-sm" style="flex:1;padding:14px;font-size:1rem;font-weight:600;border-radius:12px;">Скасувати</button>
+          <button type="submit" class="btn-primary" style="flex:2;padding:14px;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;font-weight:700;font-size:1rem;border:none;border-radius:12px;cursor:pointer;box-shadow: 0 4px 16px rgba(14,165,233,0.4);">
             💾 Зберегти в сейф
           </button>
         </div>
@@ -1865,23 +2067,34 @@ binance mylogin@crypto.com 2fa увімкнено
   </div>
 
   <!-- Modal: Review and Confirm (AI Safety Check) -->
-  <div id="vault-review-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-    <div class="modal-card" style="max-width: 520px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;border-bottom:1px solid var(--border-color);padding-bottom:10px;">
+  <div id="vault-review-modal" class="modal-overlay hidden" role="dialog" aria-modal="true"
+       onclick="if(event.target===this){VaultModule.closeReviewModal();}">
+    <div class="modal-card vault-review-modal-card" onclick="event.stopPropagation();">
+      <div style="flex-shrink: 0; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
         <div>
-          <h3 style="margin:0;font-size:1.1rem;font-weight:800;">🔍 Перевірка розпізнаних даних</h3>
-          <small style="color:var(--text-muted);font-size:0.75rem;">Знайдено записів: <strong id="vault-review-count" style="color:#38bdf8;">0</strong>. Перевірте або виправте перед збереженням:</small>
+          <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#ffffff; display:flex; align-items:center; gap:8px;">
+            <span>🔍 Перевірка розпізнаних даних</span>
+          </h3>
+          <small style="color:var(--text-muted); font-size:0.8rem; margin-top:3px; display:block;">
+            Розпізнано: <strong id="vault-review-count" style="color:#38bdf8; font-weight:700;">0</strong> записів. Гортайте вниз та виправляйте за потреби:
+          </small>
         </div>
-        <button type="button" id="vault-review-close-btn" class="icon-btn-close">&times;</button>
+        <button type="button" id="vault-review-close-btn" class="icon-btn-close"
+                onclick="VaultModule.closeReviewModal();"
+                style="width:44px; height:44px; min-width:44px; border-radius:50%; font-size:1.3rem; touch-action:manipulation; -webkit-tap-highlight-color:transparent; cursor:pointer;">&times;</button>
       </div>
 
-      <div id="vault-review-list" style="flex:1;overflow-y:auto;padding-right:4px;display:flex;flex-direction:column;gap:8px;margin-bottom:12px;min-height:180px;">
+      <div id="vault-review-list">
         <!-- Populated dynamically by JS -->
       </div>
 
-      <div style="display:flex;gap:8px;border-top:1px solid var(--border-color);padding-top:12px;">
-        <button type="button" id="vault-review-cancel-btn" class="action-btn-sm" style="flex:1;padding:12px;">Скасувати</button>
-        <button type="button" id="vault-review-save-btn" class="btn-primary" style="flex:2;padding:12px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
+      <div style="flex-shrink: 0; display:flex; gap:10px; border-top:1px solid var(--border-color); padding-top:12px;">
+        <button type="button" id="vault-review-cancel-btn" class="action-btn-sm"
+                onclick="VaultModule.closeReviewModal();"
+                style="flex:1; padding:14px 14px; font-size:0.95rem; font-weight:600; touch-action:manipulation; -webkit-tap-highlight-color:transparent; cursor:pointer;">Скасувати</button>
+        <button type="button" id="vault-review-save-btn" class="btn-primary"
+                onclick="VaultModule.confirmBulkSave();"
+                style="flex:2; padding:14px 16px; background:linear-gradient(135deg,#10b981,#059669); color:#fff; font-weight:700; font-size:0.95rem; border:none; border-radius:12px; cursor:pointer; box-shadow: 0 4px 14px rgba(16,185,129,0.35); touch-action:manipulation; -webkit-tap-highlight-color:transparent;">
           ✅ Зберегти всі в Склерозник
         </button>
       </div>
@@ -1931,15 +2144,15 @@ binance mylogin@crypto.com 2fa увімкнено
     </div>
   </div>
 
-  <script src="/static/modules/ai_chat.js?v=3.7.9"></script>
-  <script src="/static/modules/auth_phone.js?v=3.7.9"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.7.9"></script>
-  <script src="/static/modules/business.js?v=3.7.9"></script>
-  <script src="/static/modules/mailbox.js?v=3.7.9"></script>
-  <script src="/static/modules/movies.js?v=3.7.9"></script>
-  <script src="/static/modules/music.js?v=3.7.9"></script>
-  <script src="/static/modules/vault.js?v=3.7.9"></script>
-  <script src="/static/app.js?v=3.7.9"></script>
+  <script src="/static/modules/ai_chat.js?v=3.7.26"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.26"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.26"></script>
+  <script src="/static/modules/business.js?v=3.7.26"></script>
+  <script src="/static/modules/mailbox.js?v=3.7.26"></script>
+  <script src="/static/modules/movies.js?v=3.7.26"></script>
+  <script src="/static/modules/music.js?v=3.7.26"></script>
+  <script src="/static/modules/vault.js?v=3.7.26"></script>
+  <script src="/static/app.js?v=3.7.26"></script>
 </body>
 </html>
 

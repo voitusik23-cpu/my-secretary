@@ -1,6 +1,6 @@
 from datetime import date as dt_date
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -50,22 +50,44 @@ def list_blood_pressure(
     return [map_log_to_response(log) for log in logs]
 
 
+@router.get("/export-token")
+def get_bp_export_token(request: Request, _: bool = Depends(verify_secret_key)):
+    """Генерує короткоживучий HMAC токен (5 хв) для безпечного завантаження CSV без ключа в URL."""
+    from app.services.media_token import generate_media_token
+    user = request.headers.get("x-secretary-user") or "admin"
+    token = generate_media_token(action="export_bp", resource_id="csv", user=user)
+    return {"token": token}
+
+
 @router.get("/export")
-def export_blood_pressure_csv(
+async def export_blood_pressure_csv(
+    request: Request,
     days: int = Query(90, ge=1, le=365),
     start_date: Optional[dt_date] = Query(None),
     end_date: Optional[dt_date] = Query(None),
-    db: Session = Depends(get_db),
+    token: Optional[str] = Query(None),
 ):
-    """Експортує вимірювання тиску у форматі CSV для лікаря або архіву."""
-    logs = get_bp_logs(db=db, days=days, start_date=start_date, end_date=end_date)
-    csv_content = export_bp_csv(logs)
-    filename = f"blood_pressure_journal_{dt_date.today().isoformat()}.csv"
-    return Response(
-        content=csv_content,
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    """Експортує вимірювання тиску у форматі CSV. Авторизація через заголовок або токен."""
+    user = "admin"
+    if token:
+        from app.services.media_token import verify_media_token
+        token_data = verify_media_token(token, expected_action="export_bp", expected_resource_id="csv")
+        user = token_data.get("user", "admin")
+    else:
+        await verify_secret_key(request)
+        user = request.headers.get("x-secretary-user") or "admin"
+
+    from app.database import get_user_sessionmaker
+    sm = get_user_sessionmaker(user)
+    with sm() as db:
+        logs = get_bp_logs(db=db, days=days, start_date=start_date, end_date=end_date)
+        csv_content = export_bp_csv(logs)
+        filename = f"blood_pressure_journal_{dt_date.today().isoformat()}.csv"
+        return Response(
+            content=csv_content,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
 
 
 @router.get("/analytics", response_model=BloodPressureAnalyticsResponse)

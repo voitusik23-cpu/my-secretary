@@ -134,7 +134,11 @@ def delete_mail_account(account_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/check", response_model=MailboxCheckResponse)
-def check_mailboxes(account_id: Optional[int] = None, limit: int = 30, db: Session = Depends(get_db)):
+def check_mailboxes(
+    account_id: Optional[int] = None, 
+    limit: int = Query(150, description="Кількість листів для перевірки"), 
+    db: Session = Depends(get_db)
+):
     """
     Зчитує пошту з усіх або вибраної скриньки, класифікує спам та важливі повідомлення.
     """
@@ -159,7 +163,13 @@ def check_mailboxes(account_id: Optional[int] = None, limit: int = 30, db: Sessi
     top_important_subjects = []
 
     for acc in accounts:
-        acc_emails = fetch_account_emails(acc, limit=limit)
+        # Pre-fetch existing UIDs for this account so we skip already analyzed messages and scan older ones
+        existing_uids = set(
+            r[0] for r in db.query(MailMessage.message_uid).filter(
+                MailMessage.account_id == acc.id
+            ).all()
+        )
+        acc_emails = fetch_account_emails(acc, limit=limit, exclude_uids=existing_uids)
         acc.last_checked_at = datetime.utcnow()
 
         for em in acc_emails:
@@ -217,7 +227,7 @@ def check_mailboxes(account_id: Optional[int] = None, limit: int = 30, db: Sessi
 def get_mailbox_messages(
     category: Optional[str] = Query("all", description="spam | important | other | all"),
     account_id: Optional[int] = None,
-    limit: int = 100,
+    limit: int = Query(1000, description="Кількість листів для повернення"),
     db: Session = Depends(get_db),
 ):
     """Повертає список отриманих листів із фільтрацією за категорією або скринькою."""
@@ -412,3 +422,21 @@ def get_mailbox_summary(db: Session = Depends(get_db)):
         "important_messages": important_messages,
         "digest": digest,
     }
+
+
+@router.post("/messages/{message_id}/whitelist")
+def whitelist_message(message_id: int, db: Session = Depends(get_db)):
+    """
+    Позначає лист як 'не спам', зберігає у важливих та прибирає зі спаму.
+    """
+    msg = db.query(MailMessage).filter(MailMessage.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Лист не знайдено")
+
+    msg.is_spam = False
+    msg.category = "important"
+    msg.spam_reason = None
+    db.commit()
+    db.refresh(msg)
+    return {"status": "ok", "message": f"Лист «{msg.subject or 'Без теми'}» збережено як важливий та вилучено зі спаму!"}
+

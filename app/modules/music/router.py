@@ -5,8 +5,9 @@ from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 
-from app.database import get_db
+from app.database import get_db, get_user_sessionmaker
 from app.auth import verify_secret_key
+from app.services.media_token import generate_media_token, verify_media_token
 from app.modules.music.models import MusicTrack, MusicPlaylist
 from app.modules.music.schemas import (
     TrackResponse,
@@ -19,7 +20,6 @@ from app.modules.music.service import (
     search_music,
     get_track_audio_url,
     parse_and_import_shazam,
-    _download_and_cache_track_sync,
     is_track_cached,
     delete_track_cache,
     clean_orphan_cache,
@@ -28,8 +28,12 @@ from app.modules.music.service import (
 router = APIRouter(
     prefix="/music",
     tags=["Music Hub & Player"],
-    dependencies=[Depends(verify_secret_key)],
 )
+
+
+def _get_current_user_from_req(request: Request) -> str:
+    user = request.headers.get("x-secretary-user") or request.query_params.get("user") or "admin"
+    return user.strip().lower()
 
 
 @router.get("/tracks")
@@ -39,8 +43,10 @@ def get_tracks(
     q: Optional[str] = None,
     limit: int = 100,
     db: Session = Depends(get_db),
+    _: bool = Depends(verify_secret_key),
 ):
-    """Повертає список збережених треків для плеєра."""
+    """Повертає список збережених треків для плеєра з пошуком у пам'яті (захист encrypted полів)."""
+    limit = min(max(1, limit), 200)
     query = db.query(MusicTrack)
 
     if favorite_only:
@@ -50,12 +56,14 @@ def get_tracks(
     elif playlist and playlist != "Всі треки":
         query = query.filter(MusicTrack.playlist == playlist)
 
-    if q:
-        query = query.filter(
-            (MusicTrack.title.ilike(f"%{q}%")) | (MusicTrack.artist.ilike(f"%{q}%"))
-        )
+    tracks = query.order_by(desc(MusicTrack.created_at)).all()
 
-    tracks = query.order_by(desc(MusicTrack.created_at)).limit(limit).all()
+    # Filter in Python memory because title and artist are EncryptedString
+    if q:
+        clean_q = q.strip().lower()
+        tracks = [t for t in tracks if (t.title and clean_q in t.title.lower()) or (t.artist and clean_q in t.artist.lower())]
+
+    tracks = tracks[:limit]
 
     res = []
     for t in tracks:
@@ -66,34 +74,83 @@ def get_tracks(
             "album": t.album,
             "duration": t.duration,
             "cover_url": t.cover_url or "/static/icons/icon.svg",
-            "source": t.source,
-            "playlist": t.playlist,
             "is_favorite": t.is_favorite,
-            "is_cached": is_track_cached(t.id),
+            "playlist": t.playlist,
             "play_count": t.play_count,
-            "created_at": t.created_at,
-            "stream_url": f"/api/v1/music/stream/{t.id}",
+            "is_cached": is_track_cached(t.id),
         })
     return res
 
 
-@router.post("/tracks/clean-orphans")
-def trigger_clean_orphans(db: Session = Depends(get_db)):
-    """Очищає залишки видалених треків на диску."""
-    purged = clean_orphan_cache(db)
-    return {"status": "success", "purged_files": purged}
+@router.get("/token/{track_id}")
+def get_stream_token(track_id: int, request: Request, _: bool = Depends(verify_secret_key)):
+    """Генерує короткоживучий підписаний HMAC токен (5 хв) для відтворення через <audio src>."""
+    user = _get_current_user_from_req(request)
+    token = generate_media_token(action="stream", resource_id=str(track_id), user=user)
+    return {"token": token, "track_id": track_id, "user": user}
 
 
-@router.post("/tracks", status_code=status.HTTP_201_CREATED)
-def add_track(payload: TrackCreate, db: Session = Depends(get_db)):
-    """Додає новий трек до медіатеки."""
+@router.get("/stream/{track_id}")
+async def stream_track(
+    track_id: int,
+    request: Request,
+    token: Optional[str] = Query(None, description="HMAC signed media token")
+):
+    """
+    Потокове аудіо. Авторизація через:
+    1. Підписаний токен ?token=... (для браузерного <audio src>), або
+    2. Стандартний заголовок X-Secret-Key / Bearer.
+    """
+    user = "admin"
+    if token:
+        # Verify HMAC token
+        token_data = verify_media_token(token, expected_action="stream", expected_resource_id=str(track_id))
+        user = token_data.get("user", "admin")
+    else:
+        # Header-based auth
+        await verify_secret_key(request)
+        user = _get_current_user_from_req(request)
+
+    # Resolve database for the target user/tenant
+    sm = get_user_sessionmaker(user)
+    with sm() as db:
+        track = db.query(MusicTrack).filter(MusicTrack.id == track_id).first()
+        if not track:
+            raise HTTPException(status_code=404, detail="Трек не знайдено")
+
+        track.play_count += 1
+        db.commit()
+
+        audio_res = await get_track_audio_url(track, user=user)
+        if not audio_res:
+            raise HTTPException(status_code=502, detail="Не вдалося отримати аудіопотік")
+
+        if os.path.exists(audio_res) and os.path.isfile(audio_res):
+            media_type = "audio/mp4" if audio_res.endswith(".m4a") else ("audio/webm" if audio_res.endswith(".webm") else "audio/mpeg")
+            return FileResponse(
+                path=audio_res,
+                media_type=media_type,
+                headers={"Cache-Control": "private, max-age=3600"}
+            )
+
+        return RedirectResponse(
+            audio_res,
+            status_code=307,
+            headers={"Cache-Control": "private, max-age=300"}
+        )
+
+
+@router.post("/tracks")
+def add_track(payload: TrackCreate, request: Request, db: Session = Depends(get_db), _: bool = Depends(verify_secret_key)):
+    """Додає трек у медіатеку."""
+    user = _get_current_user_from_req(request)
     track = MusicTrack(
-        title=payload.title.strip(),
-        artist=payload.artist.strip(),
+        title=payload.title,
+        artist=payload.artist,
         album=payload.album,
         duration=payload.duration or 0,
-        cover_url=payload.cover_url or "/static/icons/icon.svg",
-        source=payload.source or "search",
+        cover_url=payload.cover_url,
+        source=payload.source or "manual",
         source_url=payload.source_url,
         playlist=payload.playlist or "Всі треки",
         is_favorite=payload.is_favorite or False,
@@ -101,73 +158,32 @@ def add_track(payload: TrackCreate, db: Session = Depends(get_db)):
     db.add(track)
     db.commit()
     db.refresh(track)
-
-    # Immediately ensure no old cache file collides with this ID
-    delete_track_cache(track.id)
-
-    # Trigger background download only for songs <= 1 hour
-    if track.duration and track.duration <= 3600:
-        import asyncio
-        asyncio.create_task(asyncio.to_thread(_download_and_cache_track_sync, track.id, track.artist, track.title, track.duration))
-
     return {
         "id": track.id,
         "title": track.title,
         "artist": track.artist,
         "cover_url": track.cover_url,
-        "stream_url": f"/api/v1/music/stream/{track.id}",
     }
 
 
 @router.post("/search")
-async def search_online_music(payload: SearchMusicRequest):
-    """Шукає треки в Apple Music та YouTube для додавання в 1 клік."""
+async def search_online_music(payload: SearchMusicRequest, _: bool = Depends(verify_secret_key)):
+    """Шукає треки в Apple Music та YouTube."""
     results = await search_music(payload.query, limit=payload.limit or 8)
     return {"status": "success", "results": results}
 
 
 @router.post("/shazam")
-async def import_from_shazam(payload: ShazamImportRequest, db: Session = Depends(get_db)):
-    """Імпортує трек із Shazam за посиланням або повідомленням."""
-    res = await parse_and_import_shazam(payload.url_or_text, playlist=payload.playlist, db=db)
+async def import_from_shazam(payload: ShazamImportRequest, request: Request, db: Session = Depends(get_db), _: bool = Depends(verify_secret_key)):
+    """Імпортує трек із Shazam."""
+    user = _get_current_user_from_req(request)
+    res = await parse_and_import_shazam(payload.url_or_text, playlist=payload.playlist, db=db, user=user)
     return {"status": "success", "track": res}
 
 
-@router.get("/stream/{track_id}")
-async def stream_track(track_id: int, request: Request, db: Session = Depends(get_db)):
-    """Потокове аудіо для відтворення в браузері та CarPlay з підтримкою Range перемотки."""
-    track = db.query(MusicTrack).filter(MusicTrack.id == track_id).first()
-    if not track:
-        raise HTTPException(status_code=404, detail="Трек не знайдено")
-
-    track.play_count += 1
-    db.commit()
-
-    audio_res = await get_track_audio_url(track)
-    if not audio_res:
-        raise HTTPException(status_code=502, detail="Не вдалося отримати аудіопотік")
-
-    # If it's a local cached file, serve with FileResponse (natively supports HTTP 206 Range seeking)
-    if os.path.exists(audio_res) and os.path.isfile(audio_res):
-        media_type = "audio/mp4" if audio_res.endswith(".m4a") else ("audio/webm" if audio_res.endswith(".webm") else "audio/mpeg")
-        return FileResponse(
-            path=audio_res,
-            media_type=media_type,
-            filename=f"{track.artist} - {track.title}.m4a",
-            headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
-        )
-
-    # Otherwise redirect to high-speed CDN audio stream
-    return RedirectResponse(
-        audio_res,
-        status_code=307,
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
-    )
-
-
 @router.post("/tracks/{track_id}/favorite")
-def toggle_favorite(track_id: int, db: Session = Depends(get_db)):
-    """Перемикає статус 'Улюблене' (лайк)."""
+def toggle_favorite(track_id: int, db: Session = Depends(get_db), _: bool = Depends(verify_secret_key)):
+    """Перемикає статус 'Улюблене'."""
     track = db.query(MusicTrack).filter(MusicTrack.id == track_id).first()
     if not track:
         raise HTTPException(status_code=404, detail="Трек не знайдено")
@@ -177,81 +193,14 @@ def toggle_favorite(track_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/tracks/{track_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_track(track_id: int, db: Session = Depends(get_db)):
-    """Видаляє трек із медіатеки та видаляє всі аудіофайли з диска."""
+def delete_track(track_id: int, request: Request, db: Session = Depends(get_db), _: bool = Depends(verify_secret_key)):
+    """Видаляє трек із медіатеки та його кешовані файли."""
+    user = _get_current_user_from_req(request)
     track = db.query(MusicTrack).filter(MusicTrack.id == track_id).first()
     if not track:
         raise HTTPException(status_code=404, detail="Трек не знайдено")
     db.delete(track)
     db.commit()
-    # Remove physical files from disk so deleted track can NEVER play
-    delete_track_cache(track_id)
-    clean_orphan_cache(db)
+    delete_track_cache(track_id, user=user)
+    clean_orphan_cache(db, user=user)
     return None
-
-
-@router.post("/tracks/{track_id}/playlist")
-def set_track_playlist(track_id: int, payload: dict, db: Session = Depends(get_db)):
-    """Встановлює або переносить трек у вибраний плейліст (наприклад, 'В авто 🚗')."""
-    track = db.query(MusicTrack).filter(MusicTrack.id == track_id).first()
-    if not track:
-        raise HTTPException(status_code=404, detail="Трек не знайдено")
-    target_pl = payload.get("playlist", "В авто 🚗")
-    track.playlist = target_pl
-    db.commit()
-    return {"id": track.id, "playlist": track.playlist}
-
-
-@router.post("/playlists/add-all-to-car")
-def add_all_tracks_to_car(db: Session = Depends(get_db)):
-    """Додає всі наявні треки бібліотеки у плейліст 'В авто 🚗'."""
-    tracks = db.query(MusicTrack).all()
-    count = 0
-    for t in tracks:
-        t.playlist = "В авто 🚗"
-        count += 1
-    db.commit()
-    return {"status": "success", "updated_count": count, "message": f"{count} треків додано у плейліст 'В авто'"}
-
-
-@router.get("/playlists")
-def get_playlists(db: Session = Depends(get_db)):
-    """Повертає список усіх плейлістів."""
-    default_playlists = [
-        {"name": "Всі треки", "icon": "🎵"},
-        {"name": "Улюблені", "icon": "❤️"},
-        {"name": "Shazam", "icon": "⚡"},
-        {"name": "В авто 🚗", "icon": "🚗"},
-        {"name": "Релакс 🌙", "icon": "🌙"},
-    ]
-
-    # Count tracks in each playlist
-    counts = dict(
-        db.query(MusicTrack.playlist, func.count(MusicTrack.id))
-        .group_by(MusicTrack.playlist)
-        .all()
-    )
-    fav_count = db.query(func.count(MusicTrack.id)).filter(MusicTrack.is_favorite == True).scalar() or 0
-    total_count = db.query(func.count(MusicTrack.id)).scalar() or 0
-
-    res = []
-    for p in default_playlists:
-        c = total_count if p["name"] == "Всі треки" else (fav_count if p["name"] == "Улюблені" else counts.get(p["name"], 0))
-        res.append({
-            "name": p["name"],
-            "icon": p["icon"],
-            "tracks_count": c
-        })
-
-    # Custom playlists from DB
-    custom = db.query(MusicPlaylist).all()
-    existing_names = [p["name"] for p in default_playlists]
-    for cp in custom:
-        if cp.name not in existing_names:
-            res.append({
-                "name": cp.name,
-                "icon": cp.icon,
-                "tracks_count": counts.get(cp.name, 0)
-            })
-
-    return res

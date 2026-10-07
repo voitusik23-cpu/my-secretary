@@ -191,6 +191,18 @@ def _heuristic_fallback(text: str, current_tab: Optional[str] = None) -> Dict[st
             m_type = "series" if any(s in lower for s in ["серіал", "сериал"]) else "movie"
             return {"summary": f"Знайдено фільм «{m_t}»", "transcription": text, "actions": [{"domain": "movies", "data": {"title": m_t, "type": m_type}}]}
 
+    # 6. Музика та пісні (music) — за ключовими словами або якщо активна вкладка music
+    music_kw = ["пісн", "песн", "музик", "музык", "трек", "шазам", "shazam", "слухати", "слушать", "включи", "увімкни", "постав пісню", "поставь песню", "плейлист"]
+    if current_tab == "music" or any(k in lower for k in music_kw):
+        m_song = re.sub(r'^(?:поставити|постав|поставь|включи|увімкни|слухати|слушать|знайти|найти|додай|добавь|шазам|shazam)?\s*(?:в\s+плейлист|у\s+плейліст|в\s+авто|в\s+машину)?\s*(?:пісню|песню|трек|музику|музыку|пісня|песня)?\s*(?:під\s+назвою|под\s+названием)?:?\s*', '', text, flags=re.IGNORECASE).strip(" '\"«»")
+        if m_song:
+            target_pl = "В авто 🚗" if any(k in lower for k in ["авто", "машин", "дорог", "руль"]) else "Всі треки"
+            return {
+                "summary": f"Знайдено пісню «{m_song}»",
+                "transcription": text,
+                "actions": [{"domain": "music", "data": {"title": m_song, "playlist": target_pl}}]
+            }
+
     # 2. Розбиття на частини для змішаного введення (покупки та роботи)
     work_triggers = ["зробити", "сделать", "постелити", "постелить", "прибрати", "убрать", "помити", "помыть", "хімчистк", "химчистк", "плитк", "ремонт", "подзвонити", "позвонить", "нагадай", "напомни"]
     shop_triggers = ["купити", "купить", "купи", "покупки", "покупка", "список покупок", "взяти"]
@@ -272,7 +284,7 @@ async def parse_with_gemini(text: Optional[str] = None, audio_bytes: Optional[by
         tab_label = tab_names.get(current_tab, current_tab)
         prompt += f"\nКОНТЕКСТ: Користувач зараз знаходиться у відкритому розділі «{tab_label}». Якщо запис користувача не вказує явно на іншу тему, спрямуй результат у розділ '{current_tab}'!"
 
-    models_to_try = list(dict.fromkeys([m for m in [settings.AI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"] if m]))
+    models_to_try = list(dict.fromkeys([m for m in [settings.AI_MODEL, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash"] if m]))
 
     last_error = None
 

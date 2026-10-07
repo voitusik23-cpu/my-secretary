@@ -3292,9 +3292,575 @@ body {
   filter: brightness(1.2);
 }
 
+/* ===================================================
+   Vault / Склерозник: AI Review Modal & Cards
+   =================================================== */
+.vault-review-modal-card {
+  max-width: 580px !important;
+  width: 95% !important;
+  height: 90vh !important;
+  max-height: 90vh !important;
+  max-height: 90dvh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 18px 16px 16px 16px !important;
+  box-sizing: border-box !important;
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75) !important;
+}
+
+#vault-review-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  padding: 4px 6px 16px 2px !important;
+  margin-bottom: 12px !important;
+}
+
+/* Custom scrollbar for review list */
+#vault-review-list::-webkit-scrollbar {
+  width: 6px;
+}
+#vault-review-list::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 4px;
+}
+#vault-review-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+}
+#vault-review-list::-webkit-scrollbar-thumb:hover {
+  background: #38bdf8;
+}
+
+.vault-review-card {
+  flex-shrink: 0 !important; /* CRITICAL: Never squash items vertically! */
+  background: rgba(30, 41, 59, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 14px !important;
+  padding: 14px 14px 12px 14px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.vault-review-card:focus-within {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25), 0 6px 20px rgba(0, 0, 0, 0.45) !important;
+}
+
+.vault-review-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.vault-review-title-input {
+  flex: 1;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  min-height: 40px !important;
+  box-sizing: border-box !important;
+}
+
+.vault-review-title-input:focus {
+  border-color: #38bdf8 !important;
+  outline: none !important;
+}
+
+.vault-review-cat-select {
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  background: #1e293b !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+  min-height: 40px !important;
+  cursor: pointer !important;
+}
+
+.vault-review-del-btn {
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: #ef4444 !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  border-radius: 8px !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.1rem !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  transition: all 0.15s ease;
+}
+
+.vault-review-del-btn:active {
+  transform: scale(0.92);
+  background: rgba(239, 68, 68, 0.35) !important;
+}
+
+.vault-review-fields-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 480px) {
+  .vault-review-fields-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+.vault-review-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vault-review-field-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  letter-spacing: 0.02em;
+}
+
+.vault-review-field-input {
+  font-size: 0.98rem !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 8px !important;
+  padding: 9px 12px !important;
+  min-height: 42px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+.vault-review-field-input.pwd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 1.02rem !important;
+  color: #38bdf8 !important;
+  font-weight: 700 !important;
+}
+
+.vault-review-field-input:focus {
+  border-color: #38bdf8 !important;
+  outline: none !important;
+}
+
+.vault-review-extra {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+/* ===================================================
+   Vault / Склерозник: Brand Avatar & Premium Card
+   =================================================== */
+.vault-brand-avatar {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.vault-card {
+  background: rgba(22, 33, 62, 0.85);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  transition: all 0.25s ease;
+}
+
+.vault-card:hover {
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+}
+
+.vault-drag-handle {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.2s;
+  touch-action: none;
+  z-index: 2;
+  border-radius: 6px;
+}
+
+.vault-card:hover .vault-drag-handle {
+  opacity: 1;
+}
+
+.vault-card-dragging {
+  opacity: 0.45;
+  transform: scale(0.97);
+  border-color: rgba(56, 189, 248, 0.6) !important;
+  box-shadow: 0 12px 40px rgba(56, 189, 248, 0.25) !important;
+}
+
+.vault-card-dragover {
+  border-color: rgba(16, 185, 129, 0.7) !important;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4), 0 8px 30px rgba(0,0,0,0.45) !important;
+  transform: translateY(-3px);
+}
+
+.vault-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.vault-card-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.vault-card-cat-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.vault-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.vault-open-btn {
+  text-decoration: none;
+  background: rgba(56, 189, 248, 0.15) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  font-weight: 700 !important;
+  padding: 5px 10px !important;
+  border-radius: 8px !important;
+  font-size: 0.8rem !important;
+}
+
+.vault-cred-container {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vault-cred-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.vault-cred-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.vault-cred-value {
+  color: #ffffff;
+  font-size: 0.98rem;
+  font-weight: 600;
+  word-break: break-all;
+  user-select: all;
+}
+
+.vault-cred-value.pwd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.05rem;
+  color: #38bdf8;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.vault-copy-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.vault-copy-btn:active {
+  transform: scale(0.94);
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+  color: #34d399;
+}
+
+.vault-notes-box {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  line-height: 1.45;
+}
+
+/* PWA Live Update Banner */
+.pwa-update-banner {
+  position: fixed;
+  bottom: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #3b82f6;
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4), 0 0 20px rgba(0, 0, 0, 0.5);
+  border-radius: 14px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ffffff;
+  animation: slideUpBanner 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 90vw;
+}
+
+@keyframes slideUpBanner {
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.pwa-update-btn {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.pwa-update-btn:active {
+  transform: scale(0.94);
+}
 
 
 
+/* ============================================
+   Tasks / Works Module � Redesigned Cards
+   ============================================ */
+.tasks-filter-pill {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1.5px solid rgba(139,92,246,0.3);
+  background: rgba(139,92,246,0.08);
+  color: #a78bfa;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+.tasks-filter-pill.active,
+.tasks-filter-pill:hover {
+  background: linear-gradient(135deg,#8b5cf6,#6d28d9);
+  border-color: #8b5cf6;
+  color: #fff;
+}
 
+.tasks-card {
+  background: var(--bg-card);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding: 14px 14px 14px 10px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.tasks-card:hover { border-color: rgba(139,92,246,0.4); box-shadow: 0 4px 20px rgba(0,0,0,0.25); }
+.tasks-card-done { opacity: 0.55; }
+.tasks-card-urgent {
+  border-color: rgba(239,68,68,0.45) !important;
+  background: rgba(239,68,68,0.06) !important;
+  box-shadow: 0 0 0 1px rgba(239,68,68,0.2) inset;
+}
 
+.tasks-card-check-col { flex-shrink: 0; padding-top: 2px; }
+.tasks-check-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(139,92,246,0.5);
+  background: transparent;
+  color: #8b5cf6;
+  font-size: 1rem;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+  touch-action: manipulation;
+  flex-shrink: 0;
+}
+.tasks-check-btn.checked {
+  background: linear-gradient(135deg,#8b5cf6,#6d28d9);
+  border-color: #8b5cf6;
+  color: #fff;
+}
+.tasks-check-btn:hover { transform: scale(1.1); }
 
+.tasks-card-body { flex: 1; min-width: 0; }
+.tasks-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.35;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+.tasks-title-done {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.tasks-card-desc {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.04);
+  border-left: 3px solid rgba(139,92,246,0.4);
+  padding: 4px 8px;
+  border-radius: 0 6px 6px 0;
+  margin: 4px 0 6px 0;
+  white-space: pre-line;
+  line-height: 1.4;
+}
+.tasks-card-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+
+/* Due date badges */
+.tasks-due-badge {
+  font-size: 0.73rem; font-weight: 700;
+  padding: 2px 8px; border-radius: 8px;
+  white-space: nowrap;
+}
+.tasks-due-none { background: rgba(148,163,184,0.15); color: #94a3b8; }
+.tasks-due-ok { background: rgba(34,197,94,0.15); color: #4ade80; }
+.tasks-due-week { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.tasks-due-tomorrow { background: rgba(234,179,8,0.15); color: #facc15; }
+.tasks-due-soon { background: rgba(249,115,22,0.18); color: #fb923c; }
+.tasks-due-hot { background: rgba(239,68,68,0.18); color: #f87171; animation: tasks-pulse 1.5s ease-in-out infinite; }
+.tasks-due-overdue { background: rgba(239,68,68,0.25); color: #ef4444; font-weight: 900; }
+@keyframes tasks-pulse { 0%,100% { opacity:1; } 50% { opacity:0.65; } }
+
+/* Category badge */
+.tasks-cat-badge {
+  font-size: 0.72rem; font-weight: 600;
+  padding: 2px 8px; border-radius: 8px;
+  background: rgba(255,255,255,0.08); color: #cbd5e1;
+  white-space: nowrap;
+}
+
+/* Priority badges */
+.tasks-prio-badge { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+.tasks-prio-high { background: rgba(239,68,68,0.15); color: #f87171; }
+.tasks-prio-med { background: rgba(234,179,8,0.15); color: #facc15; }
+.tasks-prio-low { background: rgba(34,197,94,0.12); color: #4ade80; }
+
+/* Action buttons */
+.tasks-card-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; align-items: center; }
+.tasks-remind-btn {
+  background: rgba(56,189,248,0.12);
+  border: 1px solid rgba(56,189,248,0.3);
+  border-radius: 8px;
+  color: #38bdf8;
+  font-size: 1rem;
+  padding: 4px 7px;
+  cursor: pointer;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+.tasks-remind-btn:hover { background: rgba(56,189,248,0.25); }

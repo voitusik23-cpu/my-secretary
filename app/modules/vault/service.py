@@ -11,21 +11,26 @@ PARSE_VAULT_PROMPT = """Ти — аналітичний помічник для 
 Твоє завдання — проаналізувати вхідний текст або зображення (фото аркуша з паролями, записки, таблиці чи старого блокнота) та виділити ВСІ облікові записи й доступи.
 
 Для кожного знайденого запису сформуй об'єкт з полями:
-- "title": коротка зрозуміла назва (наприклад: "ChatGPT Plus", "Binance", "Discord", "X (Twitter)", "Gmail Особистий", "Wi-Fi Дім 5G", "Apple ID").
+- "title": коротка зрозуміла назва (наприклад: "ChatGPT Plus", "Binance", "Discord", "X (Twitter)", "Gmail Особистий", "Wi-Fi Дім 5G", "Apple ID", "Ryanair", "PayPal", "eBay").
 - "category": одна з наступних категорій СУВОРО:
+    - "crypto" — криптобіржі, гаманці, трейдинг (Binance, Bybit, KuCoin, OKX, Gate.io, Huobi, TradingView, CoinMarketCap, TabTrader, MetaMask, TrustWallet тощо).
+    - "banking" — банки, платіжні системи та картки (PayPal, Приват24, Монобанк, Revolut, Wise, Payoneer, QIWI тощо).
+    - "airlines" — авіакомпанії, квитки, готелі та подорожі (Wizz Air, Ryanair, МАУ / Панорама клуб, Booking, Airbnb, Lufthansa тощо).
     - "ai" — нейромережі та ШІ (ChatGPT, Claude, Midjourney, Perplexity, Cursor, Gemini, ElevenLabs тощо).
-    - "social" — соцмережі та месенджери (Discord, X / Twitter, Telegram, Instagram, Facebook, TikTok, LinkedIn, YouTube).
+    - "social" — соцмережі, блоги та месенджери (Discord, X / Twitter, Telegram, Instagram, Facebook, TikTok, Reddit, YouTube, Medium тощо).
     - "email" — поштові скриньки (Gmail, Ukr.net, Yahoo, Outlook, iCloud Mail, ProtonMail).
-    - "crypto" — криптобіржі та гаманці (Binance, Bybit, OKX, WhiteBIT, TrustWallet, MetaMask тощо).
-    - "wifi" — мережі Wi-Fi та роутери (назва мережі SSID записується в login, а пароль у password).
-    - "devices" — Apple ID, активація iPhone, PIN-коди SIM/телефону, PUK, серійні номери.
-    - "other" — інші сайти, магазини, кабінети, банківські кодові слова, замітки.
+    - "shopping" — магазини, автоаукціони, маркетплейси (eBay, OLX, Amazon, Rozetka, Copart, IAA Auction, Prom, AliExpress).
+    - "work" — робота, IT, хмари та хостинг (GitHub, Dropbox, Яндекс Диск, Google Drive, Notion, Trello, хостинг).
+    - "gaming" — комп'ютерні ігри та медіа (Steam, PlayStation, Xbox, Epic Games, Netflix, Spotify).
+    - "wifi" — мережі Wi-Fi та роутери (назва SSID у login, пароль у password).
+    - "devices" — Apple ID, iCloud, активація iPhone, PIN/PUK, телефони.
+    - "other" — важливі нотатки, сейф, документи.
 - "login": логін, email, номер телефону або назва мережі SSID (якщо є, інакше null).
 - "password": пароль, WPA ключ від Wi-Fi, 16-значний ключ додатку або PIN (якщо є, інакше null).
-- "website_url": офіційний URL сайту для швидкого переходу (наприклад: "https://chatgpt.com", "https://discord.com", "https://x.com", "https://binance.com", "https://mail.google.com"). Якщо це Wi-Fi чи пристрій — null.
+- "website_url": офіційний URL сайту для швидкого переходу (наприклад: "https://chatgpt.com", "https://binance.com", "https://ryanair.com", "https://paypal.com"). Якщо це Wi-Fi чи пристрій — null.
 - "plan_type": якщо це ШІ чи сервіс: "pro" (якщо згадано Plus, Pro, Premium, платний, передплата) або "free" (якщо безкоштовний/тестовий), інакше null.
 - "two_factor_note": якщо є згадка про 2FA, Google Authenticator, SMS чи резервні коди — зазнач тут коротко, інакше null.
-- "notes": будь-які корисні примітки, дати оплати, коментарі, кодові фрази чи додаткові дані.
+- "notes": будь-які корисні примітки, дати оплати, суми коштів, коментарі, кодові фрази чи додаткові дані.
 
 Відповідь СУВОРО у форматі JSON списку:
 [
@@ -116,26 +121,46 @@ async def parse_image_with_gemini(image_bytes: bytes, mime_type: str = "image/jp
         return []
 
     try:
+        import io
+        from PIL import Image, ImageOps
+        try:
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+        except Exception:
+            pass
+
+        # Open and normalize with Pillow (handles HEIC from iPhone, rotates EXIF, converts to RGB)
+        try:
+            img = Image.open(io.BytesIO(image_bytes))
+            img = ImageOps.exif_transpose(img)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+
+            # Downscale if max dimension > 2048px (optimal for Gemini Vision OCR and prevents payload limits)
+            if max(img.size) > 2048:
+                img.thumbnail((2048, 2048), Image.Resampling.LANCZOS)
+
+            out_buf = io.BytesIO()
+            img.save(out_buf, format="JPEG", quality=88, optimize=True)
+            optimized_bytes = out_buf.getvalue()
+        except Exception as e:
+            logger.warning(f"Image normalization warning: {e}, using original bytes")
+            optimized_bytes = image_bytes
+
         from google import genai
         from google.genai import types
 
         client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        actual_mime = "image/jpeg"
-        if "png" in mime_type.lower():
-            actual_mime = "image/png"
-        elif "webp" in mime_type.lower():
-            actual_mime = "image/webp"
+        image_part = types.Part.from_bytes(data=optimized_bytes, mime_type="image/jpeg")
 
-        image_part = types.Part.from_bytes(data=image_bytes, mime_type=actual_mime)
-        models_to_try = [settings.AI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]
-
+        models_to_try = ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.5-flash-lite"]
         instruction = PARSE_VAULT_PROMPT + "\nУВАЖНО РОЗПІЗНАЙ РУКОПИСНИЙ АБО ДРУКОВАНИЙ ТЕКСТ З ЦЬОГО ЗОБРАЖЕННЯ ТА ПЕРЕТВОРИ НА СПИСОК ПАРОЛІВ."
 
         for model_name in models_to_try:
             try:
                 res = client.models.generate_content(
                     model=model_name,
-                    contents=[image_part, "Розпізнай всі логіни, паролі, сайти, Wi-Fi та ключі з цього фото."],
+                    contents=[image_part, "Розпізнай всі логіни, паролі, сайти, Wi-Fi та ключі з цього фото аркуша."],
                     config=types.GenerateContentConfig(
                         system_instruction=instruction,
                         response_mime_type="application/json",
@@ -144,7 +169,7 @@ async def parse_image_with_gemini(image_bytes: bytes, mime_type: str = "image/jp
                 )
                 if res.text:
                     items = _clean_json_response(res.text)
-                    if items:
+                    if items and len(items) > 0:
                         return items
             except Exception as ex:
                 logger.warning(f"Model {model_name} failed vault image parse: {ex}")
@@ -157,14 +182,64 @@ async def parse_image_with_gemini(image_bytes: bytes, mime_type: str = "image/jp
 
 
 CATEGORY_NAMES_UK = {
+    "crypto": "📈 Криптобіржі та гаманці",
+    "banking": "💳 Банки та платежі",
+    "airlines": "✈️ Авіакомпанії та подорожі",
     "ai": "🤖 ШІ та нейромережі",
     "social": "🌐 Соцмережі та месенджери",
     "email": "📬 Поштові скриньки",
-    "crypto": "📈 Криптобіржі та гаманці",
+    "shopping": "🛍️ Шопінг та аукціони",
+    "work": "💼 Робота, IT та хмари",
+    "gaming": "🎮 Ігри та медіа",
     "wifi": "📶 Мережі Wi-Fi",
     "devices": "📱 Apple ID та пристрої",
-    "other": "📝 Інші сервіси та коди",
+    "other": "🔒 Інше та сейф",
 }
+
+
+def classify_vault_item(title: str, notes: Optional[str] = None, website_url: Optional[str] = None, login: Optional[str] = None) -> str:
+    """Розумне автоматичне розпізнавання категорії: спочатку пріоритет за назвою, потім за URL та нотатками."""
+    title_clean = (title or "").lower().strip()
+    notes_clean = (notes or "").lower().strip()
+    url_clean = (website_url or "").lower().strip()
+
+    rules = [
+        ("devices", ["apple id", "apple", "эпл", "айфон", "iphone", "ipad", "айпад", "macbook", "макбук", "pin", "puk", "активац", "телефон", "imei"]),
+        ("crypto", ["binance", "kucoin", "ftx", "huobi", "htx", "gate.io", "gate io", "okx", "okex", "mexc", "bybit", "binbon", "bingx", "hitbtc", "эксмо", "exmo", "tdax", "btc-trade", "yobit", "blocfolio", "blockfolio", "coinlist", "bilaxy", "cryptopia", "crypto.com", "quantfury", "bitrue", "corency", "currency", "bit forex", "fmfw", "bibox", "hoo", "tradingview", "coinmarketcap", "tabtreyder", "tabtrader", "metamask", "trustwallet", "ledger", "trezor", "whitebit", "kuna", "биржа", "токен", "крипт", "usdt", "btc", "dydx"]),
+        ("airlines", ["визэир", "wizz", "runair", "ryanair", "мау", "панорама клуб", "lufthansa", "booking", "airbnb", "lot", "turkish", "emirates", "skyup", "pegasus", "авіа", "авиа", "полет", "рейс", "flight", "airline"]),
+        ("banking", ["paypal", "пейпал", "пейпел", "приват", "privat", "моно", "mono", "monobank", "revolut", "wise", "payoneer", "qiwi", "киви", "банк", "карта", "счет", "кредит", "пумб", "ощад", "аваль", "sense", "visa", "mastercard"]),
+        ("shopping", ["olx", "олх", "ebay", "ебей", "amazon", "амазон", "rozetka", "розетка", "prom", "пром", "copart", "копарт", "iaa", "аукцион", "auction", "алиэкспресс", "aliexpress", "taobao", "auto ria", "авториа"]),
+        ("work", ["github", "гитхаб", "gitlab", "dropbox", "дропбокс", "яндекс диск", "yandex disk", "google drive", "гугл диск", "диск", "onedrive", "notion", "ноушен", "trello", "jira", "zoom", "slack", "cpanel", "hosting", "хостинг", "домен", "domain", "digitalocean", "hetzner", "aws"]),
+        ("gaming", ["steam", "стим", "playstation", "psn", "плейстейшен", "xbox", "иксбокс", "epic games", "epic", "blizzard", "battlenet", "gog", "netflix", "нетфликс", "spotify", "спотифай", "megogo"]),
+        ("social", ["twitter", "твиттер", "твітер", " x ", "x.com", "telegram", "телеграм", "телега", "reddit", "реддит", "tiktok", "тикток", "discord", "дискорд", "facebook", "фейсбук", "instagram", "инстаграм", "інста", "youtube", "ютуб", "medium", "медиум", "linkedin", "whatsapp", "вацап", "viber", "вайбер"]),
+        ("email", ["ukr.net", "укр.нет", "укрнет", "gmail", "джимейл", "гмейл", "yahoo", "яхо", "яhoo", "mail.ru", "outlook", "аутлук", "proton", "protonmail", "почт", "пошта"]),
+        ("ai", ["chatgpt", "чатгпт", "чат гпт", "openai", "claude", "клод", "midjourney", "миджорней", "perplexity", "перплексити", "gemini", "джемини", "elevenlabs", "cursor", "курсор", "deepseek", "suno", "runway"]),
+        ("wifi", ["wifi", "wi-fi", "вайфай", "вай-фай", "роутер", "ssid", "homenet", "router"]),
+    ]
+
+    # Step 1: Exact / strong match on Title
+    for cat, keywords in rules:
+        for kw in keywords:
+            if kw in title_clean:
+                return cat
+
+    # Step 2: Match on Website URL
+    if url_clean:
+        for cat, keywords in rules:
+            for kw in keywords:
+                if kw in url_clean:
+                    return cat
+
+    # Step 3: Match on Notes
+    if notes_clean:
+        for cat, keywords in rules:
+            for kw in keywords:
+                if kw in notes_clean:
+                    return cat
+
+    return "other"
+
+
 
 
 def format_export_text(items: list, category_filter: Optional[str] = None) -> str:

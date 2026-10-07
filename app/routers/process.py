@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -21,7 +21,7 @@ class ProcessTextRequest(BaseModel):
     current_tab: Optional[str] = Field(None, description="Поточна активна вкладка користувача")
 
 
-async def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Dict[str, List[Any]]:
+async def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session, user: str = "admin") -> Dict[str, List[Any]]:
     """Зберігає вилучені AI дії у відповідні таблиці БД."""
     created_items: Dict[str, List[Any]] = {k: [] for k in ["finance", "shopping", "tasks", "media_notes", "auto", "health_vitals", "movies", "music", "business"]}
 
@@ -100,7 +100,7 @@ async def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Di
                     if data.get("artist") and data.get("title"):
                         q_text = f"{data['artist']} - {data['title']}"
                     pl = data.get("playlist") or "Shazam"
-                    m_track = await parse_and_import_shazam(q_text, playlist=pl, db=db)
+                    m_track = await parse_and_import_shazam(q_text, playlist=pl, db=db, user=user)
                     if m_track and isinstance(m_track, dict) and m_track.get("id"):
                         created_items["music"].append(m_track)
 
@@ -168,12 +168,13 @@ async def _save_parsed_actions(actions: List[Dict[str, Any]], db: Session) -> Di
 
 
 @router.post("/process", status_code=status.HTTP_200_OK)
-async def process_text_input(payload: ProcessTextRequest, db: Session = Depends(get_db)):
+async def process_text_input(request: Request, payload: ProcessTextRequest, db: Session = Depends(get_db)):
     """Аналізує текст через Gemini AI та розподіляє по категоріях."""
     text = payload.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Текст запроса не может быть пустым")
 
+    req_user = request.headers.get("x-secretary-user") or request.query_params.get("user") or "admin"
     lower = text.lower()
     if any(k in lower for k in ["отмени последнее", "отменить последнее", "удали то что", "скасуй останнє", "відміни останнє"]):
         from app.core.undo_service import undo_last_action
@@ -182,7 +183,7 @@ async def process_text_input(payload: ProcessTextRequest, db: Session = Depends(
 
     parsed = await parse_with_gemini(text=text, current_tab=payload.current_tab)
     actions = parsed.get("actions", [])
-    created = await _save_parsed_actions(actions, db)
+    created = await _save_parsed_actions(actions, db, user=req_user)
 
     return {
         "status": "success",
@@ -195,6 +196,7 @@ async def process_text_input(payload: ProcessTextRequest, db: Session = Depends(
 
 @router.post("/process/audio", status_code=status.HTTP_200_OK)
 async def process_audio_input(
+    request: Request,
     audio: UploadFile = File(..., description="Аудіофайл"),
     text: Optional[str] = Form(None),
     current_tab: Optional[str] = Form(None),
@@ -205,6 +207,7 @@ async def process_audio_input(
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="Файл аудио пустой")
 
+    req_user = request.headers.get("x-secretary-user") or request.query_params.get("user") or "admin"
     mime_type = audio.content_type or "audio/webm"
     parsed = await parse_with_gemini(text=text, audio_bytes=audio_bytes, mime_type=mime_type, current_tab=current_tab)
 
@@ -216,7 +219,7 @@ async def process_audio_input(
         return {"status": u_res.get("status", "success"), "summary": u_res.get("message", "Дію скасовано"), "transcription": transcription, "actions_count": 0, "created": {}}
 
     actions = parsed.get("actions", [])
-    created = await _save_parsed_actions(actions, db)
+    created = await _save_parsed_actions(actions, db, user=req_user)
     summary = parsed.get("summary", "Голосовая заметка сохранена")
     resp_status = "success" if (actions or transcription) else "warning"
 

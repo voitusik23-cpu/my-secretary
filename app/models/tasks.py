@@ -12,6 +12,8 @@ class Task(Base):
     title = Column(EncryptedString(255), nullable=False)
     description = Column(EncryptedText, nullable=True)
     due_date = Column(DateTime, nullable=True, index=True)
+    remind_at = Column(DateTime, nullable=True, index=True)
+    reminder_sent = Column(Boolean, default=False, nullable=False)
     priority = Column(String(20), default="medium", index=True)  # "low", "medium", "high"
     is_completed = Column(Boolean, default=False, index=True)
     category = Column(EncryptedString(100), default="Личное", index=True)
@@ -20,27 +22,30 @@ class Task(Base):
 
 
 class TaskBase(BaseModel):
-    title: str = Field(..., description="Название задачи")
-    description: Optional[str] = Field(default=None, description="Описание или подпункты")
-    due_date: Optional[datetime] = Field(default=None, description="Срок выполнения")
-    priority: str = Field(default="medium", description="Приоритет: low, medium, high")
-    is_completed: bool = Field(default=False, description="Статус выполнения")
-    category: str = Field(default="Личное", description="Категория (Работа, Личное, Учёба и т.д.)")
+    title: str = Field(..., description="Назва завдання")
+    description: Optional[str] = Field(default=None)
+    due_date: Optional[datetime] = Field(default=None)
+    remind_at: Optional[datetime] = Field(default=None)
+    priority: str = Field(default="medium")
+    is_completed: bool = Field(default=False)
+    category: str = Field(default="Особисте")
 
 
 class TaskCreate(BaseModel):
     title: str
     description: Optional[str] = None
     due_date: Optional[datetime] = None
+    remind_at: Optional[datetime] = None
     priority: Optional[str] = "medium"
     is_completed: Optional[bool] = False
-    category: Optional[str] = "Личное"
+    category: Optional[str] = "Особисте"
 
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     due_date: Optional[datetime] = None
+    remind_at: Optional[datetime] = None
     priority: Optional[str] = None
     is_completed: Optional[bool] = None
     category: Optional[str] = None
@@ -50,5 +55,6 @@ class TaskResponse(TaskBase):
     id: int
     created_at: datetime
     completed_at: Optional[datetime] = None
+    reminder_sent: bool = False
 
     model_config = ConfigDict(from_attributes=True)

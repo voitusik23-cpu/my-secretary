@@ -36,6 +36,20 @@ def _get_user_phone(request: Request) -> str:
     )
 
 
+def _get_vault_query(db: Session, request: Request):
+    """
+    Повертає базовий запит до VaultItem.
+    Враховує всі записи адміна та поточного користувача,
+    щоб паролі ніколи не зникали при вході за номером телефону або зміні сесії.
+    """
+    user = _get_user_phone(request)
+    if user == "admin" or not user:
+        return db.query(VaultItem)
+    return db.query(VaultItem).filter(
+        (VaultItem.user_phone == user) | (VaultItem.user_phone == "admin")
+    )
+
+
 @router.get("/items", response_model=List[VaultItemResponse])
 def get_vault_items(
     request: Request,
@@ -44,8 +58,7 @@ def get_vault_items(
     db: Session = Depends(get_db),
 ):
     """Повертає всі збережені облікові записи користувача з можливістю пошуку та фільтрації."""
-    user = _get_user_phone(request)
-    query = db.query(VaultItem).filter(VaultItem.user_phone == user)
+    query = _get_vault_query(db, request)
 
     if category and category != "all":
         query = query.filter(VaultItem.category == category)
@@ -69,8 +82,7 @@ def get_vault_items(
 @router.get("/items/{item_id}", response_model=VaultItemResponse)
 def get_single_vault_item(item_id: int, request: Request, db: Session = Depends(get_db)):
     """Повертає один запис за ID."""
-    user = _get_user_phone(request)
-    item = db.query(VaultItem).filter(VaultItem.id == item_id, VaultItem.user_phone == user).first()
+    item = _get_vault_query(db, request).filter(VaultItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Запис не знайдено")
     return item
@@ -101,8 +113,7 @@ def create_vault_item(payload: VaultItemCreate, request: Request, db: Session = 
 @router.put("/items/{item_id}", response_model=VaultItemResponse)
 def update_vault_item(item_id: int, payload: VaultItemUpdate, request: Request, db: Session = Depends(get_db)):
     """Оновлює існуючий запис у Склерознику."""
-    user = _get_user_phone(request)
-    item = db.query(VaultItem).filter(VaultItem.id == item_id, VaultItem.user_phone == user).first()
+    item = _get_vault_query(db, request).filter(VaultItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Запис не знайдено")
 
@@ -121,8 +132,7 @@ def update_vault_item(item_id: int, payload: VaultItemUpdate, request: Request, 
 @router.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_vault_item(item_id: int, request: Request, db: Session = Depends(get_db)):
     """Видаляє запис зі Склерозника."""
-    user = _get_user_phone(request)
-    item = db.query(VaultItem).filter(VaultItem.id == item_id, VaultItem.user_phone == user).first()
+    item = _get_vault_query(db, request).filter(VaultItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Запис не знайдено")
 
@@ -146,16 +156,55 @@ async def ai_parse_vault_text(payload: AITextParseRequest):
 
 
 @router.post("/ai-parse-image")
-async def ai_parse_vault_image(image: UploadFile = File(...)):
+async def ai_parse_vault_image(
+    request: Request,
+    image: Optional[UploadFile] = File(None),
+    file: Optional[UploadFile] = File(None),
+    photo: Optional[UploadFile] = File(None),
+):
     """
     Приймає фото блокнота або аркуша з паролями, зчитує через Gemini Vision OCR
     і повертає структуровані облікові записи для перевірки користувачем перед збереженням.
     """
-    image_bytes = await image.read()
-    if not image_bytes:
-        raise HTTPException(status_code=400, detail="Файл порожній")
+    upload = image or file or photo
+    if not upload:
+        try:
+            form = await request.form()
+            for key in ["image", "file", "photo", "upload", "img"]:
+                val = form.get(key)
+                if val is not None and hasattr(val, "read"):
+                    upload = val
+                    break
+        except Exception:
+            pass
 
-    mime = image.content_type or "image/jpeg"
+    image_bytes = None
+    mime = "image/jpeg"
+    if upload:
+        image_bytes = await upload.read()
+        mime = upload.content_type or "image/jpeg"
+    else:
+        try:
+            body = await request.body()
+            if body:
+                if body.startswith(b"{"):
+                    import json, base64
+                    j = json.loads(body.decode("utf-8"))
+                    b64 = j.get("image") or j.get("image_base64") or j.get("data")
+                    if b64:
+                        if "," in b64:
+                            b64 = b64.split(",", 1)[1]
+                        image_bytes = base64.b64decode(b64)
+                        mime = j.get("mime_type", "image/jpeg")
+                elif body.startswith(b"\xff\xd8") or body.startswith(b"\x89PNG") or b"ftyp" in body[:20]:
+                    image_bytes = body
+                    mime = "image/jpeg"
+        except Exception:
+            pass
+
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Файл зображення не знайдено у запиті")
+
     items = await parse_image_with_gemini(image_bytes, mime_type=mime)
     return {
         "status": "ok",
@@ -205,8 +254,7 @@ def export_vault_list(
     db: Session = Depends(get_db),
 ):
     """Генерує текстовий файл/звіт для друку або копіювання до буфера обміну."""
-    user = _get_user_phone(request)
-    query = db.query(VaultItem).filter(VaultItem.user_phone == user)
+    query = _get_vault_query(db, request)
 
     if category and category != "all":
         query = query.filter(VaultItem.category == category)
@@ -219,3 +267,25 @@ def export_vault_list(
         count=len(items),
         text_content=text_content,
     )
+
+
+@router.post("/recategorize")
+def recategorize_vault_items(request: Request, db: Session = Depends(get_db)):
+    """Автоматично перерозподіляє всі записи користувача за новими категоріями."""
+    from app.modules.vault.service import classify_vault_item
+    items = _get_vault_query(db, request).all()
+    updated_count = 0
+    for it in items:
+        new_cat = classify_vault_item(it.title, it.notes, it.website_url, it.login)
+        if new_cat and new_cat != it.category:
+            it.category = new_cat
+            updated_count += 1
+    if updated_count > 0:
+        db.commit()
+    return {
+        "status": "ok",
+        "updated_count": updated_count,
+        "total_items": len(items),
+        "message": f"Розсортовано {updated_count} записів за новими категоріями!",
+    }
+

@@ -37,6 +37,8 @@ from app.modules.vault import vault_router, VaultItem
 from app.core import web_agent_router, gemini_router, system_router, start_nightly_backup_task
 from app.core.undo_service import router as undo_router
 from app.database import Base, engine
+from app.services.telegram_router import telegram_router
+from app.services.reminder_scheduler import start_reminder_scheduler
 
 
 @asynccontextmanager
@@ -58,10 +60,15 @@ async def lifespan(app: FastAPI):
 
     # Start background Google Drive nightly backup task
     backup_task = asyncio.create_task(start_nightly_backup_task())
+
+    # Start Telegram reminder scheduler (checks every 60s)
+    reminder_task = asyncio.create_task(start_reminder_scheduler())
+
     try:
         yield
     finally:
         backup_task.cancel()
+        reminder_task.cancel()
 
 
 START_TIME = time.time()
@@ -70,16 +77,16 @@ START_TIME = time.time()
 app = FastAPI(
     title="Мой Секретарь (My Secretary)",
     description="Автономный персональный AI-секретарь на FastAPI и Google Gemini",
-    version="3.7.9",
+    version="3.7.26",
     lifespan=lifespan,
 )
 
-# Configure CORS
+# Configure CORS (Secure configuration without wildcard credentials)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -116,6 +123,7 @@ api_v1.include_router(business_router)
 api_v1.include_router(ai_chat_router)
 api_v1.include_router(mailbox_router)
 api_v1.include_router(vault_router)
+api_v1.include_router(telegram_router)
 
 
 # Dormant Hospitality Module (Feature-flagged)
@@ -268,11 +276,27 @@ async def transcribe_audio(audio: UploadFile = File(...)):
             actual_mime = "audio/mp4"
 
         part = types.Part.from_bytes(data=audio_bytes, mime_type=actual_mime)
-        res = client.models.generate_content(
-            model=settings.AI_MODEL,
-            contents=[part, "Розпізнай цей голос та виведи ТІЛЬКИ чистий розпізнаний текст користувача без лапок, пояснень та форматування."]
-        )
-        return {"status": "ok", "text": (res.text or "").strip()}
+        models_to_try = [
+            getattr(settings, "AI_MODEL", "gemini-3.5-flash-lite"),
+            "gemini-3.5-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+        ]
+        seen = set()
+        deduped = [m for m in models_to_try if m and not (m in seen or seen.add(m))]
+
+        last_err = None
+        for m in deduped:
+            try:
+                res = client.models.generate_content(
+                    model=m,
+                    contents=[part, "Розпізнай цей голос та виведи ТІЛЬКИ чистий розпізнаний текст користувача без лапок, пояснень та форматування."]
+                )
+                return {"status": "ok", "text": (res.text or "").strip()}
+            except Exception as ex:
+                last_err = ex
+                continue
+        return {"status": "error", "text": "", "detail": str(last_err)}
     except Exception as e:
         return {"status": "error", "text": "", "detail": str(e)}
 
@@ -307,7 +331,7 @@ if os.path.exists(frontend_dir):
                     with open(tunnel_file, "r", encoding="utf-8") as tf:
                         tunnel_url = tf.read().strip()
                         if tunnel_url.startswith("https://"):
-                            return RedirectResponse(f"{tunnel_url}/?key={settings.SECRET_KEY}", status_code=307)
+                            return RedirectResponse(tunnel_url, status_code=307)
                 except Exception:
                     pass
 

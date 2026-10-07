@@ -6,7 +6,7 @@ import imaplib
 from email.header import decode_header
 import html
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Set
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -222,15 +222,19 @@ def classify_email(subject: str, sender: str, snippet: str, raw_headers: Dict[st
     return "other", False, None
 
 
-def fetch_account_emails(account: MailAccount, limit: int = 30) -> List[Dict[str, Any]]:
+def fetch_account_emails(
+    account: MailAccount, 
+    limit: int = 150, 
+    exclude_uids: Optional[Set[str]] = None
+) -> List[Dict[str, Any]]:
     """Підключається до поштової скриньки за IMAP та зчитує останні листи."""
     results = []
     client = None
     try:
         if account.use_ssl:
-            client = imaplib.IMAP4_SSL(account.imap_server, account.imap_port, timeout=12)
+            client = imaplib.IMAP4_SSL(account.imap_server, account.imap_port, timeout=15)
         else:
-            client = imaplib.IMAP4(account.imap_server, account.imap_port, timeout=12)
+            client = imaplib.IMAP4(account.imap_server, account.imap_port, timeout=15)
 
         clean_pwd = account.password.strip()
         if "gmail" in account.imap_server.lower() and len(clean_pwd.replace(" ", "")) == 16:
@@ -248,7 +252,12 @@ def fetch_account_emails(account: MailAccount, limit: int = 30) -> List[Dict[str
             return []
 
         uids = search_data[0].split()
-        latest_uids = uids[-limit:]  # get last N messages
+        if exclude_uids:
+            target_uids = [u for u in uids if u.decode() not in exclude_uids]
+        else:
+            target_uids = uids
+
+        latest_uids = target_uids[-limit:]  # get last N unprocessed messages
         latest_uids.reverse()  # newest first
 
         for uid_bytes in latest_uids:

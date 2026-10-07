@@ -3,13 +3,23 @@
 // ===================================================
 
 const urlParams = new URLSearchParams(window.location.search);
-const initialKey = urlParams.get("key") || localStorage.getItem("secret_key") || "";
-if (urlParams.get("key")) {
+const initialKey = urlParams.get("token") || urlParams.get("key") || localStorage.getItem("secret_key") || "";
+if (urlParams.get("token") || urlParams.get("key")) {
   localStorage.setItem("secret_key", initialKey);
 }
 const initialUser = urlParams.get("user") || localStorage.getItem("secretary_user") || "admin";
 if (urlParams.get("user")) {
   localStorage.setItem("secretary_user", initialUser);
+}
+
+// Strip sensitive key/token from browser address bar immediately to prevent history/referrer leakage
+if (urlParams.has("key") || urlParams.has("secret") || urlParams.has("token")) {
+  urlParams.delete("key");
+  urlParams.delete("secret");
+  urlParams.delete("token");
+  const cleanSearch = urlParams.toString();
+  const cleanUrl = window.location.pathname + (cleanSearch ? "?" + cleanSearch : "") + window.location.hash;
+  window.history.replaceState({}, document.title, cleanUrl);
 }
 
 const state = {
@@ -28,7 +38,7 @@ const state = {
 
 
 // --- Service Worker Registration with Safe Auto-Update & Hard-Cache Flush ---
-const APP_VERSION = "3.7.9";
+const APP_VERSION = "3.7.26";
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // If version changed, purge old caches to prevent stale script/audio issues on iPhone
@@ -78,7 +88,14 @@ async function apiFetch(endpoint, options = {}) {
 
 
   // Set Content-Type only if not FormData
-  if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
+  const isFormData = (typeof FormData !== "undefined" && options.body instanceof FormData) ||
+                     (options.body && typeof options.body.append === "function") ||
+                     (options.body && Object.prototype.toString.call(options.body) === "[object FormData]");
+
+  if (isFormData) {
+    delete headers["Content-Type"];
+    delete headers["content-type"];
+  } else if (!headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
 
@@ -122,17 +139,59 @@ function updateStatus(status) {
   }
 }
 
+// Global App Force-Update function
+async function forceAppUpdate() {
+  try {
+    localStorage.removeItem("secretary_sw_version");
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((r) => r.unregister()));
+    }
+  } catch (e) {
+    console.warn("Update error:", e);
+  }
+  const keyParam = state.secretKey ? `key=${encodeURIComponent(state.secretKey)}` : "";
+  const tParam = `_force=${Date.now()}`;
+  const queryStr = [keyParam, tParam].filter(Boolean).join("&");
+  window.location.replace(`${window.location.origin}/?${queryStr}`);
+}
+
+function showAppUpdatePrompt(newVer) {
+  if (document.getElementById("pwa-update-banner")) return;
+  const banner = document.createElement("div");
+  banner.id = "pwa-update-banner";
+  banner.className = "pwa-update-banner";
+  banner.innerHTML = `
+    <span>🚀 Доступне оновлення <b>v${newVer}</b>!</span>
+    <button id="pwa-quick-update-btn" class="pwa-update-btn">🔄 Оновити зараз</button>
+  `;
+  document.body.appendChild(banner);
+  document.getElementById("pwa-quick-update-btn")?.addEventListener("click", () => {
+    banner.innerHTML = `<span>⏳ Оновлення додатку...</span>`;
+    forceAppUpdate();
+  });
+}
+
 // Check initial health
 async function checkHealth() {
   try {
     const data = await apiFetch("/health");
     if (data && data.status === "online") {
       updateStatus("online");
+      if (data.version && data.version !== APP_VERSION) {
+        console.warn(`[App] Update detected: server ${data.version}, client ${APP_VERSION}`);
+        showAppUpdatePrompt(data.version);
+      }
     }
   } catch {
     updateStatus("offline");
   }
 }
+
 
 // --- Theme Management ---
 function initTheme() {
@@ -624,51 +683,171 @@ async function loadShopping() {
   }
 }
 
-// 4. Tasks
-async function loadTasks() {
-  const list = document.getElementById("tasks-list");
-  try {
-    const tasks = await apiFetch("/api/tasks");
-    if (!tasks || tasks.length === 0) {
-      list.innerHTML = `<div class="empty-state"><p>Немає активних робіт. Скажіть мікрофону: «Постелити плитку, помити авто...»</p></div>`;
+// 4. Tasks — TasksModule
+const TasksModule = {
+  _filter: "active",
+  _tasks: [],
+
+  setFilter(f, btn) {
+    this._filter = f;
+    document.querySelectorAll(".tasks-filter-pill").forEach(p => p.classList.remove("active"));
+    if (btn) btn.classList.add("active");
+    this.render();
+  },
+
+  _urgencyInfo(dueDate) {
+    if (!dueDate) return { label: "Без дедлайну", cls: "tasks-due-none", urgent: false };
+    const now = Date.now();
+    const due = new Date(dueDate).getTime();
+    const diff = due - now; // ms
+    if (diff < 0) return { label: "⚠️ Прострочено!", cls: "tasks-due-overdue", urgent: true };
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return { label: `🔥 через ${mins} хв`, cls: "tasks-due-hot", urgent: true };
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return { label: `⏰ через ${hrs} год`, cls: "tasks-due-soon", urgent: true };
+    const days = Math.floor(hrs / 24);
+    if (days === 1) return { label: "📅 Завтра", cls: "tasks-due-tomorrow", urgent: false };
+    if (days < 7) return { label: `📅 через ${days} дн.`, cls: "tasks-due-week", urgent: false };
+    const d = new Date(dueDate);
+    return {
+      label: d.toLocaleString("uk-UA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
+      cls: "tasks-due-ok", urgent: false
+    };
+  },
+
+  _catIcon(cat) {
+    const map = { "Здоров'я": "❤️", "Роботи": "🔨", "Документи": "📄", "Фінанси": "💳", "Сім'я": "👨‍👩‍👧", "Авто": "🚗", "Покупки": "🛍️", "Особисте": "👤" };
+    return map[cat] || "📌";
+  },
+
+  render() {
+    const list = document.getElementById("tasks-list");
+    if (!list) return;
+    let tasks = this._tasks;
+    const f = this._filter;
+    const now = Date.now();
+
+    if (f === "active") tasks = tasks.filter(t => !t.is_completed);
+    else if (f === "done") tasks = tasks.filter(t => t.is_completed);
+    else if (f === "urgent") tasks = tasks.filter(t => !t.is_completed && t.due_date && (new Date(t.due_date).getTime() - now) < 86400000);
+    else if (f === "no_date") tasks = tasks.filter(t => !t.is_completed && !t.due_date);
+
+    const activeCnt = this._tasks.filter(t => !t.is_completed).length;
+    const badge = document.getElementById("tasks-total-badge");
+    if (badge) badge.textContent = `${activeCnt} активних`;
+
+    if (tasks.length === 0) {
+      list.innerHTML = `
+        <div class="empty-state" style="padding:32px 16px;">
+          <span class="empty-icon">${f === "done" ? "✅" : "📋"}</span>
+          <p><strong>${f === "done" ? "Виконаних справ немає" : "Справ немає"}</strong></p>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin:8px auto 16px;max-width:340px;">
+            ${f === "active" ? "Скажіть мікрофону: «Здати кров 7 жовтня о 8 ранку» або натисніть «+ Додати роботу»" : "Нічого не знайдено у цьому фільтрі"}
+          </p>
+          ${f === "active" ? `<button class="btn-primary" style="padding:9px 18px;font-size:0.85rem;background:linear-gradient(135deg,#8b5cf6,#6d28d9);" onclick="document.getElementById('add-task-btn').click()">+ Додати роботу</button>` : ""}
+        </div>`;
       return;
     }
 
-    list.innerHTML = tasks
-      .map((t) => {
-        let dueStr = "Без срока";
-        if (t.due_date) {
-          dueStr = new Date(t.due_date).toLocaleString("ru-RU", {
-            day: "numeric",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-        }
+    list.innerHTML = tasks.map(t => {
+      const due = this._urgencyInfo(t.due_date);
+      const prioMap = { high: { cls: "tasks-prio-high", label: "🔥 Терміново" }, medium: { cls: "tasks-prio-med", label: "⚡ Середній" }, low: { cls: "tasks-prio-low", label: "☕ Низький" } };
+      const prio = prioMap[t.priority] || prioMap.medium;
+      const catIcon = this._catIcon(t.category);
+      const desc = t.description ? `<div class="tasks-card-desc">${escapeHtml(t.description)}</div>` : "";
 
-        const prioColor = t.priority === "high" ? "badge-finance" : (t.priority === "medium" ? "badge-tasks" : "badge-auto");
-        const prioLabel = t.priority === "high" ? "🔥 Терміново" : (t.priority === "medium" ? "⚡ Середній" : "☕ Низький");
-
-        return `
-          <div class="item-card">
-            <button class="custom-checkbox ${t.is_completed ? "checked" : ""}" onclick="toggleTask(${t.id})">
-              ✓
+      return `
+        <div class="tasks-card ${t.is_completed ? "tasks-card-done" : ""} ${due.urgent && !t.is_completed ? "tasks-card-urgent" : ""}">
+          <div class="tasks-card-check-col">
+            <button class="tasks-check-btn ${t.is_completed ? "checked" : ""}" onclick="toggleTask(${t.id})" title="${t.is_completed ? "Позначити як активну" : "Позначити виконаною"}">
+              ${t.is_completed ? "✓" : ""}
             </button>
-            <div class="item-content">
-              <span class="item-title ${t.is_completed ? "completed" : ""}">${escapeHtml(t.title)}</span>
-              <span class="item-subtitle">📅 ${dueStr} • ${escapeHtml(t.category)}</span>
-              <span class="item-badge ${prioColor}">${prioLabel}</span>
+          </div>
+          <div class="tasks-card-body">
+            <div class="tasks-card-title ${t.is_completed ? "tasks-title-done" : ""}">${escapeHtml(t.title)}</div>
+            ${desc}
+            <div class="tasks-card-meta">
+              <span class="tasks-due-badge ${due.cls}">${due.label}</span>
+              <span class="tasks-cat-badge">${catIcon} ${escapeHtml(t.category || "Особисте")}</span>
+              <span class="${prio.cls} tasks-prio-badge">${prio.label}</span>
             </div>
-            <div class="item-actions">
-              <button class="delete-btn" onclick="deleteItem('tasks', ${t.id})" title="Удалить">🗑️</button>
-            </div>
-          </div>`;
-      })
-      .join("");
-  } catch {
-    list.innerHTML = `<div class="empty-state"><p>Ошибка загрузки задач</p></div>`;
-  }
+          </div>
+          <div class="tasks-card-actions">
+            ${!t.is_completed && t.due_date ? `<button class="tasks-remind-btn" onclick="TasksModule.setReminder(${t.id},'${escapeHtml(t.title)}','${t.due_date}')" title="Встановити нагадування">🔔</button>` : ""}
+            <button class="delete-btn" onclick="deleteItem('tasks', ${t.id})" title="Видалити">🗑️</button>
+          </div>
+        </div>`;
+    }).join("");
+  },
+
+  async load() {
+    const list = document.getElementById("tasks-list");
+    if (list) list.innerHTML = `<div class="empty-state"><span class="empty-icon">⏳</span><p>Завантажую справи...</p></div>`;
+    try {
+      const tasks = await apiFetch("/api/tasks?limit=200");
+      this._tasks = Array.isArray(tasks) ? tasks : [];
+      this.render();
+      this._scheduleReminders();
+    } catch {
+      if (list) list.innerHTML = `<div class="empty-state"><p>❌ Помилка завантаження</p></div>`;
+    }
+  },
+
+  setReminder(id, title, dueDate) {
+    if (!("Notification" in window)) {
+      showToast("❌ Браузер не підтримує сповіщення");
+      return;
+    }
+    const requestAndSet = () => {
+      const due = new Date(dueDate).getTime();
+      const now = Date.now();
+      const delay = due - now;
+      if (delay <= 0) { showToast("⚠️ Термін вже минув!"); return; }
+      // Save to localStorage
+      const reminders = JSON.parse(localStorage.getItem("task_reminders") || "{}");
+      reminders[id] = { title, dueDate, notified: false };
+      localStorage.setItem("task_reminders", JSON.stringify(reminders));
+      const mins = Math.round(delay / 60000);
+      showToast(`🔔 Нагадування встановлено! Спрацює через ${mins < 60 ? mins + " хв" : Math.round(mins/60) + " год"}`);
+    };
+    if (Notification.permission === "granted") {
+      requestAndSet();
+    } else {
+      Notification.requestPermission().then(p => {
+        if (p === "granted") requestAndSet();
+        else showToast("🔕 Дозвіл на сповіщення не надано");
+      });
+    }
+  },
+
+  _scheduleReminders() {
+    const reminders = JSON.parse(localStorage.getItem("task_reminders") || "{}");
+    const now = Date.now();
+    Object.entries(reminders).forEach(([id, r]) => {
+      if (r.notified) return;
+      const due = new Date(r.dueDate).getTime();
+      const delay = due - now;
+      if (delay > 0 && delay < 7 * 24 * 3600000) { // within 7 days
+        setTimeout(() => {
+          if (Notification.permission === "granted") {
+            new Notification("📋 Нагадування: " + r.title, {
+              body: "Час виконати справу! " + new Date(r.dueDate).toLocaleString("uk-UA"),
+              icon: "/static/icon-192.png",
+            });
+          }
+          const rem = JSON.parse(localStorage.getItem("task_reminders") || "{}");
+          if (rem[id]) { rem[id].notified = true; localStorage.setItem("task_reminders", JSON.stringify(rem)); }
+        }, delay);
+      }
+    });
+  },
+};
+window.TasksModule = TasksModule;
+
+async function loadTasks() {
+  await TasksModule.load();
 }
+
 
 // 5. Media Notes / Склерозник
 window.copySclerozText = function(text, ev) {
@@ -1152,12 +1331,12 @@ async function loadVersionInfo() {
 
       if (statusTag) {
         if (res.bot_version === APP_VERSION) {
-          statusTag.textContent = "● Актуальна";
+          statusTag.textContent = `● Актуальна (v${APP_VERSION})`;
           statusTag.style.color = "#22c55e";
           statusTag.style.background = "rgba(34,197,94,0.18)";
           statusTag.style.borderColor = "rgba(34,197,94,0.3)";
         } else {
-          statusTag.textContent = "⚠️ Оновіть додаток";
+          statusTag.textContent = `⚠️ Доступно v${res.bot_version}`;
           statusTag.style.color = "#f59e0b";
           statusTag.style.background = "rgba(245,158,11,0.18)";
           statusTag.style.borderColor = "rgba(245,158,11,0.3)";
@@ -1214,26 +1393,10 @@ function initSettingsModal() {
   document.getElementById("clear-cache-reload-btn")?.addEventListener("click", async () => {
     const feedback = document.getElementById("version-action-feedback");
     if (feedback) feedback.textContent = "⏳ Очищення кешу Safari/PWA та оновлення...";
-    showToast("🔄 Очищення кешу та примусове оновлення...");
-    try {
-      localStorage.removeItem("secretary_sw_version");
-      if ("caches" in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      }
-      if ("serviceWorker" in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((r) => r.unregister()));
-      }
-    } catch (e) {
-      console.warn("Cache clear error:", e);
-    }
+    showToast("🔄 Очищення кешу та примусове оновлення...", 3500);
     setTimeout(() => {
-      const keyParam = state.secretKey ? `key=${encodeURIComponent(state.secretKey)}` : "";
-      const tParam = `_force=${Date.now()}`;
-      const queryStr = [keyParam, tParam].filter(Boolean).join("&");
-      window.location.href = `${window.location.origin}/?${queryStr}`;
-    }, 450);
+      forceAppUpdate();
+    }, 300);
   });
 
   closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
@@ -1567,19 +1730,67 @@ function initManualAddModal() {
         <input type="text" name="category" value="Продукты" />
       `;
     } else if (domain === "tasks") {
-      titleEl.textContent = "Додати роботу / справу";
+      titleEl.textContent = "📋 Нова робота / справа";
       fieldsEl.innerHTML = `
-        <label>Назва роботи або справи:</label>
-        <input type="text" name="title" required placeholder="Постелити плитку, помити авто..." />
-        <label>Термін виконання:</label>
-        <input type="datetime-local" name="due_date" />
-        <label>Пріоритет:</label>
+        <label>📝 Назва роботи або справи:</label>
+        <input type="text" name="title" required placeholder="Здати кров, оформити пенсію, помити авто..." autofocus />
+        <label>📄 Опис / деталі (необов'язково):</label>
+        <textarea name="description" rows="2" placeholder="Адреса лабораторії: вул. Шевченка 5&#10;Взяти направлення від лікаря"></textarea>
+        <label>📅 Дедлайн — до якого часу зробити:</label>
+        <input type="datetime-local" name="due_date" id="task-due-date-input" />
+        <label>🔔 Нагадати мені о: <span style="font-size:0.78rem;color:var(--text-muted);font-weight:400;">(оберіть дату і час)</span></label>
+        <input type="datetime-local" name="remind_at" id="task-remind-at-input"
+          style="border-color:rgba(56,189,248,0.4);" />
+        <p style="font-size:0.76rem;color:var(--text-muted);margin:-6px 0 4px 0;">
+          💡 Телефон пропищить у вказаний час навіть якщо додаток згорнутий
+        </p>
+        <label>🏷️ Категорія:</label>
+        <select name="category">
+          <option value="Особисте">👤 Особисте</option>
+          <option value="Здоров'я">❤️ Здоров'я / Лікарі</option>
+          <option value="Роботи">🔨 Роботи / Ремонт</option>
+          <option value="Документи">📄 Документи / Держоргани</option>
+          <option value="Фінанси">💳 Фінанси / Платежі</option>
+          <option value="Сім'я">👨‍👩‍👧 Сім'я</option>
+          <option value="Авто">🚗 Авто</option>
+          <option value="Покупки">🛍️ Покупки</option>
+        </select>
+        <label>⚡ Пріоритет:</label>
         <select name="priority">
-          <option value="low">Низький</option>
-          <option value="medium" selected>Середній</option>
-          <option value="high">Високий / Терміново</option>
+          <option value="low">☕ Низький — коли буде час</option>
+          <option value="medium" selected>⚡ Середній — цього тижня</option>
+          <option value="high">🔥 Терміново — якомога швидше</option>
         </select>
       `;
+
+      // Pre-fill due_date to +1 hour from now
+      const dueDateInput = fieldsEl.querySelector('#task-due-date-input');
+      const remindAtInput = fieldsEl.querySelector('#task-remind-at-input');
+      const roundToHour = (d) => { d.setMinutes(0,0,0); d.setHours(d.getHours()+1); return d; };
+
+      if (dueDateInput) {
+        const d = roundToHour(new Date());
+        dueDateInput.value = d.toISOString().slice(0, 16);
+        // Pre-fill remind_at to 1 hour before due_date
+        if (remindAtInput) {
+          const r = new Date(d.getTime() - 60 * 60000);
+          remindAtInput.value = r.toISOString().slice(0, 16);
+        }
+        // When user changes due_date → auto-update remind_at to 1h before
+        dueDateInput.addEventListener('change', () => {
+          if (!dueDateInput.value) return;
+          const due = new Date(dueDateInput.value);
+          const remind = new Date(due.getTime() - 60 * 60000);
+          if (remindAtInput && !remindAtInput._userEdited) {
+            remindAtInput.value = remind.toISOString().slice(0, 16);
+          }
+        });
+        // Mark remind_at as user-edited if they touch it
+        if (remindAtInput) {
+          remindAtInput.addEventListener('change', () => { remindAtInput._userEdited = true; });
+        }
+      }
+
     } else if (domain === "media") {
       titleEl.textContent = "🧠 Додати запис у Склерозник";
       fieldsEl.innerHTML = `
@@ -1718,6 +1929,41 @@ function initManualAddModal() {
     } else if (currentDomain === "tasks") {
       endpoint = "/api/tasks";
       if (!data.due_date) delete data.due_date;
+      if (data.description === "") delete data.description;
+      if (!data.remind_at) delete data.remind_at;
+
+      // Also schedule browser notification (works even without Telegram)
+      const remindAt = data.remind_at;
+      if (remindAt) {
+        const remindMs = new Date(remindAt).getTime();
+        const delayMs = remindMs - Date.now();
+        if (delayMs > 0) {
+          const scheduleIt = () => {
+            const reminders = JSON.parse(localStorage.getItem("task_reminders") || "{}");
+            const key = "_pending_" + Date.now();
+            reminders[key] = { title: data.title, dueDate: data.due_date || remindAt, notified: false, remindAt };
+            localStorage.setItem("task_reminders", JSON.stringify(reminders));
+            setTimeout(() => {
+              if (Notification.permission === "granted") {
+                new Notification("🔔 Нагадування: " + data.title, {
+                  body: "Час виконати справу!\n" + new Date(data.due_date || remindAt).toLocaleString("uk-UA", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }),
+                  icon: "/static/icon-192.png",
+                  tag: key,
+                  requireInteraction: true,
+                });
+              }
+              const rem = JSON.parse(localStorage.getItem("task_reminders") || "{}");
+              if (rem[key]) { rem[key].notified = true; localStorage.setItem("task_reminders", JSON.stringify(rem)); }
+            }, delayMs);
+            const mins = Math.round(delayMs / 60000);
+            const timeStr = mins < 60 ? `${mins} хв` : mins < 1440 ? `${Math.round(mins/60)} год` : `${Math.round(mins/1440)} дн.`;
+            showToast(`🔔 Нагадування встановлено! Спрацює через ${timeStr}`);
+          };
+          if (Notification.permission === "granted") { scheduleIt(); }
+          else { Notification.requestPermission().then(p => { if (p === "granted") scheduleIt(); }); }
+        }
+      }
+
     } else if (currentDomain === "media") {
       endpoint = "/api/media_notes";
     } else if (currentDomain === "inventory") {
@@ -3039,9 +3285,17 @@ function initVitalsScreen() {
     }
   });
 
-  document.getElementById("export-bp-csv-btn")?.addEventListener("click", () => {
-    const keyParam = state.secretKey ? `&key=${encodeURIComponent(state.secretKey)}` : "";
-    const exportUrl = `${state.serverUrl}/api/v1/vitals/bp/export?days=${vitalsSelectedDays}${keyParam}`;
+  document.getElementById("export-bp-csv-btn")?.addEventListener("click", async () => {
+    let tokenParam = "";
+    try {
+      const res = await apiFetch("/api/v1/vitals/bp/export-token");
+      if (res && res.token) {
+        tokenParam = `&token=${encodeURIComponent(res.token)}`;
+      }
+    } catch (e) {
+      console.warn("Could not get export token:", e);
+    }
+    const exportUrl = `${state.serverUrl}/api/v1/vitals/bp/export?days=${vitalsSelectedDays}${tokenParam}`;
     const link = document.createElement("a");
     link.href = exportUrl;
     link.setAttribute("download", `blood_pressure_journal_${new Date().toISOString().slice(0, 10)}.csv`);

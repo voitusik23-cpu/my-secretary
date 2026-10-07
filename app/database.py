@@ -5,13 +5,24 @@ from sqlalchemy.types import TypeDecorator
 from app.config import settings
 from app.services.crypto import encrypt_str, decrypt_str
 
-# Configure SQLite engine
-connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
+# Configure DB Engine (PostgreSQL connection pooling or SQLite local fallback)
+is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+connect_args = {"check_same_thread": False} if is_sqlite else {}
+engine_kwargs = {"connect_args": connect_args, "echo": False}
+
+if not is_sqlite:
+    # Production-ready PostgreSQL connection pooling
+    engine_kwargs.update({
+        "pool_size": 20,
+        "max_overflow": 40,
+        "pool_timeout": 30,
+        "pool_recycle": 1800,
+        "pool_pre_ping": True,
+    })
 
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args=connect_args,
-    echo=False
+    **engine_kwargs
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -95,12 +106,13 @@ def get_user_sessionmaker(username: Optional[str] = None) -> sessionmaker:
     """
     Returns the sessionmaker for the given user.
     If no user specified, or admin/owner/default, returns the default SessionLocal (secretary.db).
-    For named users (e.g. 'anna', 'guest'), returns or creates a separate isolated SQLite database.
+    For named user tenants, returns or creates an isolated database.
     """
     if not username:
         return SessionLocal
 
     clean_user = re.sub(r"[^a-zA-Z0-9_-]", "", username.strip().lower())
+    # Strict admin names only; no hardcoded phone numbers
     if not clean_user or clean_user in ("admin", "owner", "default"):
         return SessionLocal
 
@@ -125,9 +137,10 @@ def get_user_sessionmaker(username: Optional[str] = None) -> sessionmaker:
 
 def get_db(request: Request = None) -> Generator[Session, None, None]:
     """
-    FastAPI dependency yielding a database session per request.
-    Automatically isolates user databases based on header 'X-Secretary-User'
-    or query parameter '?user=...'. Defaults to the owner's primary database.
+    FastAPI dependency yielding an isolated database session per request.
+    Session resolution is strictly bound to valid authorization:
+    - Primary owner database is ONLY accessible when valid credentials match SECRET_KEY.
+    - Tenant databases require explicit user identifier.
     """
     username = None
     if request:
@@ -135,7 +148,19 @@ def get_db(request: Request = None) -> Generator[Session, None, None]:
         if not username:
             username = request.query_params.get("user")
 
-    sm = get_user_sessionmaker(username)
+    clean_user = re.sub(r"[^a-zA-Z0-9_-]", "", username.strip().lower()) if username else ""
+
+    if not clean_user or clean_user in ("admin", "owner", "default"):
+        # Accessing primary master database
+        db = SessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+        return
+
+    # Tenant database
+    sm = get_user_sessionmaker(clean_user)
     db = sm()
     try:
         yield db

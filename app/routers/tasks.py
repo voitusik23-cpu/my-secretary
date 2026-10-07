@@ -40,9 +40,11 @@ def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
         title=payload.title,
         description=payload.description,
         due_date=payload.due_date,
+        remind_at=payload.remind_at,
+        reminder_sent=False,
         priority=payload.priority or "medium",
         is_completed=payload.is_completed or False,
-        category=payload.category or "Личное",
+        category=payload.category or "Особисте",
     )
     db.add(task)
     db.commit()

@@ -1,9 +1,10 @@
 // ===================================================
 // Мой Секретарь — Модуль Фільмів та Серіалів
-// frontend/modules/movies.js
+// frontend/modules/movies.js (Безпечна версія без XSS)
 // ===================================================
 
 let _moviesWatchlistType = "all";
+let _lastMovieSearchResult = null;
 
 async function loadMoviesTab() {
   initMoviesSearch();
@@ -49,9 +50,10 @@ async function searchMovie() {
     });
 
     if (!res?.data?.found) {
-      inner.innerHTML = `<div class="empty-state"><span class="empty-icon">🎬</span><p>Фільм «${escapeHtml(title)}» не знайдено.<br><small>Спробуйте написати назву англійською.</small></p></div>`;
+      inner.innerHTML = `<div class="empty-state"><span class="empty-icon">🎬</span><p>Фільм «${escapeHtml(title)}» не знайдено.<br><small>Спробуйте написати назву англійською або уточнити рік.</small></p></div>`;
       return;
     }
+    _lastMovieSearchResult = res.data;
     renderMovieResult(res.data);
   } catch (err) {
     inner.innerHTML = `<div class="empty-state"><p>Помилка пошуку: ${escapeHtml(err.message)}</p></div>`;
@@ -60,29 +62,29 @@ async function searchMovie() {
 
 function renderMovieResult(m) {
   const inner = document.getElementById("movie-result-inner");
-  const genre = Array.isArray(m.genre) ? m.genre.join(", ") : (m.genre || "");
-  const cast = Array.isArray(m.cast) ? m.cast.slice(0, 4).join(", ") : (m.cast || "");
+  if (!inner) return;
 
-  const netflixLinks = (m.watch_links || []).filter(w => w.platform && w.platform.includes("Netflix"));
-  const otherOfficialLinks = (m.watch_links || []).filter(w => w.category === "official" && (!w.platform || !w.platform.includes("Netflix")));
-  const onlineLinks = (m.watch_links || []).filter(w => w.category === "online");
-  const torrentLinks = (m.watch_links || []).filter(w => w.category === "torrent");
+  const genre = Array.isArray(m.genre) ? m.genre.join(", ") : (m.genre || "");
+  const cast = Array.isArray(m.cast) ? m.cast.join(", ") : (m.cast || "");
 
   let watchLinksHtml = "";
-  if (netflixLinks.length || otherOfficialLinks.length || onlineLinks.length || torrentLinks.length) {
+  if (Array.isArray(m.watch_links) && m.watch_links.length > 0) {
+    const officialLinks = m.watch_links.filter(w => w.category === "official");
+    const onlineLinks = m.watch_links.filter(w => w.category === "online");
+    const torrentLinks = m.watch_links.filter(w => w.category === "torrent");
+
     watchLinksHtml = `
       <div class="movie-links-section">
-        ${(netflixLinks.length || otherOfficialLinks.length) ? `
+        ${officialLinks.length ? `
           <div class="movie-links-group">
-            <span class="movie-links-label">🔴 Стрімінг (Ваш Netflix акаунт & Megogo):</span>
+            <span class="movie-links-label">📺 Офіційні стрімінги:</span>
             <div class="movie-links-grid">
-              ${netflixLinks.map(w => `<a href="${escapeHtml(w.url)}" target="_blank" rel="noopener noreferrer" class="movie-link-btn movie-link-netflix">${escapeHtml(w.platform)}</a>`).join("")}
-              ${otherOfficialLinks.map(w => `<a href="${escapeHtml(w.url)}" target="_blank" rel="noopener noreferrer" class="movie-link-btn movie-link-official">${escapeHtml(w.platform)}</a>`).join("")}
+              ${officialLinks.map(w => `<a href="${escapeHtml(w.url)}" target="_blank" rel="noopener noreferrer" class="movie-link-btn movie-link-official">${escapeHtml(w.platform)}</a>`).join("")}
             </div>
           </div>` : ""}
         ${onlineLinks.length ? `
           <div class="movie-links-group">
-            <span class="movie-links-label">🍿 Дивитись онлайн безкоштовно:</span>
+            <span class="movie-links-label">🍿 Дивитись онлайн:</span>
             <div class="movie-links-grid">
               ${onlineLinks.map(w => `<a href="${escapeHtml(w.url)}" target="_blank" rel="noopener noreferrer" class="movie-link-btn movie-link-online">${escapeHtml(w.platform)}</a>`).join("")}
             </div>
@@ -96,13 +98,6 @@ function renderMovieResult(m) {
           </div>` : ""}
       </div>
     `;
-  } else if (Array.isArray(m.where_to_watch)) {
-    const links = m.where_to_watch.filter(w => w.available !== false).map(w =>
-      `<a href="${escapeHtml(w.url || '#')}" target="_blank" rel="noopener noreferrer" class="movie-link-btn movie-link-online">🎬 ${escapeHtml(w.platform)}</a>`
-    ).join("");
-    if (links) {
-      watchLinksHtml = `<div class="movie-links-section"><div class="movie-links-grid">${links}</div></div>`;
-    }
   }
 
   inner.innerHTML = `
@@ -113,14 +108,14 @@ function renderMovieResult(m) {
           ${m.original_title ? `<div style="color:var(--text-muted);font-size:0.84rem;">${escapeHtml(m.original_title)}</div>` : ""}
         </div>
         <div style="display:flex;gap:6px;">
-          ${m.rating_imdb ? `<span style="background:#f5c518;color:#000;font-weight:700;border-radius:6px;padding:3px 8px;font-size:0.88rem;">IMDb ${m.rating_imdb}</span>` : ""}
-          ${m.rating_kinopoisk ? `<span style="background:#f60;color:#fff;font-weight:700;border-radius:6px;padding:3px 8px;font-size:0.88rem;">КП ${m.rating_kinopoisk}</span>` : ""}
+          ${m.rating_imdb ? `<span style="background:#f5c518;color:#000;font-weight:700;border-radius:6px;padding:3px 8px;font-size:0.88rem;">IMDb ${escapeHtml(String(m.rating_imdb))}</span>` : ""}
+          ${m.rating_kinopoisk ? `<span style="background:#f60;color:#fff;font-weight:700;border-radius:6px;padding:3px 8px;font-size:0.88rem;">КП ${escapeHtml(String(m.rating_kinopoisk))}</span>` : ""}
         </div>
       </div>
 
       <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:0.82rem;">
-        ${m.year ? `<span style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:6px;padding:2px 8px;">📅 ${m.year}</span>` : ""}
-        ${m.duration_min ? `<span style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:6px;padding:2px 8px;">⏱ ${m.duration_min} хв</span>` : ""}
+        ${m.year ? `<span style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:6px;padding:2px 8px;">📅 ${escapeHtml(String(m.year))}</span>` : ""}
+        ${m.duration_min ? `<span style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:6px;padding:2px 8px;">⏱ ${escapeHtml(String(m.duration_min))} хв</span>` : ""}
         ${m.country ? `<span style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:6px;padding:2px 8px;">🌍 ${escapeHtml(m.country)}</span>` : ""}
         ${genre ? `<span style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:6px;padding:2px 8px;">🎭 ${escapeHtml(genre)}</span>` : ""}
       </div>
@@ -136,10 +131,17 @@ function renderMovieResult(m) {
 
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
         ${m.trailer_search ? `<a href="${escapeHtml(m.trailer_search)}" target="_blank" rel="noopener noreferrer" style="background:var(--danger);color:#fff;border-radius:8px;padding:6px 14px;font-size:0.85rem;font-weight:600;text-decoration:none;">▶️ Трейлер YouTube</a>` : ""}
-        <button onclick='addMovieToWatchlist(${JSON.stringify(m).replace(/'/g, "&#39;")})' style="background:var(--success);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:0.85rem;font-weight:600;cursor:pointer;">📌 До списку перегляду</button>
+        <button id="add-to-watchlist-btn" style="background:var(--success);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:0.85rem;font-weight:600;cursor:pointer;">📌 До списку перегляду</button>
       </div>
     </div>
   `;
+
+  // Safe event listener binding (no inline JSON eval or XSS)
+  document.getElementById("add-to-watchlist-btn")?.addEventListener("click", () => {
+    if (_lastMovieSearchResult) {
+      addMovieToWatchlist(_lastMovieSearchResult);
+    }
+  });
 }
 
 window.quickSearchMovie = function(title) {
@@ -159,13 +161,13 @@ window.addMovieToWatchlist = async function(m) {
         title: m.title,
         original_title: m.original_title || null,
         year: m.year || null,
-        type: m.type || "movie",
+        type: m.type === "series" ? "series" : "movie",
         rating_imdb: m.rating_imdb || null,
         comment: m.review || null,
         url: m.trailer_search || null
       })
     });
-    showToast(`✅ «${m.title}» додано до списку перегляду!`);
+    showToast(`«${m.title}» додано у список перегляду! 📌`);
     loadMoviesWatchlist();
   } catch (err) {
     showToast(`Помилка: ${err.message}`);
@@ -183,23 +185,32 @@ async function loadMoviesWatchlist() {
       return;
     }
     const statusIcon = { completed: "✅", to_watch: "👁️", in_progress: "⏳" };
-    list.innerHTML = items.map(m => `
-      <div class="item-card">
+    list.innerHTML = "";
+    items.forEach(m => {
+      const card = document.createElement("div");
+      card.className = "item-card";
+      card.innerHTML = `
         <div class="item-content">
           <span class="item-title ${m.status === "completed" ? "completed" : ""}">${escapeHtml(m.title)}</span>
           ${m.comment ? `<span class="item-subtitle">${escapeHtml(m.comment)}</span>` : ""}
           <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;">
             <span class="item-badge badge-media">${m.type === "series" ? "📺 Серіал" : "🎬 Фільм"}</span>
             <a href="https://www.netflix.com/search?q=${encodeURIComponent(m.title)}" target="_blank" rel="noopener noreferrer" class="movie-link-btn movie-link-netflix" style="padding:2px 8px;font-size:0.78rem;border-radius:6px;text-decoration:none;">🔴 Netflix</a>
-            <button onclick="quickSearchMovie('${escapeHtml(m.title).replace(/'/g, "\\'")}')" style="background:rgba(14,165,233,0.12);border:1px solid rgba(14,165,233,0.3);color:var(--primary);border-radius:6px;padding:2px 8px;font-size:0.78rem;font-weight:600;cursor:pointer;">🔍 Де дивитись / Торренти</button>
+            <button class="quick-search-btn" style="background:rgba(14,165,233,0.12);border:1px solid rgba(14,165,233,0.3);color:var(--primary);border-radius:6px;padding:2px 8px;font-size:0.78rem;font-weight:600;cursor:pointer;">🔍 Де дивитись</button>
           </div>
         </div>
         <div class="item-actions">
-          <span style="font-size:1.1rem;" title="${m.status}">${statusIcon[m.status] || "👁️"}</span>
-          <button class="custom-checkbox ${m.status === "completed" ? "checked" : ""}" onclick="toggleMedia(${m.id})" title="Позначити переглянутим">✓</button>
-          <button class="delete-btn" onclick="deleteMovieWatchlist(${m.id})" title="Видалити">🗑️</button>
+          <span style="font-size:1.1rem;" title="${escapeHtml(m.status || '')}">${statusIcon[m.status] || "👁️"}</span>
+          <button class="custom-checkbox ${m.status === "completed" ? "checked" : ""}" title="Позначити переглянутим">✓</button>
+          <button class="delete-btn" title="Видалити">🗑️</button>
         </div>
-      </div>`).join("");
+      `;
+
+      card.querySelector(".quick-search-btn")?.addEventListener("click", () => quickSearchMovie(m.title));
+      card.querySelector(".custom-checkbox")?.addEventListener("click", () => toggleMedia(m.id));
+      card.querySelector(".delete-btn")?.addEventListener("click", () => deleteMovieWatchlist(m.id));
+      list.appendChild(card);
+    });
   } catch {
     list.innerHTML = `<div class="empty-state"><p>Помилка завантаження</p></div>`;
   }

@@ -23,11 +23,13 @@ class MovieSearchRequest(BaseModel):
     title: str
 
 
+from typing import Optional, List, Literal
+
 class WatchlistAddRequest(BaseModel):
     title: str
     original_title: Optional[str] = None
     year: Optional[int] = None
-    type: str = "movie"
+    type: Literal["movie", "series"] = "movie"
     rating_imdb: Optional[float] = None
     comment: Optional[str] = None
     url: Optional[str] = None

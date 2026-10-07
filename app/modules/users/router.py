@@ -266,14 +266,14 @@ def create_invite_link(payload: dict, request: Request):
     if forwarded_host:
         base_url = f"{forwarded_proto}://{forwarded_host}"
 
-    secret_key = settings.SECRET_KEY.strip() if settings.SECRET_KEY else ""
-    invite_url = f"{base_url}/?user={clean_user}"
-    if secret_key:
-        invite_url += f"&key={secret_key}"
+    from app.services.media_token import generate_media_token
+    # Generate an isolated user token (never leak master SECRET_KEY)
+    user_token = generate_media_token(action="user_session", resource_id=clean_user, user=clean_user)
+    invite_url = f"{base_url}/?user={clean_user}&token={user_token}"
 
     return {
         "username": clean_user,
         "invite_url": invite_url,
-        "instructions": "Надішліть це посилання другу. Він відкриє його у Safari/Chrome і зможе додати на головний екран в 1 клік."
+        "instructions": "Надішліть це персональне посилання другу. Він відкриє його у Safari/Chrome і матиме доступ виключно до свого ізольованого кабінету."
     }
 
