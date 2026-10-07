@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime as dt_datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ModuleCatalogItem(BaseModel):
@@ -30,9 +30,7 @@ class UserSettingsResponse(UserSettingsBase):
     id: int
     user_id: int
     updated_at: dt_datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserBase(BaseModel):
@@ -58,6 +56,4 @@ class UserResponse(UserBase):
     id: int
     created_at: dt_datetime
     settings: Optional[UserSettingsResponse] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

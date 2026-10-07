@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime as dt_datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class PlantBase(BaseModel):
@@ -38,5 +38,4 @@ class PlantResponse(PlantBase):
     needs_watering_now: bool = False
     days_until_next_watering: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

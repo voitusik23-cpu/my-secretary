@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime as dt_datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class IngredientItem(BaseModel):
@@ -38,8 +38,7 @@ class RecipeResponse(RecipeBase):
     user_id: str
     created_at: dt_datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AddToShoppingRequest(BaseModel):

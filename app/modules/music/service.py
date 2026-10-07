@@ -64,6 +64,7 @@ def _extract_audio_stream_sync(artist: str, title: str) -> Optional[str]:
         "noplaylist": True,
         "quiet": True,
         "skip_download": True,
+        "match_filter": yt_dlp.utils.match_filter_func("duration <= 600"),
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -100,6 +101,8 @@ def _download_and_cache_track_sync(track_id: int, artist: str, title: str, expec
         "outtmpl": temp_template,
         "noplaylist": True,
         "quiet": True,
+        "match_filter": yt_dlp.utils.match_filter_func("duration <= 600"),
+        "max_filesize": 25 * 1024 * 1024,
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

@@ -1,7 +1,7 @@
 import os
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, BackgroundTasks
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 
@@ -133,16 +133,40 @@ async def stream_track(
                 headers={"Cache-Control": "private, max-age=3600"}
             )
 
-        return RedirectResponse(
-            audio_res,
-            status_code=307,
-            headers={"Cache-Control": "private, max-age=300"}
+        # Stream remote URL through server proxy to bypass YouTube 403 Forbidden IP-binding
+        import httpx
+
+        client_range = request.headers.get("range")
+        req_headers = {"User-Agent": "Mozilla/5.0"}
+        if client_range:
+            req_headers["Range"] = client_range
+
+        async def stream_remote_audio():
+            try:
+                async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
+                    async with client.stream("GET", audio_res, headers=req_headers) as resp:
+                        async for chunk in resp.aiter_bytes(chunk_size=65536):
+                            yield chunk
+            except Exception as e:
+                import logging
+                logging.getLogger("my_secretary.music").warning(f"Remote stream error for track {track_id}: {e}")
+
+        resp_headers = {
+            "Cache-Control": "private, max-age=300",
+            "Accept-Ranges": "bytes",
+        }
+        status_code = 206 if client_range else 200
+        return StreamingResponse(
+            stream_remote_audio(),
+            status_code=status_code,
+            media_type="audio/mp4",
+            headers=resp_headers
         )
 
 
 @router.post("/tracks")
-def add_track(payload: TrackCreate, request: Request, db: Session = Depends(get_db), _: bool = Depends(verify_secret_key)):
-    """Додає трек у медіатеку."""
+def add_track(payload: TrackCreate, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db), _: bool = Depends(verify_secret_key)):
+    """Додає трек у медіатеку та запускає фонове кешування аудіофайлу."""
     user = _get_current_user_from_req(request)
     track = MusicTrack(
         title=payload.title,
@@ -158,6 +182,10 @@ def add_track(payload: TrackCreate, request: Request, db: Session = Depends(get_
     db.add(track)
     db.commit()
     db.refresh(track)
+
+    from app.modules.music.service import _download_and_cache_track_sync
+    background_tasks.add_task(_download_and_cache_track_sync, track.id, track.artist, track.title, track.duration, user)
+
     return {
         "id": track.id,
         "title": track.title,

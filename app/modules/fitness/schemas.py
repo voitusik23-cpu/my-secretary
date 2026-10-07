@@ -1,6 +1,6 @@
 from datetime import date as dt_date, datetime as dt_datetime
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class FitnessSyncRequest(BaseModel):
@@ -27,8 +27,7 @@ class FitnessLogResponse(BaseModel):
     workout_details: Optional[Dict[str, Any]] = None
     created_at: dt_datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WeeklyStats(BaseModel):

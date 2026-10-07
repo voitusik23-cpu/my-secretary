@@ -38,7 +38,7 @@ const state = {
 
 
 // --- Service Worker Registration with Safe Auto-Update & Hard-Cache Flush ---
-const APP_VERSION = "3.7.26";
+const APP_VERSION = "3.7.27";
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // If version changed, purge old caches to prevent stale script/audio issues on iPhone
@@ -235,6 +235,12 @@ function initVoice() {
   const timerEl = document.getElementById("recording-timer");
 
   micBtn.addEventListener("click", async () => {
+    // Warm up audio element for iOS Safari autoplay permissions
+    const musicAudio = document.getElementById("global-music-audio");
+    if (musicAudio && !state.isRecording) {
+      try { musicAudio.load(); } catch (e) {}
+    }
+
     if (state.isRecording) {
       stopRecording();
     } else {
@@ -353,9 +359,16 @@ function initVoice() {
         }
         if (data.created?.music?.length > 0) {
           window.switchToTab("music");
-          loadMusicTab();
-          if (data.created.music[0]?.id) {
-            setTimeout(() => playTrackById(data.created.music[0].id), 500);
+          const createdTrack = data.created.music[0];
+          if (typeof loadMusicTab === "function") {
+            loadMusicTab().then(() => {
+              if (createdTrack?.id && typeof playTrackById === "function") {
+                playTrackById(createdTrack.id);
+              }
+            });
+          }
+          if (createdTrack && typeof window.playTrack === "function") {
+            window.playTrack(createdTrack, [createdTrack, ...(window.musicState?.tracks || [])]);
           }
         } else if (data.created?.movies?.length > 0) {
           window.switchToTab("movies");

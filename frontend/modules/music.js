@@ -627,7 +627,12 @@ async function searchMusicOnline(query) {
       body: JSON.stringify({ query: query.trim(), limit: 6 })
     });
 
-    const results = data?.results || [];
+    if (!data) {
+      resList.innerHTML = `<div style="text-align:center;padding:12px;color:var(--danger);font-size:0.85rem;">⚠️ Помилка авторизації: перевірте секретний ключ у Налаштуваннях ⚙️</div>`;
+      return;
+    }
+
+    const results = data.results || [];
     if (results.length === 0) {
       resList.innerHTML = `<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:0.85rem;">Нічого не знайдено за запитом «${escapeHtml(query)}»</div>`;
       return;
@@ -637,20 +642,35 @@ async function searchMusicOnline(query) {
     results.forEach(item => {
       const cover = (item.cover_url && item.cover_url.startsWith("http")) ? item.cover_url : "/static/icons/icon.svg";
       const row = document.createElement("div");
-      row.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:8px;background:var(--bg-input);border-radius:10px;margin-bottom:6px;";
+      row.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg-input);border-radius:10px;margin-bottom:6px;cursor:pointer;";
       row.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;">
-          <img src="${escapeHtml(cover)}" style="width:42px;height:42px;border-radius:8px;object-fit:cover;" />
+          <img src="${escapeHtml(cover)}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;" />
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
             <div style="font-weight:700;font-size:0.88rem;color:var(--text-main);">${escapeHtml(item.title)}</div>
             <div style="font-size:0.76rem;color:var(--text-muted);">${escapeHtml(item.artist)}</div>
           </div>
         </div>
-        <button class="action-btn-sm add-searched-btn" style="margin-left:8px;white-space:nowrap;">
-          + Додати
-        </button>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:8px;flex-shrink:0;">
+          <button class="action-btn-sm play-searched-btn" type="button" style="background:var(--primary);color:#fff;font-weight:700;padding:5px 10px;">
+            ▶ Грати
+          </button>
+          <button class="action-btn-sm add-searched-btn" type="button" style="padding:5px 8px;font-size:0.8rem;" title="Додати у плейліст">
+            +
+          </button>
+        </div>
       `;
-      row.querySelector(".add-searched-btn")?.addEventListener("click", () => addSearchedTrack(item));
+      row.querySelector(".play-searched-btn")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        addSearchedTrack(item, true);
+      });
+      row.querySelector(".add-searched-btn")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        addSearchedTrack(item, false);
+      });
+      row.addEventListener("click", () => {
+        addSearchedTrack(item, true);
+      });
       resList.appendChild(row);
     });
   } catch (err) {
@@ -659,8 +679,18 @@ async function searchMusicOnline(query) {
 }
 
 
-async function addSearchedTrack(item) {
+async function addSearchedTrack(item, autoPlay = true) {
+  // Warm up audio element for iOS Safari immediately during user click
+  const audio = musicState.audio || document.getElementById("global-music-audio");
+  if (audio && autoPlay) {
+    try { audio.load(); } catch (e) {}
+  }
+
   try {
+    if (autoPlay) {
+      showToast(`⚡ Додаю та запускаю: «${item.title}»...`);
+    }
+
     const payload = {
       title: item.title,
       artist: item.artist,
@@ -676,14 +706,29 @@ async function addSearchedTrack(item) {
       body: JSON.stringify(payload)
     });
 
+    if (!saved || !saved.id) {
+      showToast("❌ Не вдалося зберегти трек");
+      return;
+    }
+
     showToast(`✅ Додано трек: «${item.title}»`);
     document.getElementById("music-search-results")?.classList.add("hidden");
     const input = document.getElementById("music-search-input");
     if (input) input.value = "";
 
     await loadMusicTab();
-    if (saved && saved.id) {
-      playTrackById(saved.id);
+
+    if (autoPlay) {
+      const fullTrack = {
+        id: saved.id,
+        title: saved.title || item.title,
+        artist: saved.artist || item.artist,
+        album: item.album || "",
+        duration: item.duration || 0,
+        cover_url: saved.cover_url || item.cover_url,
+        playlist: payload.playlist,
+      };
+      playTrack(fullTrack, [fullTrack, ...(musicState.tracks || [])]);
     }
   } catch (err) {
     showToast(`Помилка додавання: ${err.message}`);
@@ -949,9 +994,20 @@ function initMusicPlayer() {
     });
   });
 
-  // Instant local filtering + online search on Enter
+  // Instant local filtering + online search on Enter / Form submit
   const searchInput = document.getElementById("music-search-input");
   const searchBtn = document.getElementById("music-search-btn");
+  const searchForm = document.getElementById("music-search-form");
+
+  const runSearch = () => {
+    const val = searchInput?.value?.trim();
+    if (!val) return;
+    if (val.includes("shazam.com") || val.toLowerCase().includes("shazam")) {
+      importFromShazamModal(val);
+    } else {
+      searchMusicOnline(val);
+    }
+  };
 
   searchInput?.addEventListener("input", (e) => {
     const val = (e.target.value || "").toLowerCase().trim();
@@ -964,19 +1020,33 @@ function initMusicPlayer() {
       (t.artist && t.artist.toLowerCase().includes(val))
     );
     renderMusicTracks(filtered);
+
+    // If no local tracks found, show a direct button to search online immediately!
+    if (filtered.length === 0) {
+      const container = document.getElementById("music-tracks-list");
+      if (container) {
+        container.innerHTML = `
+          <div style="text-align:center;padding:22px 14px;background:var(--bg-card);border:1.5px dashed var(--border-color);border-radius:12px;margin-top:8px;">
+            <div style="font-size:1.6rem;margin-bottom:6px;">🔍</div>
+            <div style="font-weight:700;color:var(--text-main);font-size:0.95rem;margin-bottom:4px;">Немає в збережених</div>
+            <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;">Шукайте «${escapeHtml(e.target.value)}» в Apple Music та YouTube</div>
+            <button type="button" class="action-btn-sm" style="background:var(--primary);color:#fff;font-weight:700;padding:7px 16px;border-radius:20px;box-shadow:0 2px 8px rgba(37,99,235,0.35);" onclick="window.searchMusicOnline(document.getElementById('music-search-input').value)">
+              ⚡ Шукати в інтернеті
+            </button>
+          </div>
+        `;
+      }
+    }
   });
 
-  const runSearch = () => {
-    const val = searchInput?.value?.trim();
-    if (!val) return;
-    if (val.includes("shazam.com") || val.toLowerCase().includes("shazam")) {
-      importFromShazamModal(val);
-    } else {
-      searchMusicOnline(val);
-    }
-  };
-
-  searchBtn?.addEventListener("click", runSearch);
+  searchBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    runSearch();
+  });
+  searchForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    runSearch();
+  });
   searchInput?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -1236,11 +1306,13 @@ function importFromShazamModal(initialText) {
   shazamInput?.focus();
 }
 
+window.playTrack = playTrack;
 window.playTrackById = playTrackById;
 window.toggleFavTrack = toggleFavTrack;
 window.assignTrackToCar = assignTrackToCar;
 window.deleteTrackItem = deleteTrackItem;
 window.addSearchedTrack = addSearchedTrack;
+window.searchMusicOnline = searchMusicOnline;
 window.quickPasteShazamTrack = quickPasteShazamTrack;
 window.loadMusicTab = loadMusicTab;
 window.initMusicPlayer = initMusicPlayer;
