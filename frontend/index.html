@@ -29,7 +29,7 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.7.28">
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.29">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -39,7 +39,7 @@
   </div>
 
   <div class="app-container">
-    <!-- Top Header -->
+    <!-- Top Header (Clean & Minimal) -->
     <header class="app-header">
       <div class="header-brand">
         <div class="brand-icon">
@@ -50,40 +50,9 @@
           </svg>
         </div>
         <div class="brand-text">
-          <h1>Мой Секретарь</h1>
+          <h1>Секретарь</h1>
           <span id="connection-status" class="status-indicator">● В сети</span>
         </div>
-      </div>
-      <div class="header-actions">
-        <button id="blocks-toggle-btn" class="icon-btn" title="Конструктор блоків" aria-label="Конструктор блоків">
-          <span style="font-size: 1.15rem; line-height: 1;">🧩</span>
-        </button>
-        <button id="theme-toggle-btn" class="icon-btn" title="Переключить тему" aria-label="Сменить тему">
-
-          <svg class="sun-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
-          <svg class="moon-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
-        </button>
-        <button id="help-open-btn" class="icon-btn" title="Довідка, FAQ та Відгук" aria-label="Довідка">
-          <span style="font-size: 1.15rem; line-height: 1;">💡</span>
-        </button>
-        <button id="settings-open-btn" class="icon-btn" title="Настройки" aria-label="Настройки">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
       </div>
     </header>
 
@@ -1364,6 +1333,54 @@
       </section>
     </main>
 
+    <!-- Bottom Quick Action Dock -->
+    <nav class="app-bottom-dock" aria-label="Быстрые действия">
+      <button type="button" id="dock-feed-btn" class="dock-btn active" title="Главная" onclick="window.switchToTab('feed');">
+        <span class="dock-icon">⚡</span>
+        <span class="dock-label">Главная</span>
+      </button>
+      <button type="button" id="dock-account-btn" class="dock-btn" title="Акаунт">
+        <span class="dock-icon">👤</span>
+        <span class="dock-label" id="dock-account-label">Акаунт</span>
+      </button>
+      <button type="button" id="blocks-toggle-btn" class="dock-btn" title="Конструктор блоків">
+        <span class="dock-icon">🧩</span>
+        <span class="dock-label">Блоки</span>
+      </button>
+      <button type="button" id="theme-toggle-btn" class="dock-btn" title="Переключить тему">
+        <span class="dock-icon">
+          <svg class="sun-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </span>
+        <span class="dock-label">Тема</span>
+      </button>
+      <button type="button" id="help-open-btn" class="dock-btn" title="Довідка">
+        <span class="dock-icon">💡</span>
+        <span class="dock-label">Довідка</span>
+      </button>
+      <button type="button" id="settings-open-btn" class="dock-btn" title="Настройки">
+        <span class="dock-icon">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </span>
+        <span class="dock-label">Опции</span>
+      </button>
+    </nav>
+
     <!-- Family Delegation Modal -->
     <div id="delegation-modal" class="modal-overlay hidden">
       <div class="modal-card">
@@ -2280,15 +2297,15 @@ binance mylogin@crypto.com 2fa увімкнено
     </div>
   </div>
 
-  <script src="/static/modules/ai_chat.js?v=3.7.28"></script>
-  <script src="/static/modules/auth_phone.js?v=3.7.28"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.7.28"></script>
-  <script src="/static/modules/business.js?v=3.7.28"></script>
-  <script src="/static/modules/mailbox.js?v=3.7.28"></script>
-  <script src="/static/modules/movies.js?v=3.7.28"></script>
-  <script src="/static/modules/music.js?v=3.7.28"></script>
-  <script src="/static/modules/vault.js?v=3.7.28"></script>
-  <script src="/static/app.js?v=3.7.28"></script>
+  <script src="/static/modules/ai_chat.js?v=3.7.29"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.29"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.29"></script>
+  <script src="/static/modules/business.js?v=3.7.29"></script>
+  <script src="/static/modules/mailbox.js?v=3.7.29"></script>
+  <script src="/static/modules/movies.js?v=3.7.29"></script>
+  <script src="/static/modules/music.js?v=3.7.29"></script>
+  <script src="/static/modules/vault.js?v=3.7.29"></script>
+  <script src="/static/app.js?v=3.7.29"></script>
 </body>
 </html>
 

@@ -495,22 +495,23 @@ function initTabs() {
     });
   });
 
-  // Account nav tab listener -> opens settings & account modal
-  const accountBtn = document.getElementById("tab-btn-account");
-  if (accountBtn) {
-    accountBtn.addEventListener("click", () => {
-      document.getElementById("settings-open-btn")?.click();
-    });
-  }
+  // Account button listeners -> opens settings & account modal
+  const handleAccountClick = () => {
+    document.getElementById("settings-open-btn")?.click();
+  };
+  document.getElementById("tab-btn-account")?.addEventListener("click", handleAccountClick);
+  document.getElementById("dock-account-btn")?.addEventListener("click", handleAccountClick);
 
   // Update account label with current user phone if saved
   function refreshAccountBadge() {
     const userPhone = localStorage.getItem("secretary_user_phone") || localStorage.getItem("secretary_phone");
-    const accLabel = document.getElementById("nav-account-label");
-    if (accLabel && userPhone) {
+    if (userPhone) {
       const cleanPhone = userPhone.replace(/\D/g, "");
       const shortPhone = cleanPhone.length > 4 ? `+..${cleanPhone.slice(-4)}` : userPhone;
-      accLabel.textContent = shortPhone;
+      const accLabel = document.getElementById("nav-account-label");
+      const dockLabel = document.getElementById("dock-account-label");
+      if (accLabel) accLabel.textContent = shortPhone;
+      if (dockLabel) dockLabel.textContent = shortPhone;
     }
   }
   refreshAccountBadge();
