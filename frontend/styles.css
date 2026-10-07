@@ -526,7 +526,7 @@ body {
 
 .send-btn {
   background: var(--primary);
-  color: #fff;
+  color: #000000 !important;
   border: none;
   width: 36px;
   height: 36px;
@@ -536,6 +536,10 @@ body {
   justify-content: center;
   cursor: pointer;
   transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.send-btn svg {
+  stroke: #000000 !important;
 }
 
 .send-btn:hover {
@@ -1069,15 +1073,16 @@ body {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: #ffffff;
+  background: linear-gradient(135deg, #a3e635, #84cc16) !important;
+  color: #000000 !important;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.82rem;
+  font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 2px 8px rgba(132, 204, 22, 0.45);
   transition: transform 0.15s ease;
 }
 
@@ -1140,12 +1145,12 @@ body {
 
 .action-btn-sm {
   background: var(--primary);
-  color: #ffffff;
+  color: #000000 !important;
   border: none;
   padding: 6px 12px;
   border-radius: var(--radius-sm);
   font-size: 0.82rem;
-  font-weight: 600;
+  font-weight: 800;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
@@ -1681,11 +1686,11 @@ body {
 
 .btn-primary {
   background: var(--primary);
-  color: #fff;
+  color: #000000 !important;
   border: none;
   padding: 10px 18px;
   border-radius: var(--radius-sm);
-  font-weight: 600;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -2368,7 +2373,8 @@ body {
 .music-pl-pill:hover,
 .music-pl-pill.active {
   background: var(--primary);
-  color: #ffffff;
+  color: #000000 !important;
+  font-weight: 800;
   border-color: var(--primary);
   box-shadow: 0 2px 10px var(--primary-glow);
 }
@@ -2641,7 +2647,7 @@ body {
 
 .mini-play-btn {
   background: var(--primary);
-  color: #ffffff;
+  color: #000000 !important;
   box-shadow: 0 2px 8px var(--primary-glow);
 }
 
@@ -4667,6 +4673,28 @@ body {
 
 [data-theme="light"] .tasks-filter-pill.active {
   background: linear-gradient(135deg, #65a30d, #84cc16) !important;
-  color: #ffffff !important;
+  color: #000000 !important;
+  font-weight: 800 !important;
   border-color: #65a30d !important;
+}
+
+/* ===================================================
+   DARK THEME: LIME BUTTONS BLACK TEXT CONTRAST
+   =================================================== */
+[data-theme="dark"] .btn-primary,
+[data-theme="dark"] .action-btn-sm,
+[data-theme="dark"] .send-btn,
+[data-theme="dark"] .bento-btn-play,
+[data-theme="dark"] .mini-play-btn,
+[data-theme="dark"] .music-pl-pill.active,
+[data-theme="dark"] .custom-checkbox.checked,
+[data-theme="dark"] .tasks-filter-pill.active {
+  color: #000000 !important;
+  font-weight: 800 !important;
+}
+
+[data-theme="dark"] .send-btn svg,
+[data-theme="dark"] .btn-primary svg,
+[data-theme="dark"] .action-btn-sm svg {
+  stroke: #000000 !important;
 }
