@@ -267,8 +267,8 @@ def create_invite_link(payload: dict, request: Request):
         base_url = f"{forwarded_proto}://{forwarded_host}"
 
     from app.services.media_token import generate_media_token
-    # Generate an isolated user token (never leak master SECRET_KEY)
-    user_token = generate_media_token(action="user_session", resource_id=clean_user, user=clean_user)
+    # Generate an isolated user token with 1 year validity (never leak master SECRET_KEY)
+    user_token = generate_media_token(action="user_session", resource_id=clean_user, user=clean_user, ttl_seconds=31536000)
     invite_url = f"{base_url}/?user={clean_user}&token={user_token}"
 
     return {

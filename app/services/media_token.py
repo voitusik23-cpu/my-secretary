@@ -14,7 +14,7 @@ from app.config import settings
 TOKEN_TTL_SECONDS = 300  # 5 minutes validity
 
 
-def generate_media_token(action: str, resource_id: str, user: str = "admin") -> str:
+def generate_media_token(action: str, resource_id: str, user: str = "admin", ttl_seconds: int = TOKEN_TTL_SECONDS) -> str:
     """
     Generates an HMAC-SHA256 signed token:
     payload = f"{action}:{resource_id}:{user}:{exp_timestamp}"
@@ -22,7 +22,7 @@ def generate_media_token(action: str, resource_id: str, user: str = "admin") -> 
     token = base64url(payload + "." + signature)
     """
     secret = settings.SECRET_KEY.strip().encode("utf-8")
-    exp = int(time.time()) + TOKEN_TTL_SECONDS
+    exp = int(time.time()) + ttl_seconds
     payload = f"{action}:{resource_id}:{user}:{exp}"
     sig = hmac.new(secret, payload.encode("utf-8"), hashlib.sha256).hexdigest()
     raw = f"{payload}.{sig}"
