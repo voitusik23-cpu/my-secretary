@@ -232,3 +232,22 @@ def delete_track(track_id: int, request: Request, db: Session = Depends(get_db),
     delete_track_cache(track_id, user=user)
     clean_orphan_cache(db, user=user)
     return None
+
+
+@router.get("/playlists")
+def get_playlists(db: Session = Depends(get_db), _: bool = Depends(verify_secret_key)):
+    """Повертає список доступних плейлістів із кількістю треків."""
+    all_tracks = db.query(MusicTrack).all()
+    total_count = len(all_tracks)
+    fav_count = sum(1 for t in all_tracks if t.is_favorite)
+    shazam_count = sum(1 for t in all_tracks if t.playlist == "Shazam" or t.source == "shazam")
+    car_count = sum(1 for t in all_tracks if t.playlist == "В авто 🚗")
+    relax_count = sum(1 for t in all_tracks if t.playlist == "Релакс 🌙")
+
+    return [
+        {"name": "Всі треки", "tracks_count": total_count, "icon": "🎵"},
+        {"name": "Shazam", "tracks_count": shazam_count, "icon": "⚡"},
+        {"name": "Улюблені", "tracks_count": fav_count, "icon": "❤️"},
+        {"name": "В авто 🚗", "tracks_count": car_count, "icon": "🚗"},
+        {"name": "Релакс 🌙", "tracks_count": relax_count, "icon": "🌙"},
+    ]
