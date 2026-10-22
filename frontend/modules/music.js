@@ -112,7 +112,7 @@ function resetPlayerUI() {
   }
 }
 
-function playTrack(track, queue = null) {
+async function playTrack(track, queue = null) {
   if (!track) return;
   const strId = String(track.id);
 

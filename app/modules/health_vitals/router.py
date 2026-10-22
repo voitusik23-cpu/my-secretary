@@ -24,12 +24,15 @@ from app.modules.health_vitals.service import (
 router = APIRouter(
     prefix="/vitals/bp",
     tags=["Blood Pressure & Vitals"],
-    dependencies=[Depends(verify_secret_key)],
 )
 
 
 @router.post("", response_model=BloodPressureItemResponse, status_code=status.HTTP_201_CREATED)
-def record_blood_pressure(payload: BloodPressureCreateRequest, db: Session = Depends(get_db)):
+def record_blood_pressure(
+    payload: BloodPressureCreateRequest,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_secret_key),
+):
     """Фіксує новий вимір артеріального тиску та пульсу."""
     log = create_bp_log(db=db, data=payload)
     tod_label = {"morning": "ранок", "evening": "вечір", "afternoon": "день", "night": "ніч"}.get(log.time_of_day, log.time_of_day)
@@ -44,6 +47,7 @@ def list_blood_pressure(
     start_date: Optional[dt_date] = Query(None, description="Початкова дата YYYY-MM-DD"),
     end_date: Optional[dt_date] = Query(None, description="Кінцева дата YYYY-MM-DD"),
     db: Session = Depends(get_db),
+    _: bool = Depends(verify_secret_key),
 ):
     """Повертає історію вимірювань за вказаний проміжок часу."""
     logs = get_bp_logs(db=db, days=days, start_date=start_date, end_date=end_date)
@@ -52,10 +56,10 @@ def list_blood_pressure(
 
 @router.get("/export-token")
 def get_bp_export_token(request: Request, _: bool = Depends(verify_secret_key)):
-    """Генерує короткоживучий HMAC токен (5 хв) для безпечного завантаження CSV без ключа в URL."""
+    """Генерує HMAC токен для завантаження CSV без передачі майстер-ключа в URL."""
     from app.services.media_token import generate_media_token
     user = request.headers.get("x-secretary-user") or "admin"
-    token = generate_media_token(action="export_bp", resource_id="csv", user=user)
+    token = generate_media_token(action="export_bp", resource_id="csv", user=user, ttl_seconds=86400)
     return {"token": token}
 
 
@@ -67,15 +71,27 @@ async def export_blood_pressure_csv(
     end_date: Optional[dt_date] = Query(None),
     token: Optional[str] = Query(None),
 ):
-    """Експортує вимірювання тиску у форматі CSV. Авторизація через заголовок або токен."""
-    user = "admin"
+    """Експортує вимірювання тиску у форматі CSV. Авторизація через токен, заголовок або ключ."""
+    import hmac
+    from app.config import settings
+
+    user = None
     if token:
-        from app.services.media_token import verify_media_token
-        token_data = verify_media_token(token, expected_action="export_bp", expected_resource_id="csv")
-        user = token_data.get("user", "admin")
-    else:
-        await verify_secret_key(request)
-        user = request.headers.get("x-secretary-user") or "admin"
+        try:
+            from app.services.media_token import verify_media_token
+            token_data = verify_media_token(token, expected_action="export_bp", expected_resource_id="csv")
+            user = token_data.get("user", "admin")
+        except HTTPException:
+            user = None
+
+    if not user:
+        key_param = request.query_params.get("key")
+        configured_key = settings.SECRET_KEY.strip() if settings.SECRET_KEY else ""
+        if key_param and configured_key and hmac.compare_digest(key_param.strip(), configured_key):
+            user = request.query_params.get("user") or "admin"
+        else:
+            await verify_secret_key(request)
+            user = request.headers.get("x-secretary-user") or "admin"
 
     from app.database import get_user_sessionmaker
     sm = get_user_sessionmaker(user)
@@ -96,6 +112,7 @@ def get_blood_pressure_analytics(
     start_date: Optional[dt_date] = Query(None),
     end_date: Optional[dt_date] = Query(None),
     db: Session = Depends(get_db),
+    _: bool = Depends(verify_secret_key),
 ):
     """Розраховує аналітику: середні значення, ранок/вечір та кореляцію зі способом життя."""
     logs = get_bp_logs(db=db, days=days, start_date=start_date, end_date=end_date)
@@ -103,7 +120,11 @@ def get_blood_pressure_analytics(
 
 
 @router.delete("/{log_id}", status_code=status.HTTP_200_OK)
-def delete_blood_pressure(log_id: str, db: Session = Depends(get_db)):
+def delete_blood_pressure(
+    log_id: str,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_secret_key),
+):
     """Видаляє один запис тиску за його ID."""
     log = db.query(BloodPressureLog).filter(BloodPressureLog.id == log_id).first()
     if not log:

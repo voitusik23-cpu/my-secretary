@@ -103,6 +103,15 @@ def delete_transaction(tx_id: int, db: Session = Depends(get_db)):
     return {"status": "ok", "deleted_id": tx_id}
 
 
+@business_router.get("/balance")
+def get_balance_alias(db: Session = Depends(get_db)):
+    """Отримати поточний баланс каси для дашборду."""
+    transactions = db.query(BusinessTransaction).all()
+    total_income = sum(t.amount for t in transactions if t.type == "income")
+    total_expense = sum(t.amount for t in transactions if t.type == "expense")
+    return {"balance": total_income - total_expense, "currency": "₴"}
+
+
 @business_router.get("/summary", response_model=BusinessSummaryResponse)
 def get_summary(db: Session = Depends(get_db)):
     """Порахувати баланс та згенерувати текстовий звіт."""

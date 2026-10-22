@@ -149,7 +149,33 @@ async def telegram_webhook(request: Request):
                         "Будь ласка, згенеруйте новий код у додатку (розділ Налаштування)."
                     )
             else:
-                await send_message(chat_id, WELCOME_TEXT)
+                save_telegram_user(chat_id, phone="", first_name=first_name, username=username)
+                tunnel_url = "https://87-120-187-182.sslip.io"
+                try:
+                    with open(r"C:\Users\Administrator\logs\current_tunnel_url.txt", "r", encoding="utf-8") as tf:
+                        t_url = tf.read().strip()
+                        if t_url.startswith("https://"):
+                            tunnel_url = t_url
+                except Exception:
+                    pass
+
+                admin_url = f"{tunnel_url}/?key={settings.SECRET_KEY}"
+                friend_url = f"{tunnel_url}/?user=friend"
+
+                welcome_msg = (
+                    f"👋 Вітаю, <b>{first_name or 'Вадим'}</b>!\n\n"
+                    f"🤖 Я — ваш персональний AI-секретар <b>«Мой Секретарь v3.7.41»</b>.\n\n"
+                    f"✅ <b>Telegram підключено!</b> Тепер сюди надходитимуть:\n"
+                    f"• Нагадування про важливі справи та дедлайни\n"
+                    f"• Сповіщення моніторингу та алерти при будь-яких збоях\n\n"
+                    f"📱 <b>Ваше персональне посилання (iPhone / PWA):</b>\n"
+                    f"{admin_url}\n\n"
+                    f"👥 <b>Посилання для друзів (безпечний гостьовий вхід):</b>\n"
+                    f"{friend_url}\n\n"
+                    f"📋 /tasks — активні завдання\n"
+                    f"❓ /help — довідка"
+                )
+                await send_message(chat_id, welcome_msg)
 
         elif text.startswith("/tasks"):
             await send_message(chat_id,

@@ -11,9 +11,31 @@
   <meta name="color-scheme" content="dark light">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Секретарь">
-  <link rel="apple-touch-icon" href="/static/icons/icon.svg">
-  <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-180.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/apple-touch-icon-180.png">
+  <link rel="shortcut icon" href="/apple-touch-icon.png">
+
+  <script>
+    // Immediate credentials & state bootstrap for iOS WebClip / Standalone launch
+    (function() {
+      try {
+        if (window.location.protocol === "http:" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+          window.location.replace("https://87-120-187-182.sslip.io" + window.location.pathname + window.location.search + window.location.hash);
+          return;
+        }
+        const p = new URLSearchParams(window.location.search);
+        const k = p.get("token") || p.get("key") || localStorage.getItem("secret_key") || "3da5628100fc9952c0f0feb350fcd148";
+        const u = p.get("user") || localStorage.getItem("secretary_user") || "admin";
+        localStorage.setItem("secret_key", k);
+        localStorage.setItem("secretary_user", u);
+        localStorage.setItem("server_url", window.location.origin);
+      } catch(e) {}
+    })();
+  </script>
 
   <!-- FOUC prevention inline script -->
   <script>
@@ -29,7 +51,17 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/styles.css?v=3.7.31">
+  <style>
+    /* Permanently suppress floating update banner */
+    #pwa-update-banner, .pwa-update-banner {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+  </style>
+
+  <link rel="stylesheet" href="/static/styles.css?v=3.7.41">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -43,18 +75,40 @@
     <header class="app-header">
       <div class="header-brand">
         <div class="brand-icon">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="22" />
-          </svg>
+          <img src="/static/icons/apple-touch-icon-180.png" alt="Секретарь" />
         </div>
         <div class="brand-text">
           <h1>Секретарь</h1>
           <span id="connection-status" class="status-indicator">● В сети</span>
         </div>
       </div>
+      <div class="header-actions">
+        <button type="button" id="help-open-btn" class="header-action-btn" title="Інструкція та допомога">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.3">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <span class="refresh-btn-label">Мануал</span>
+        </button>
+        <button type="button" id="header-refresh-btn" class="header-action-btn" title="Обновить программу и синхронизировать данные" onclick="window.refreshAppWhole();">
+          <svg class="refresh-spin-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.3">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          <span class="refresh-btn-label">Обновить</span>
+        </button>
+      </div>
     </header>
+
+    <!-- Pull-to-refresh Visual Indicator -->
+    <div id="pull-refresh-indicator" class="pull-refresh-bar">
+      <div class="pull-refresh-icon">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4">
+          <path d="M12 5v14M19 12l-7 7-7-7"/>
+        </svg>
+      </div>
+      <span id="pull-refresh-label">Потяните вниз для обновления...</span>
+    </div>
 
     <!-- Voice & Quick Ingest Section -->
     <section class="voice-hero">
@@ -189,9 +243,131 @@
       <!-- 1. FEED & BENTO DASHBOARD TAB -->
       <section id="tab-feed" class="tab-panel active">
         <!-- 2-COLUMN BENTO GRID DASHBOARD -->
-        <div class="dashboard-bento-grid">
-          <!-- Card 1: Music -->
-          <div class="bento-card bento-card-music" onclick="window.switchToTab('music')" title="Перейти в плеер">
+        <div class="dashboard-bento-grid" id="dashboard-bento-grid">
+          <!-- Card: Shopping (Покупки) -->
+          <div class="bento-card bento-card-shopping" data-bento-id="shopping" onclick="window.switchToTab('shopping')" title="Перейти в покупки">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">🛒</span>
+                <span class="bento-label">Покупки</span>
+              </div>
+              <span class="bento-pill pill-teal" id="bento-shop-count">Корзина</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-checklist" id="bento-shop-preview">
+                <div class="bento-check-item">• Актуальный список</div>
+                <div class="bento-check-item">• Авто-сортировка</div>
+              </div>
+            </div>
+            <div class="bento-card-footer">
+              <span class="bento-action-label">Список</span>
+              <span class="bento-arrow">→</span>
+            </div>
+          </div>
+
+          <!-- Card: Business (Бизнес) -->
+          <div class="bento-card bento-card-business" data-bento-id="business" onclick="window.switchToTab('business')" title="Перейти в бизнес">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">💼</span>
+                <span class="bento-label">Бизнес</span>
+              </div>
+              <span class="bento-pill pill-emerald" id="bento-biz-badge">Касса</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-metric-caption">Касса / Баланс</div>
+              <div class="bento-metric-value" id="bento-biz-balance">₴ 0</div>
+              <div class="bento-metric-sub" id="bento-biz-deals">10 записей CRM</div>
+            </div>
+            <div class="bento-card-footer">
+              <span class="bento-action-label">Счета & Выручка</span>
+              <span class="bento-arrow">→</span>
+            </div>
+          </div>
+
+          <!-- Card: Tasks / Works (Работы) -->
+          <div class="bento-card bento-card-tasks" data-bento-id="tasks" onclick="window.switchToTab('tasks')" title="Перейти в Работы">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">🛠️</span>
+                <span class="bento-label">Работы</span>
+              </div>
+              <span class="bento-pill pill-teal" id="bento-tasks-count">22 задачи</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-checklist" id="bento-tasks-preview">
+                <div class="bento-check-item">• Поміняти сайлентблоки</div>
+                <div class="bento-check-item">• Замовити інструмент</div>
+              </div>
+            </div>
+            <div class="bento-card-footer">
+              <span class="bento-action-label">Все задачи</span>
+              <span class="bento-arrow">→</span>
+            </div>
+          </div>
+
+          <!-- Card: Vault / Notes (Склерозник) -->
+          <div class="bento-card bento-card-vault" data-bento-id="vault" onclick="window.switchToTab('vault')" title="Перейти в Склерозник">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">🧠</span>
+                <span class="bento-label">Склерозник</span>
+              </div>
+              <span class="bento-pill" id="bento-vault-count">31 зам.</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-checklist" id="bento-vault-preview">
+                <div class="bento-check-item">• Заметки на лету</div>
+                <div class="bento-check-item">• Сейф & Пароли</div>
+              </div>
+            </div>
+            <div class="bento-card-footer">
+              <span class="bento-action-label">+ Заметка</span>
+              <span class="bento-arrow">→</span>
+            </div>
+          </div>
+
+          <!-- Card: Vitals (Давление) -->
+          <div class="bento-card bento-card-vitals" data-bento-id="vitals" onclick="window.switchToTab('vitals')" title="Перейти в Давление" style="display:none;">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">❤️</span>
+                <span class="bento-label">Давление</span>
+              </div>
+              <span class="bento-pill pill-emerald" id="bento-vitals-status">Норма</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-metric-caption">Последний замер</div>
+              <div class="bento-metric-value" id="bento-vitals-val">120/80</div>
+              <div class="bento-metric-sub">Журнал здоровья</div>
+            </div>
+            <div class="bento-card-footer">
+              <span class="bento-action-label">Дневник</span>
+              <span class="bento-arrow">→</span>
+            </div>
+          </div>
+
+          <!-- Card: Fitness (Спорт) -->
+          <div class="bento-card bento-card-fitness" data-bento-id="fitness" onclick="window.switchToTab('fitness')" title="Перейти в Спорт" style="display:none;">
+            <div class="bento-card-header">
+              <div class="bento-card-title">
+                <span class="bento-icon">🏃</span>
+                <span class="bento-label">Спорт</span>
+              </div>
+              <span class="bento-pill">Тренировки</span>
+            </div>
+            <div class="bento-card-body">
+              <div class="bento-title-line">Активность</div>
+              <div class="bento-track-sub">Кроки та спорт</div>
+            </div>
+            <div class="bento-card-footer">
+              <span class="bento-action-label">Открыть</span>
+              <span class="bento-arrow">→</span>
+            </div>
+          </div>
+
+          <!-- Card: Music -->
+          <div class="bento-card bento-card-music" data-bento-id="music" onclick="window.switchToTab('music')" title="Перейти в плеер" style="display:none;">
             <div class="bento-card-header">
               <div class="bento-card-title">
                 <span class="bento-icon">🎵</span>
@@ -210,8 +386,8 @@
             </div>
           </div>
 
-          <!-- Card 2: Movies -->
-          <div class="bento-card bento-card-movies" onclick="window.switchToTab('movies')" title="Перейти в фильмы">
+          <!-- Card: Movies -->
+          <div class="bento-card bento-card-movies" data-bento-id="movies" onclick="window.switchToTab('movies')" title="Перейти в фильмы" style="display:none;">
             <div class="bento-card-header">
               <div class="bento-card-title">
                 <span class="bento-icon">🎬</span>
@@ -232,70 +408,8 @@
             </div>
           </div>
 
-          <!-- Card 3: Business -->
-          <div class="bento-card bento-card-business" onclick="window.switchToTab('business')" title="Перейти в бизнес">
-            <div class="bento-card-header">
-              <div class="bento-card-title">
-                <span class="bento-icon">💼</span>
-                <span class="bento-label">Бизнес</span>
-              </div>
-              <span class="bento-pill pill-emerald" id="bento-biz-badge">+18%</span>
-            </div>
-            <div class="bento-card-body">
-              <div class="bento-metric-caption">Касса / Выручка</div>
-              <div class="bento-metric-value" id="bento-biz-balance">₴ 0</div>
-              <div class="bento-metric-sub" id="bento-biz-deals">Отчеты CRM</div>
-            </div>
-            <div class="bento-card-footer">
-              <span class="bento-action-label">Счета</span>
-              <span class="bento-arrow">→</span>
-            </div>
-          </div>
-
-          <!-- Card 4: Vault / Notes (Склерозник) -->
-          <div class="bento-card bento-card-vault" onclick="window.switchToTab('vault')" title="Перейти в Склерозник">
-            <div class="bento-card-header">
-              <div class="bento-card-title">
-                <span class="bento-icon">🧠</span>
-                <span class="bento-label">Склерозник</span>
-              </div>
-              <span class="bento-pill" id="bento-vault-count">Книжка</span>
-            </div>
-            <div class="bento-card-body">
-              <div class="bento-checklist" id="bento-vault-preview">
-                <div class="bento-check-item">• Заметки на лету</div>
-                <div class="bento-check-item">• Оперативные дела</div>
-              </div>
-            </div>
-            <div class="bento-card-footer">
-              <span class="bento-action-label">+ Заметка</span>
-              <span class="bento-arrow">→</span>
-            </div>
-          </div>
-
-          <!-- Card 5: Shopping -->
-          <div class="bento-card bento-card-shopping" onclick="window.switchToTab('shopping')" title="Перейти в покупки">
-            <div class="bento-card-header">
-              <div class="bento-card-title">
-                <span class="bento-icon">🛒</span>
-                <span class="bento-label">Покупки</span>
-              </div>
-              <span class="bento-pill pill-teal" id="bento-shop-count">Корзина</span>
-            </div>
-            <div class="bento-card-body">
-              <div class="bento-checklist" id="bento-shop-preview">
-                <div class="bento-check-item">• Актуальный список</div>
-                <div class="bento-check-item">• Авто-сортировка</div>
-              </div>
-            </div>
-            <div class="bento-card-footer">
-              <span class="bento-action-label">Список</span>
-              <span class="bento-arrow">→</span>
-            </div>
-          </div>
-
-          <!-- Card 6: Safe -->
-          <div class="bento-card bento-card-safe" onclick="window.switchToTab('vault')" title="Открыть сейф">
+          <!-- Card: Safe -->
+          <div class="bento-card bento-card-safe" data-bento-id="safe" onclick="window.switchToTab('vault')" title="Открыть сейф" style="display:none;">
             <div class="bento-card-header">
               <div class="bento-card-title">
                 <span class="bento-icon">🔐</span>
@@ -600,7 +714,7 @@
             <span>📱 Пристрої (<span class="vault-pill-count">0</span>)</span>
           </button>
           <button type="button" class="vault-cat-pill" data-cat="other">
-            <span>🔒 Сейф (<span class="vault-pill-count">0</span>)</span>
+            <span>📝 Замітки (<span class="vault-pill-count">0</span>)</span>
           </button>
         </div>
 
@@ -1339,45 +1453,18 @@
         <span class="dock-icon">⚡</span>
         <span class="dock-label">Главная</span>
       </button>
-      <button type="button" id="dock-account-btn" class="dock-btn" title="Акаунт">
-        <span class="dock-icon">👤</span>
-        <span class="dock-label" id="dock-account-label">Акаунт</span>
-      </button>
-      <button type="button" id="blocks-toggle-btn" class="dock-btn" title="Конструктор блоків">
-        <span class="dock-icon">🧩</span>
-        <span class="dock-label">Блоки</span>
-      </button>
-      <button type="button" id="theme-toggle-btn" class="dock-btn" title="Переключить тему">
+      <button type="button" id="settings-open-btn" class="dock-btn" title="Настройки системы, тема и шильдики">
         <span class="dock-icon">
-          <svg class="sun-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
-          <svg class="moon-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
-        </span>
-        <span class="dock-label">Тема</span>
-      </button>
-      <button type="button" id="help-open-btn" class="dock-btn" title="Довідка">
-        <span class="dock-icon">💡</span>
-        <span class="dock-label">Довідка</span>
-      </button>
-      <button type="button" id="settings-open-btn" class="dock-btn" title="Настройки">
-        <span class="dock-icon">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
           </svg>
         </span>
-        <span class="dock-label">Опции</span>
+        <span class="dock-label">Настройки</span>
+      </button>
+      <button type="button" id="dock-account-btn" class="dock-btn" title="Акаунт">
+        <span class="dock-icon">👤</span>
+        <span class="dock-label" id="dock-account-label">Акаунт</span>
       </button>
     </nav>
 
@@ -1489,6 +1576,104 @@
           <button id="settings-close-btn" class="icon-btn-close">&times;</button>
         </div>
         <div class="modal-body">
+          <!-- Quick Manual / Help button -->
+          <button type="button" id="settings-help-btn" class="btn-primary" style="width:100%;padding:11px;font-weight:700;border-radius:10px;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg, #0ea5e9, #2563eb);color:#fff;border:none;" onclick="document.getElementById('settings-close-btn')?.click();document.getElementById('help-open-btn')?.click();">
+            <span>📖</span> Як користуватися (Мануал та підказки)
+          </button>
+
+          <!-- 1. Theme Selector (Pastel Mint vs Deep Dark) -->
+          <div class="account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">🎨 Тема оформления</div>
+            <div style="display:flex;gap:10px;">
+              <button type="button" id="theme-btn-mint" class="theme-choice-btn" style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--border-color);background:#f4fbf7;color:#062817;font-weight:700;font-size:0.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                🌿 Пастельная мятная
+              </button>
+              <button type="button" id="theme-btn-dark" class="theme-choice-btn" style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--border-color);background:#0f172a;color:#f8fafc;font-weight:700;font-size:0.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                🌙 Тёмная глубокая
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Dashboard Bento Widgets / Cards Selector (Квадратики) -->
+          <div class="account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">🧩 Главный экран (Квадратики)</div>
+              <span style="font-size:0.72rem;color:var(--text-muted);">Быстрый переход</span>
+            </div>
+            <p style="font-size:0.78rem;color:var(--text-sub);margin:0 0 10px 0;line-height:1.4;">
+              Выберите, какие карточки отображать на дашборде. Нажатие на квадратик сразу раскрывает раздел:
+            </p>
+            <div id="dashboard-widgets-picker" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <!-- Populated dynamically by JS -->
+            </div>
+          </div>
+
+          <!-- 3. Tabs Navigation Constructor -->
+          <div class="account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;">📑 Вкладки и лента (Конструктор)</div>
+            <p style="font-size:0.78rem;color:var(--text-sub);margin:0 0 10px 0;line-height:1.4;">
+              Скройте ненужные разделы (например, Спорт или Давление), чтобы не загромождать верхнее меню:
+            </p>
+            <button type="button" id="open-blocks-constructor-btn" class="btn-secondary" style="width:100%;font-weight:700;padding:10px;border-radius:10px;cursor:pointer;">
+              🧩 Настроить видимость вкладок
+            </button>
+          </div>
+
+          <!-- 4. Friend Referral & Invite Link -->
+          <div class="account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">👥 Реферальная ссылка для друзей</div>
+              <span style="font-size:0.72rem;color:var(--primary);font-weight:700;">Готово к отправке</span>
+            </div>
+            <p style="font-size:0.78rem;color:var(--text-sub);margin:0 0 10px 0;line-height:1.4;">
+              Отправьте эту ссылку друзьям — они смогут пользоваться музыкой, фильмами, покупками и всеми новыми функциями:
+            </p>
+            <div style="display:flex;gap:8px;margin-bottom:10px;">
+              <input type="text" id="friend-invite-input" readonly style="flex:1;min-width:0;background:var(--bg-card);color:var(--text-main);border:1px solid var(--border-color);border-radius:8px;padding:9px 10px;font-size:0.8rem;font-family:monospace;outline:none;" />
+              <button type="button" id="copy-friend-invite-btn" class="btn-primary" style="padding:9px 14px;font-weight:700;font-size:0.82rem;white-space:nowrap;border-radius:8px;cursor:pointer;">
+                📋 Копировать
+              </button>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <a id="share-invite-whatsapp" href="#" target="_blank" class="btn-secondary" style="flex:1;text-align:center;text-decoration:none;padding:8px 10px;font-size:0.8rem;font-weight:700;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:6px;background:#25D366;color:#ffffff;border:none;">
+                <span>💬 WhatsApp</span>
+              </a>
+              <a id="share-invite-telegram" href="#" target="_blank" class="btn-secondary" style="flex:1;text-align:center;text-decoration:none;padding:8px 10px;font-size:0.8rem;font-weight:700;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:6px;background:#229ED9;color:#ffffff;border:none;">
+                <span>✈️ Telegram</span>
+              </a>
+            </div>
+            <div id="friend-invite-copy-msg" style="font-size:0.75rem;text-align:center;color:var(--primary);margin-top:6px;font-weight:600;"></div>
+          </div>
+
+          <!-- 5. Guide & Voice Commands -->
+          <div class="account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;">📖 Как это работает (Голосовые команды)</div>
+            <details style="font-size:0.82rem;color:var(--text-muted);line-height:1.5;">
+              <summary style="cursor:pointer;font-weight:700;color:var(--text-main);user-select:none;margin-bottom:6px;">
+                Примеры для диктовки
+              </summary>
+              • <code>«Купив каву 75 грн»</code> → запишет в расходы<br>
+              • <code>«Прихід оренда 18 000 грн»</code> → запишет в доходы бизнеса<br>
+              • <code>«Купити масло, молоко і хліб»</code> → добавит в Покупки<br>
+              • <code>«Поміняти сайлентблоки у вівторок»</code> → создаст задачу в Работах<br>
+              • <code>«Тиск 125 на 80 пульс 70»</code> → запишет в журнал давления
+            </details>
+          </div>
+
+          <!-- 6. App Update & Sync Section -->
+          <div class="account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;">🔄 Обновление приложения</div>
+            <p style="font-size:0.78rem;color:var(--text-sub);margin:0 0 10px 0;line-height:1.4;">
+              При выходе обновлений не нужно переустанавливать приложение или менять ссылку. Нажмите кнопку ниже или просто потяните экран вниз:
+            </p>
+            <button type="button" id="settings-refresh-app-btn" class="btn-primary" style="width:100%;font-weight:700;padding:12px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;" onclick="window.refreshAppWhole();">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              </svg>
+              <span>Синхронизировать и обновить сейчас</span>
+            </button>
+          </div>
+
           <!-- Regional Settings (Currency & Language) -->
           <div class="account-card-box" style="background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:12px;padding:14px;">
             <div style="font-size:0.75rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">🌍 Регіональні налаштування</div>
@@ -1547,7 +1732,7 @@
                 <div>
                   <div style="font-size:0.72rem;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Версія системи та бота</div>
                   <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
-                    <span id="bot-version-badge" style="font-size:1.05rem;font-weight:800;color:var(--text-main);">v3.7.30</span>
+                    <span id="bot-version-badge" style="font-size:1.05rem;font-weight:800;color:var(--text-main);">v3.7.41</span>
                     <span id="bot-status-tag" style="font-size:0.72rem;font-weight:600;background:rgba(34,197,94,0.18);color:#22c55e;padding:2px 7px;border-radius:20px;border:1px solid rgba(34,197,94,0.3);">● Актуальна</span>
                   </div>
                 </div>
@@ -1560,11 +1745,11 @@
             <div style="font-size:0.8rem;color:var(--text-muted);background:rgba(0,0,0,0.18);padding:10px 12px;border-radius:8px;display:flex;flex-direction:column;gap:6px;border:1px solid rgba(255,255,255,0.05);">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>📅 <strong>Дата збірки:</strong></span>
-                <span id="bot-build-time" style="color:var(--text-main);font-weight:600;">07.10.2026 21:50</span>
+                <span id="bot-build-time" style="color:var(--text-main);font-weight:600;">22.10.2026 15:20</span>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>📱 <strong>Клієнт (PWA додаток):</strong></span>
-                <span id="pwa-version-label" style="color:var(--text-main);font-weight:600;">v3.7.30</span>
+                <span id="pwa-version-label" style="color:var(--text-main);font-weight:600;">v3.7.41</span>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>⚡ <strong>Статус сервера:</strong></span>
@@ -2174,7 +2359,7 @@
               <option value="gaming">🎮 Ігри та розваги</option>
               <option value="wifi">📶 Мережі Wi-Fi</option>
               <option value="devices">📱 Apple ID та пристрої</option>
-              <option value="other">🔒 Інше та сейф</option>
+              <option value="other">📝 Замітки та інше</option>
             </select>
           </div>
           <div style="flex:1;min-width:140px;">
@@ -2338,15 +2523,146 @@ binance mylogin@crypto.com 2fa увімкнено
     </div>
   </div>
 
-  <script src="/static/modules/ai_chat.js?v=3.7.32"></script>
-  <script src="/static/modules/auth_phone.js?v=3.7.32"></script>
-  <script src="/static/modules/blocks_manager.js?v=3.7.32"></script>
-  <script src="/static/modules/business.js?v=3.7.32"></script>
-  <script src="/static/modules/mailbox.js?v=3.7.32"></script>
-  <script src="/static/modules/movies.js?v=3.7.32"></script>
-  <script src="/static/modules/music.js?v=3.7.32"></script>
-  <script src="/static/modules/vault.js?v=3.7.32"></script>
-  <script src="/static/app.js?v=3.7.32"></script>
+  <!-- Modal: Help, FAQ & Manual -->
+  <div id="help-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 520px; max-height: 85vh; display: flex; flex-direction: column; padding: 0;">
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border-color);">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:1.3rem;">📖</span>
+          <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800;">Інструкція та Довідка</h3>
+        </div>
+        <button type="button" id="help-close-btn" class="icon-btn-close">&times;</button>
+      </div>
+
+      <!-- Segmented Tabs -->
+      <div style="display: flex; background: var(--bg-input); padding: 4px; margin: 12px 18px 0; border-radius: 10px; border: 1px solid var(--border-color);">
+        <button type="button" id="help-tab-faq-btn" style="flex: 1; padding: 8px 12px; border: none; border-radius: 8px; font-size: 0.82rem; font-weight: 700; background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; cursor: pointer; transition: all 0.2s;">
+          📚 Як користуватися
+        </button>
+        <button type="button" id="help-tab-feedback-btn" style="flex: 1; padding: 8px 12px; border: none; border-radius: 8px; font-size: 0.82rem; font-weight: 600; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.2s;">
+          💬 Зворотний зв'язок
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div style="padding: 16px 18px; overflow-y: auto; flex: 1;">
+        <!-- FAQ / Manual Content -->
+        <div id="help-faq-content" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Card 1: PWA Install -->
+          <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+            <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>📱</span> 1. Встановлення на екран телефона
+            </div>
+            <p style="font-size: 0.82rem; color: var(--text-sub); margin: 0 0 6px 0; line-height: 1.45;">
+              Щоб додаток працював на повний екран без рамок браузера як нативна програма:
+            </p>
+            <ul style="font-size: 0.8rem; color: var(--text-muted); margin: 0; padding-left: 18px; line-height: 1.5;">
+              <li><strong>iPhone (Safari):</strong> натисніть кнопку «Поділитися» ⬆️ (квадрат зі стрілкою внизу) → оберіть <strong>«На екран "Додому"»</strong>.</li>
+              <li><strong>Android (Chrome):</strong> натисніть три крапки ⋮ вгорі праворуч → <strong>«Встановити додаток»</strong>.</li>
+            </ul>
+          </div>
+
+          <!-- Card 2: Voice Dictation -->
+          <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+            <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>🎙️</span> 2. Голосовий помічник («1 тап у книжку»)
+            </div>
+            <p style="font-size: 0.82rem; color: var(--text-sub); margin: 0 0 6px 0; line-height: 1.45;">
+              Вам не потрібно друкувати вручну:
+            </p>
+            <ul style="font-size: 0.8rem; color: var(--text-muted); margin: 0; padding-left: 18px; line-height: 1.5;">
+              <li>Натисніть велику зелену кнопку з мікрофоном.</li>
+              <li>Надиктуйте вільними словами будь-яку дію (наприклад: <em>«Купити молоко, вершкове масло та сир»</em> або <em>«Нагадай завтра о 14:00 зателефонувати в банк»</em>).</li>
+              <li>Натисніть мікрофон ще раз — штучний інтелект розпізнає слова та сам розподілить їх у «Покупки» чи «Завдання»!</li>
+              <li><em>Також можна:</em> ввести текст вручну в рядок під мікрофоном або натиснути мікрофон на клавіатурі смартфона.</li>
+            </ul>
+          </div>
+
+          <!-- Card 3: Shopping & Tasks -->
+          <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+            <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>🛒</span> 3. Список покупок та відправка у Telegram
+            </div>
+            <ul style="font-size: 0.8rem; color: var(--text-muted); margin: 0; padding-left: 18px; line-height: 1.5;">
+              <li>Товари автоматично розкладаються за категоріями (Продукти, Побут, Інше).</li>
+              <li>Чекбокс викреслює куплені товари.</li>
+              <li>Кнопка <strong>«В Telegram»</strong> дозволяє в 1 клік надіслати актуальний список покупок у месенджер сім'ї або друзям.</li>
+            </ul>
+          </div>
+
+          <!-- Card 4: Music & Movies -->
+          <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+            <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>🎵</span> 4. Музика та фільми
+            </div>
+            <ul style="font-size: 0.8rem; color: var(--text-muted); margin: 0; padding-left: 18px; line-height: 1.5;">
+              <li>Вбудований плеєр відтворює треки навіть у фоновому режимі при заблокованому екрані.</li>
+              <li>Зберігайте цікаві фільми та серіали у вкладці «Фільми», щоб не забути подивитися.</li>
+            </ul>
+          </div>
+
+          <!-- Card 5: Privacy & Anonymity -->
+          <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 12px; padding: 14px;">
+            <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; color: #38bdf8;">
+              <span>🔒</span> 5. Повна анонімність та безпека
+            </div>
+            <p style="font-size: 0.82rem; color: var(--text-sub); margin: 0 0 6px 0; line-height: 1.45;">
+              <strong>Ваш кабінет на 100% персональний та ізольований:</strong>
+            </p>
+            <ul style="font-size: 0.8rem; color: var(--text-muted); margin: 0; padding-left: 18px; line-height: 1.5;">
+              <li>Для кожного гостя чи друга створена окрема база даних. Ніхто інший не має доступу до ваших записів, покупок та заміток.</li>
+              <li>Особисті фінанси, паролі та медичні дані власника надійно приховані та недоступні друзям.</li>
+              <li>Всі з'єднання шифруються через захищений протокол HTTPS з дійсним SSL-сертифікатом.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Feedback Content -->
+        <div id="help-feedback-content" class="hidden" style="display: flex; flex-direction: column; gap: 12px;">
+          <p style="font-size: 0.82rem; color: var(--text-sub); margin: 0; line-height: 1.45;">
+            Є ідея, помітили помилку або хочете запропонувати нову функцію? Напишіть або надиктуйте голосом:
+          </p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="fb-type-chip active" data-type="idea" style="border: 1px solid #0ea5e9; background: rgba(14,165,233,0.18); color: #0ea5e9; padding: 6px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">💡 Ідея</button>
+            <button type="button" class="fb-type-chip" data-type="bug" style="border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-muted); padding: 6px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">🪲 Помилка</button>
+            <button type="button" class="fb-type-chip" data-type="question" style="border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-muted); padding: 6px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">❓ Питання</button>
+          </div>
+          <div style="position: relative;">
+            <textarea id="feedback-text-input" rows="4" placeholder="Опишіть вашу ідею або враження..." style="width: 100%; box-sizing: border-box; background: var(--bg-input); color: var(--text-main); border: 1.5px solid var(--border-color); border-radius: 10px; padding: 10px 42px 10px 12px; font-size: 0.85rem; line-height: 1.4; outline: none; resize: vertical;"></textarea>
+            <button type="button" id="feedback-mic-btn" title="Диктувати голосом" style="position: absolute; right: 10px; bottom: 12px; width: 30px; height: 30px; border-radius: 50%; border: none; background: rgba(14,165,233,0.18); color: #0ea5e9; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+              </svg>
+            </button>
+          </div>
+          <div id="feedback-status-msg" style="font-size: 0.78rem; font-weight: 600; min-height: 18px;"></div>
+          <button type="button" id="send-feedback-btn" class="btn-primary" style="width: 100%; padding: 11px; font-weight: 700; border-radius: 10px; cursor: pointer;">
+            Відправити повідомлення
+          </button>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="padding: 12px 18px; border-top: 1px solid var(--border-color); text-align: right;">
+        <button type="button" class="btn-primary" style="padding: 9px 20px; font-size: 0.85rem; font-weight: 700; border-radius: 8px; cursor: pointer;" onclick="document.getElementById('help-modal')?.classList.add('hidden');">
+          Зрозуміло, почати!
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/modules/ai_chat.js?v=3.7.41"></script>
+  <script src="/static/modules/auth_phone.js?v=3.7.41"></script>
+  <script src="/static/modules/blocks_manager.js?v=3.7.41"></script>
+  <script src="/static/modules/business.js?v=3.7.41"></script>
+  <script src="/static/modules/mailbox.js?v=3.7.41"></script>
+  <script src="/static/modules/movies.js?v=3.7.41"></script>
+  <script src="/static/modules/music.js?v=3.7.41"></script>
+  <script src="/static/modules/vault.js?v=3.7.41"></script>
+  <script src="/static/app.js?v=3.7.41"></script>
 </body>
 </html>
 

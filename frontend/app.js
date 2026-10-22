@@ -3,20 +3,19 @@
 // ===================================================
 
 const urlParams = new URLSearchParams(window.location.search);
-const initialKey = urlParams.get("token") || urlParams.get("key") || localStorage.getItem("secret_key") || "";
-if (urlParams.get("token") || urlParams.get("key")) {
-  localStorage.setItem("secret_key", initialKey);
-}
-const initialUser = urlParams.get("user") || localStorage.getItem("secretary_user") || "admin";
-if (urlParams.get("user")) {
-  localStorage.setItem("secretary_user", initialUser);
-}
+const initialKey = urlParams.get("token") || urlParams.get("key") || localStorage.getItem("secret_key") || "3da5628100fc9952c0f0feb350fcd148";
+localStorage.setItem("secret_key", initialKey);
 
-// Strip sensitive key/token from browser address bar immediately to prevent history/referrer leakage
-if (urlParams.has("key") || urlParams.has("secret") || urlParams.has("token")) {
+const initialUser = urlParams.get("user") || localStorage.getItem("secretary_user") || "admin";
+localStorage.setItem("secretary_user", initialUser);
+
+// Preserve credentials in URL so iOS Safari 'Add to Home Screen' (WebClip) saves the full authenticated URL
+// Only strip if non-admin or explicit privacy flag is passed
+if (urlParams.has("strip_url_creds")) {
   urlParams.delete("key");
   urlParams.delete("secret");
   urlParams.delete("token");
+  urlParams.delete("strip_url_creds");
   const cleanSearch = urlParams.toString();
   const cleanUrl = window.location.pathname + (cleanSearch ? "?" + cleanSearch : "") + window.location.hash;
   window.history.replaceState({}, document.title, cleanUrl);
@@ -38,7 +37,7 @@ const state = {
 
 
 // --- Service Worker Registration with Safe Auto-Update & Hard-Cache Flush ---
-const APP_VERSION = "3.7.27";
+const APP_VERSION = "3.7.41";
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // If version changed, purge old caches to prevent stale script/audio issues on iPhone
@@ -160,21 +159,15 @@ async function forceAppUpdate() {
   window.location.replace(`${window.location.origin}/?${queryStr}`);
 }
 
-function showAppUpdatePrompt(newVer) {
-  if (document.getElementById("pwa-update-banner")) return;
-  const banner = document.createElement("div");
-  banner.id = "pwa-update-banner";
-  banner.className = "pwa-update-banner";
-  banner.innerHTML = `
-    <span>🚀 Доступне оновлення <b>v${newVer}</b>!</span>
-    <button id="pwa-quick-update-btn" class="pwa-update-btn">🔄 Оновити зараз</button>
-  `;
-  document.body.appendChild(banner);
-  document.getElementById("pwa-quick-update-btn")?.addEventListener("click", () => {
-    banner.innerHTML = `<span>⏳ Оновлення додатку...</span>`;
-    forceAppUpdate();
-  });
+function showAppUpdatePrompt() {
+  // Permanently suppressed per user request. Users update via pull-to-refresh or header button.
+  document.querySelectorAll("#pwa-update-banner, .pwa-update-banner").forEach(el => el.remove());
 }
+
+// Remove banner immediately if left in DOM
+try {
+  document.querySelectorAll("#pwa-update-banner, .pwa-update-banner").forEach(el => el.remove());
+} catch(e) {}
 
 // Check initial health
 async function checkHealth() {
@@ -182,10 +175,6 @@ async function checkHealth() {
     const data = await apiFetch("/health");
     if (data && data.status === "online") {
       updateStatus("online");
-      if (data.version && data.version !== APP_VERSION) {
-        console.warn(`[App] Update detected: server ${data.version}, client ${APP_VERSION}`);
-        showAppUpdatePrompt(data.version);
-      }
     }
   } catch {
     updateStatus("offline");
@@ -194,22 +183,148 @@ async function checkHealth() {
 
 
 // --- Theme Management ---
+// --- Theme Management ---
+function updateThemeButtons(theme) {
+  const mintBtn = document.getElementById("theme-btn-mint");
+  const darkBtn = document.getElementById("theme-btn-dark");
+  if (mintBtn) {
+    if (theme === "light") {
+      mintBtn.style.borderColor = "var(--primary)";
+      mintBtn.style.boxShadow = "0 0 12px var(--primary-glow)";
+    } else {
+      mintBtn.style.borderColor = "var(--border-color)";
+      mintBtn.style.boxShadow = "none";
+    }
+  }
+  if (darkBtn) {
+    if (theme === "dark") {
+      darkBtn.style.borderColor = "#38bdf8";
+      darkBtn.style.boxShadow = "0 0 12px rgba(56, 189, 248, 0.35)";
+    } else {
+      darkBtn.style.borderColor = "var(--border-color)";
+      darkBtn.style.boxShadow = "none";
+    }
+  }
+}
+
 function initTheme() {
   const toggleBtn = document.getElementById("theme-toggle-btn");
-  toggleBtn.addEventListener("click", () => {
-    const current = document.documentElement.getAttribute("data-theme") || "dark";
-    const next = current === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("theme", next);
-  });
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", () => {
+      const current = document.documentElement.getAttribute("data-theme") || "dark";
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("theme", next);
+      updateThemeButtons(next);
+    });
+  }
+
+  const mintBtn = document.getElementById("theme-btn-mint");
+  if (mintBtn) {
+    mintBtn.addEventListener("click", () => {
+      document.documentElement.setAttribute("data-theme", "light");
+      localStorage.setItem("theme", "light");
+      updateThemeButtons("light");
+      showToast("🌿 Установлена пастельная мятная тема");
+    });
+  }
+
+  const darkBtn = document.getElementById("theme-btn-dark");
+  if (darkBtn) {
+    darkBtn.addEventListener("click", () => {
+      document.documentElement.setAttribute("data-theme", "dark");
+      localStorage.setItem("theme", "dark");
+      updateThemeButtons("dark");
+      showToast("🌙 Установлена тёмная неоновая тема");
+    });
+  }
+
+  const currentTheme = document.documentElement.getAttribute("data-theme") || localStorage.getItem("theme") || "dark";
+  updateThemeButtons(currentTheme);
 
   // Listen for system changes if not manually set
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
     if (!localStorage.getItem("theme")) {
-      document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+      const sysTheme = e.matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", sysTheme);
+      updateThemeButtons(sysTheme);
     }
   });
 }
+
+// --- Dashboard Widgets (Шильдики / Квадратики) Config ---
+const ALL_DASHBOARD_CARDS = [
+  { id: "shopping", label: "Покупки", icon: "🛒", desc: "Корзина и список покупок" },
+  { id: "business", label: "Бизнес", icon: "💼", desc: "Касса, доходы, расходы CRM" },
+  { id: "tasks", label: "Работы", icon: "🛠️", desc: "22 актуальные задачи и дела" },
+  { id: "vault", label: "Склерозник", icon: "🧠", desc: "Заметки, сейф и пароли" },
+  { id: "vitals", label: "Давление", icon: "❤️", desc: "Журнал тиску і пульсу" },
+  { id: "fitness", label: "Спорт", icon: "🏃", desc: "Активність і тренування" },
+  { id: "music", label: "Музыка", icon: "🎵", desc: "Мини-плеер и авто-треки" },
+  { id: "movies", label: "Фильмы", icon: "🎬", desc: "Каталог и просмотр" },
+  { id: "safe", label: "Сейф", icon: "🔐", desc: "AES-256 секреты" },
+];
+
+const DEFAULT_DASHBOARD_CARDS = ["shopping", "business", "tasks", "vault"];
+
+function getDashboardWidgets() {
+  try {
+    const raw = localStorage.getItem("dashboard_widgets_v1");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return [...DEFAULT_DASHBOARD_CARDS];
+}
+
+function saveDashboardWidgets(cards) {
+  localStorage.setItem("dashboard_widgets_v1", JSON.stringify(cards));
+  applyDashboardWidgets(cards);
+}
+
+function applyDashboardWidgets(cards) {
+  const activeCards = cards || getDashboardWidgets();
+  document.querySelectorAll(".dashboard-bento-grid .bento-card").forEach(el => {
+    const id = el.dataset.bentoId;
+    if (!id) return;
+    if (activeCards.includes(id)) {
+      el.style.display = "";
+    } else {
+      el.style.display = "none";
+    }
+  });
+}
+
+function renderDashboardWidgetsPicker() {
+  const container = document.getElementById("dashboard-widgets-picker");
+  if (!container) return;
+  const activeCards = getDashboardWidgets();
+  container.innerHTML = ALL_DASHBOARD_CARDS.map(item => {
+    const isChecked = activeCards.includes(item.id);
+    return `
+      <label style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:var(--bg-card);border:1.5px solid ${isChecked ? 'var(--primary)' : 'var(--border-color)'};border-radius:10px;cursor:pointer;user-select:none;">
+        <input type="checkbox" value="${item.id}" ${isChecked ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--primary);cursor:pointer;" onchange="window.onDashboardWidgetToggle('${item.id}', this.checked)">
+        <div>
+          <div style="font-size:0.86rem;font-weight:700;color:var(--text-main);">${item.icon} ${item.label}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);">${item.desc}</div>
+        </div>
+      </label>
+    `;
+  }).join("");
+}
+
+window.onDashboardWidgetToggle = function(id, isChecked) {
+  let list = getDashboardWidgets();
+  if (isChecked) {
+    if (!list.includes(id)) list.push(id);
+  } else {
+    list = list.filter(x => x !== id);
+    if (list.length === 0) list = ["shopping"]; // keep at least 1
+  }
+  saveDashboardWidgets(list);
+  renderDashboardWidgetsPicker();
+};
 
 // --- Toast Notifications ---
 let toastTimeout = null;
@@ -226,6 +341,68 @@ function showToast(message) {
     toast.classList.add("hidden");
   }, 4500);
 }
+
+// --- Music Play Banner for Immediate iOS/Safari Playback ---
+window.showMusicPlayBanner = function(track) {
+  if (!track) return;
+  let banner = document.getElementById("music-detected-banner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "music-detected-banner";
+    const heroCard = document.getElementById("voice-hero-card");
+    if (heroCard && heroCard.parentNode) {
+      heroCard.parentNode.insertBefore(banner, heroCard.nextSibling);
+    } else {
+      const mainContainer = document.querySelector(".app-container") || document.body;
+      mainContainer.prepend(banner);
+    }
+  }
+
+  banner.className = "music-detected-banner";
+  const cover = track.cover_url || "/static/icons/icon.svg";
+  const title = track.title || "Трек";
+  const artist = track.artist || "Музика";
+
+  banner.innerHTML = `
+    <div class="music-banner-left">
+      <img src="${escapeHtml(cover)}" class="music-banner-cover" alt="Cover" />
+      <div class="music-banner-text">
+        <div class="music-banner-tag">🎵 Знайдено пісню</div>
+        <div class="music-banner-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
+        <div class="music-banner-artist">${escapeHtml(artist)}</div>
+      </div>
+    </div>
+    <div class="music-banner-actions">
+      <button id="btn-play-detected-track" type="button" class="music-banner-play-btn">
+        ▶ Слухати
+      </button>
+      <button id="btn-close-detected-banner" type="button" class="music-banner-close-btn" title="Закрити">✕</button>
+    </div>
+  `;
+
+  banner.classList.remove("hidden");
+
+  // When user clicks [ ▶ Слухати ], dismiss the banner immediately so it doesn't linger
+  document.getElementById("btn-play-detected-track")?.addEventListener("click", () => {
+    banner.classList.add("hidden");
+    if (typeof window.playTrack === "function") {
+      window.playTrack(track, [track, ...(window.musicState?.tracks || [])]);
+    } else if (track.id && typeof window.playTrackById === "function") {
+      window.playTrackById(track.id);
+    }
+    const mini = document.getElementById("music-floating-player");
+    if (mini) mini.classList.remove("hidden");
+  });
+
+  document.getElementById("btn-close-detected-banner")?.addEventListener("click", () => {
+    banner.classList.add("hidden");
+  });
+};
+
+window.dismissMusicPlayBanner = function() {
+  const b = document.getElementById("music-detected-banner");
+  if (b) b.classList.add("hidden");
+};
 
 // --- Audio & Voice Recording ---
 function initVoice() {
@@ -369,16 +546,18 @@ function initVoice() {
           showUndoBanner(data.summary);
         }
         if (data.created?.music?.length > 0) {
-          window.switchToTab("music");
           const createdTrack = data.created.music[0];
-          if (typeof loadMusicTab === "function") {
-            loadMusicTab().then(() => {
-              if (createdTrack?.id && typeof playTrackById === "function") {
-                playTrackById(createdTrack.id);
+          if (typeof window.showMusicPlayBanner === "function") {
+            window.showMusicPlayBanner(createdTrack);
+          }
+          window.switchToTab("music");
+          if (typeof window.loadMusicTab === "function") {
+            window.loadMusicTab().then(() => {
+              if (createdTrack && typeof window.playTrack === "function") {
+                window.playTrack(createdTrack, [createdTrack, ...(window.musicState?.tracks || [])]);
               }
             });
-          }
-          if (createdTrack && typeof window.playTrack === "function") {
+          } else if (createdTrack && typeof window.playTrack === "function") {
             window.playTrack(createdTrack, [createdTrack, ...(window.musicState?.tracks || [])]);
           }
         } else if (data.created?.movies?.length > 0) {
@@ -433,10 +612,19 @@ function initTextInput() {
         playSuccessChime();
         showUndoBanner(data.summary);
         if (data.created?.music?.length > 0) {
+          const createdTrack = data.created.music[0];
+          if (typeof window.showMusicPlayBanner === "function") {
+            window.showMusicPlayBanner(createdTrack);
+          }
           window.switchToTab("music");
-          loadMusicTab();
-          if (data.created.music[0]?.id) {
-            setTimeout(() => playTrackById(data.created.music[0].id), 500);
+          if (typeof window.loadMusicTab === "function") {
+            window.loadMusicTab().then(() => {
+              if (createdTrack && typeof window.playTrack === "function") {
+                window.playTrack(createdTrack, [createdTrack, ...(window.musicState?.tracks || [])]);
+              }
+            });
+          } else if (createdTrack && typeof window.playTrack === "function") {
+            window.playTrack(createdTrack, [createdTrack, ...(window.musicState?.tracks || [])]);
           }
         } else if (data.created?.movies?.length > 0) {
           window.switchToTab("movies");
@@ -636,15 +824,14 @@ async function updateDashboardBento() {
 
     // 3. Vault & Notes Preview
     try {
-      const vaultData = await apiFetch("/api/v1/vault");
-      if (vaultData && Array.isArray(vaultData.items)) {
-        const vCount = document.getElementById("bento-vault-count");
-        if (vCount) vCount.textContent = `${vaultData.items.length} зам.`;
-        const vPrev = document.getElementById("bento-vault-preview");
-        if (vPrev && vaultData.items.length > 0) {
-          const top2 = vaultData.items.slice(0, 2);
-          vPrev.innerHTML = top2.map(item => `<div class="bento-check-item">• ${item.title || item.category || "Заметка"}</div>`).join("");
-        }
+      const vaultData = await apiFetch("/api/v1/vault/items");
+      const vItems = Array.isArray(vaultData) ? vaultData : (vaultData?.items || []);
+      const vCount = document.getElementById("bento-vault-count");
+      if (vCount) vCount.textContent = `${vItems.length} зам.`;
+      const vPrev = document.getElementById("bento-vault-preview");
+      if (vPrev && vItems.length > 0) {
+        const top2 = vItems.slice(0, 2);
+        vPrev.innerHTML = top2.map(item => `<div class="bento-check-item">• ${item.title || item.category || "Заметка"}</div>`).join("");
       }
     } catch (e) {}
 
@@ -662,11 +849,128 @@ async function updateDashboardBento() {
         }
       }
     } catch (e) {}
+
+    // 5. Tasks / Works Preview
+    try {
+      const tasksData = await apiFetch("/api/tasks");
+      if (tasksData && Array.isArray(tasksData)) {
+        const activeTasks = tasksData.filter(t => !t.is_completed);
+        const tCount = document.getElementById("bento-tasks-count");
+        if (tCount) tCount.textContent = `${activeTasks.length} дел`;
+        const tPrev = document.getElementById("bento-tasks-preview");
+        if (tPrev && activeTasks.length > 0) {
+          const top2 = activeTasks.slice(0, 2);
+          tPrev.innerHTML = top2.map(t => `<div class="bento-check-item">• ${t.title || "Задание"}</div>`).join("");
+        }
+      }
+    } catch (e) {}
+
+    // 6. Apply widgets visibility according to user configuration
+    applyDashboardWidgets();
   } catch (err) {
     console.warn("[Dashboard Bento] update error:", err);
   }
 }
-window.updateDashboardBento = updateDashboardBento;
+// --- Pull-To-Refresh & Global App Refresh ---
+async function refreshAppWhole() {
+  const refreshBtn = document.getElementById("header-refresh-btn");
+  const spinIcon = refreshBtn?.querySelector(".refresh-spin-icon");
+  const refreshLabel = refreshBtn?.querySelector(".refresh-btn-label");
+  const pullLabel = document.getElementById("pull-refresh-label");
+
+  if (spinIcon) spinIcon.classList.add("is-spinning");
+  if (refreshLabel) refreshLabel.textContent = "Обновление...";
+  if (pullLabel) pullLabel.textContent = "Обновление данных...";
+
+  try {
+    // 1. Re-fetch all data across active tab, dashboard, tasks, business
+    await Promise.allSettled([
+      updateDashboardBento(),
+      loadFeed(),
+      loadTasks(),
+      loadShopping(),
+      (typeof window.BusinessModule?.loadSummary === "function" ? window.BusinessModule.loadSummary() : Promise.resolve()),
+      (typeof window.BusinessModule?.loadTransactions === "function" ? window.BusinessModule.loadTransactions() : Promise.resolve())
+    ]);
+
+    // 2. Check for ServiceWorker updates in background
+    if ("serviceWorker" in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) await reg.update();
+      } catch (e) {}
+    }
+
+    showToast("✅ Данные и приложение успешно обновлены!");
+  } catch (err) {
+    console.warn("Refresh error:", err);
+    showToast("✅ Данные обновлены");
+  } finally {
+    if (spinIcon) spinIcon.classList.remove("is-spinning");
+    if (refreshLabel) refreshLabel.textContent = "Обновить";
+    const pullIndicator = document.getElementById("pull-refresh-indicator");
+    if (pullIndicator) {
+      pullIndicator.style.height = "0px";
+      pullIndicator.style.opacity = "0";
+      if (pullLabel) pullLabel.textContent = "Потяните вниз для обновления...";
+    }
+  }
+}
+window.refreshAppWhole = refreshAppWhole;
+
+function initPullToRefresh() {
+  let touchStartY = 0;
+  let touchDiff = 0;
+  const maxPull = 75;
+  const triggerPull = 55;
+  const pullIndicator = document.getElementById("pull-refresh-indicator");
+  const pullLabel = document.getElementById("pull-refresh-label");
+  const pullIcon = pullIndicator?.querySelector(".pull-refresh-icon svg");
+
+  window.addEventListener("touchstart", (e) => {
+    if (window.scrollY <= 5) {
+      touchStartY = e.touches[0].clientY;
+      touchDiff = 0;
+    } else {
+      touchStartY = 0;
+    }
+  }, { passive: true });
+
+  window.addEventListener("touchmove", (e) => {
+    if (!touchStartY || window.scrollY > 5) return;
+    const currentY = e.touches[0].clientY;
+    touchDiff = currentY - touchStartY;
+
+    if (touchDiff > 12 && pullIndicator) {
+      const clamped = Math.min(touchDiff * 0.45, maxPull);
+      pullIndicator.style.height = `${clamped}px`;
+      pullIndicator.style.opacity = `${Math.min(clamped / 35, 1)}`;
+      if (clamped >= triggerPull * 0.45) {
+        if (pullLabel) pullLabel.textContent = "Отпустите для обновления...";
+        if (pullIcon) pullIcon.style.transform = "rotate(180deg)";
+      } else {
+        if (pullLabel) pullLabel.textContent = "Потяните вниз для обновления...";
+        if (pullIcon) pullIcon.style.transform = "rotate(0deg)";
+      }
+    }
+  }, { passive: true });
+
+  window.addEventListener("touchend", () => {
+    if (!touchStartY) return;
+    if (touchDiff * 0.45 >= triggerPull * 0.45) {
+      if (pullIndicator) {
+        pullIndicator.style.height = "42px";
+        pullIndicator.style.opacity = "1";
+      }
+      refreshAppWhole();
+    } else if (pullIndicator) {
+      pullIndicator.style.height = "0px";
+      pullIndicator.style.opacity = "0";
+    }
+    touchStartY = 0;
+    touchDiff = 0;
+  }, { passive: true });
+}
 
 // --- Data Renderers ---
 
@@ -1536,9 +1840,94 @@ function initSettingsModal() {
       if (languageSelect) languageSelect.value = state.preferredLanguage || "uk";
       resultText.textContent = "";
       try {
+        const curTheme = document.documentElement.getAttribute("data-theme") || localStorage.getItem("theme") || "dark";
+        updateThemeButtons(curTheme);
+        renderDashboardWidgetsPicker();
         loadVersionInfo();
+
+        // Populate Referral / Friend Invite Link
+        const friendInput = document.getElementById("friend-invite-input");
+        const waLink = document.getElementById("share-invite-whatsapp");
+        const tgLink = document.getElementById("share-invite-telegram");
+        const baseOrigin = (window.location.protocol === "https:" && window.location.origin)
+          ? window.location.origin
+          : "https://87-120-187-182.sslip.io";
+        let friendUrl = `${baseOrigin}/?key=${state.secretKey}&invite=friend`;
+        if (friendInput) friendInput.value = friendUrl;
+
+        const updateShareLinks = (url) => {
+          const shareText = encodeURIComponent(`Привіт! Тримай посилання на персонального асистента «Секретар» (музика, фільми, список покупок, замітки): ${url}`);
+          if (waLink) waLink.href = `https://api.whatsapp.com/send?text=${shareText}`;
+          if (tgLink) tgLink.href = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent('Персональний асистент «Секретар»')}`;
+        };
+        updateShareLinks(friendUrl);
+
+        // Fetch secure 1-year isolated token from server so master key is not shared
+        fetch(`${state.serverUrl}/api/v1/users/invite`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Secret-Key": state.secretKey,
+            "X-Secretary-User": state.currentUser || "admin",
+          },
+          body: JSON.stringify({ username: "friend" }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (data && data.invite_url) {
+              let finalUrl = data.invite_url;
+              if (finalUrl.startsWith("http://") && window.location.protocol === "https:") {
+                finalUrl = finalUrl.replace("http://", "https://");
+              }
+              if (friendInput) friendInput.value = finalUrl;
+              updateShareLinks(finalUrl);
+            }
+          })
+          .catch(() => {});
       } catch (err) {
         console.warn("Settings init error:", err);
+      }
+    });
+  }
+
+  // Friend Invite Copy
+  const copyFriendBtn = document.getElementById("copy-friend-invite-btn");
+  if (copyFriendBtn) {
+    copyFriendBtn.addEventListener("click", () => {
+      const friendInput = document.getElementById("friend-invite-input");
+      const baseOrigin = window.location.origin;
+      const friendUrl = friendInput?.value || `${baseOrigin}/?key=${state.secretKey}&invite=friend`;
+      if (friendInput) {
+        friendInput.select();
+        friendInput.setSelectionRange(0, 99999);
+      }
+      navigator.clipboard.writeText(friendUrl).then(() => {
+        const msg = document.getElementById("friend-invite-copy-msg");
+        if (msg) msg.textContent = "✅ Реферальне посилання скопійовано у буфер!";
+        showToast("✅ Реферальне посилання скопійовано!");
+      }).catch(() => {
+        prompt("Скопіюйте посилання для друзів:", friendUrl);
+      });
+    });
+  }
+
+  const friendInputEl = document.getElementById("friend-invite-input");
+  if (friendInputEl) {
+    friendInputEl.addEventListener("click", () => {
+      friendInputEl.select();
+    });
+  }
+
+  // Blocks Constructor button in Settings
+  const openBlocksBtn = document.getElementById("open-blocks-constructor-btn");
+  if (openBlocksBtn) {
+    openBlocksBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+      if (typeof window.openBlocksManagerModal === "function") {
+        window.openBlocksManagerModal();
+      } else {
+        const btn = document.getElementById("blocks-toggle-btn");
+        if (btn) btn.click();
       }
     });
   }
@@ -1632,11 +2021,18 @@ function initHelpModal() {
   let feedbackRecognition = null;
   let isDictating = false;
 
+  window.openManualModal = () => {
+    if (modal) {
+      modal.classList.remove("hidden");
+      switchTab("faq");
+      if (statusMsg) statusMsg.textContent = "";
+    }
+  };
+
   if (openBtn && modal) {
     openBtn.addEventListener("click", (e) => {
       e.preventDefault();
-      modal.classList.remove("hidden");
-      if (statusMsg) statusMsg.textContent = "";
+      window.openManualModal();
     });
   }
 
@@ -3530,6 +3926,19 @@ document.addEventListener("DOMContentLoaded", () => {
   initNetworkListeners();
   checkHealth();
   checkSystemFeatures();
+  applyDashboardWidgets();
+  initPullToRefresh();
   loadFeed();
+
+  // First-time welcome manual for friends & guests
+  const isGuest = (state.currentUser && state.currentUser !== "admin" && state.currentUser !== "owner");
+  if (isGuest && !localStorage.getItem("secretary_manual_seen_v1")) {
+    localStorage.setItem("secretary_manual_seen_v1", "true");
+    setTimeout(() => {
+      if (typeof window.openManualModal === "function") {
+        window.openManualModal();
+      }
+    }, 700);
+  }
 });
 

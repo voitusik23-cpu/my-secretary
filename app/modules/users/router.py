@@ -265,6 +265,8 @@ def create_invite_link(payload: dict, request: Request):
     forwarded_proto = request.headers.get("x-forwarded-proto", "https")
     if forwarded_host:
         base_url = f"{forwarded_proto}://{forwarded_host}"
+    if "87.120.187.182" in base_url or base_url.startswith("http://"):
+        base_url = "https://87-120-187-182.sslip.io"
 
     from app.services.media_token import generate_media_token
     # Generate an isolated user token with 1 year validity (never leak master SECRET_KEY)

@@ -331,7 +331,8 @@ if os.path.exists(frontend_dir):
                     with open(tunnel_file, "r", encoding="utf-8") as tf:
                         tunnel_url = tf.read().strip()
                         if tunnel_url.startswith("https://"):
-                            return RedirectResponse(tunnel_url, status_code=307)
+                            target_url = f"{tunnel_url}?{request.url.query}" if request.url.query else tunnel_url
+                            return RedirectResponse(target_url, status_code=307)
                 except Exception:
                     pass
 

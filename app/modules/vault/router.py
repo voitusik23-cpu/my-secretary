@@ -50,6 +50,14 @@ def _get_vault_query(db: Session, request: Request):
     )
 
 
+@router.get("")
+def get_vault_alias(request: Request, db: Session = Depends(get_db)):
+    """Повертає короткий список для дашборду."""
+    query = _get_vault_query(db, request)
+    items = query.order_by(desc(VaultItem.created_at)).all()
+    return {"items": items}
+
+
 @router.get("/items", response_model=List[VaultItemResponse])
 def get_vault_items(
     request: Request,
