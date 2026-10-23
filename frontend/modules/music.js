@@ -116,6 +116,14 @@ async function playTrack(track, queue = null) {
   if (!track) return;
   const strId = String(track.id);
 
+  // Dismiss any lingering detect banner whenever any track begins playback
+  if (typeof window.dismissMusicPlayBanner === "function") {
+    window.dismissMusicPlayBanner();
+  } else {
+    const b = document.getElementById("music-detected-banner");
+    if (b) b.classList.add("hidden");
+  }
+
   // If track was deleted, never play it!
   if (musicState.deletedTrackIds.has(strId)) {
     console.warn(`[Music] Refusing to play deleted track ${strId}`);
@@ -571,6 +579,9 @@ async function deleteTrackItem(trackId, event) {
 
   // 1. Позначаємо трек видаленим у поточній сесії (блокує будь-які повторні виклики)
   musicState.deletedTrackIds.add(strId);
+  if (typeof window.dismissMusicPlayBanner === "function") {
+    window.dismissMusicPlayBanner();
+  }
 
   // 2. Перевіряємо, чи цей трек зараз грає або завантажений
   const isCurrent = musicState.currentTrack && String(musicState.currentTrack.id) === strId;

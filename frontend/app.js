@@ -345,6 +345,15 @@ function showToast(message) {
 // --- Music Play Banner for Immediate iOS/Safari Playback ---
 window.showMusicPlayBanner = function(track) {
   if (!track) return;
+  const strId = String(track.id || "");
+  if (strId && window.musicState?.deletedTrackIds?.has(strId)) return;
+
+  // Clear existing timer if any
+  if (window._musicDetectBannerTimer) {
+    clearTimeout(window._musicDetectBannerTimer);
+    window._musicDetectBannerTimer = null;
+  }
+
   let banner = document.getElementById("music-detected-banner");
   if (!banner) {
     banner = document.createElement("div");
@@ -359,6 +368,7 @@ window.showMusicPlayBanner = function(track) {
   }
 
   banner.className = "music-detected-banner";
+  banner.style.display = "flex";
   const cover = track.cover_url || "/static/icons/icon.svg";
   const title = track.title || "Трек";
   const artist = track.artist || "Музика";
@@ -384,7 +394,7 @@ window.showMusicPlayBanner = function(track) {
 
   // When user clicks [ ▶ Слухати ], dismiss the banner immediately so it doesn't linger
   document.getElementById("btn-play-detected-track")?.addEventListener("click", () => {
-    banner.classList.add("hidden");
+    window.dismissMusicPlayBanner();
     if (typeof window.playTrack === "function") {
       window.playTrack(track, [track, ...(window.musicState?.tracks || [])]);
     } else if (track.id && typeof window.playTrackById === "function") {
@@ -395,13 +405,26 @@ window.showMusicPlayBanner = function(track) {
   });
 
   document.getElementById("btn-close-detected-banner")?.addEventListener("click", () => {
-    banner.classList.add("hidden");
+    window.dismissMusicPlayBanner();
   });
+
+  // Auto-dismiss after 7 seconds so it never hangs indefinitely
+  window._musicDetectBannerTimer = setTimeout(() => {
+    window.dismissMusicPlayBanner();
+  }, 7000);
 };
 
 window.dismissMusicPlayBanner = function() {
+  if (window._musicDetectBannerTimer) {
+    clearTimeout(window._musicDetectBannerTimer);
+    window._musicDetectBannerTimer = null;
+  }
   const b = document.getElementById("music-detected-banner");
-  if (b) b.classList.add("hidden");
+  if (b) {
+    b.classList.add("hidden");
+    b.style.display = "none";
+    b.remove();
+  }
 };
 
 // --- Audio & Voice Recording ---
@@ -672,6 +695,9 @@ function initTabs() {
 
       const target = tab.dataset.tab;
       state.activeTab = target;
+      if (typeof window.dismissMusicPlayBanner === "function") {
+        window.dismissMusicPlayBanner();
+      }
 
       document.querySelectorAll(".tab-panel").forEach((panel) => {
         panel.classList.remove("active");
